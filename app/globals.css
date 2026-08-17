@@ -10,6 +10,58 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-manrope: var(--font-manrope);
+
+  /* Pulled from the Karsa logo. */
+  --color-karsa: #56785d;
+  --color-karsa-dark: #3f5c46;
+  --color-karsa-soft: #eef2ec;
+  --color-karsa-sand: #c8b399;
+  --color-karsa-cream: #faf8f3;
+  --color-karsa-line: #e7e3d9;
+  /* A shade under the rail's cream, so white cards lift off the page. */
+  --color-karsa-canvas: #f3f0e8;
+
+  /* Card tints. Each block gets its own, but they stay barely-there washes
+     lighter than the canvas — enough to tell the sections apart, not enough
+     to read as coloured blocks. Edges are a hairline of the same hue. */
+  --color-tint-sand: #fdfaf4;
+  --color-edge-sand: #efe7d8;
+  --color-tint-sky: #f6f8f8;
+  --color-edge-sky: #e4eaea;
+  --color-tint-mint: #f5f8f5;
+  --color-edge-mint: #e0e9e1;
+  --color-tint-lilac: #f8f6fb;
+  --color-edge-lilac: #e8e3f0;
+
+  /* Care category palette. Each area of care owns a hue so colour carries
+     meaning rather than decoration: 50 is the card wash, 100 the icon tile,
+     600 the icon and accent ink, edge the hairline. Kept pale on purpose —
+     these sit next to each other four at a time. */
+  --color-med-50: #f4f1fc;
+  --color-med-100: #e7e1f8;
+  --color-med-600: #6a58ae;
+  --color-med-edge: #e3dcf4;
+
+  --color-nut-50: #fdf4ea;
+  --color-nut-100: #fae3cd;
+  --color-nut-600: #b06c34;
+  --color-nut-edge: #f4e2cd;
+
+  --color-act-50: #eef6f0;
+  --color-act-100: #dbecdf;
+  --color-act-600: #45734e;
+  --color-act-edge: #d9e9dd;
+
+  --color-rest-50: #ecf2fa;
+  --color-rest-100: #d9e6f6;
+  --color-rest-600: #3f6a95;
+  --color-rest-edge: #d6e3f1;
+
+  --color-info-50: #fdf7e9;
+  --color-info-100: #f8ebc8;
+  --color-info-600: #97722a;
+  --color-info-edge: #f2e5c7;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,7 +72,103 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-karsa-canvas);
+  color: #262626;
+  overflow-x:hidden;
+  font-family: var(--font-manrope), Helvetica, sans-serif;
+}
+
+#sb ul {
+  list-style: none;
+}
+
+/* The pinned schedule column is sized to the viewport, and on a short desktop
+   window the month grid plus the selected day's events don't fit at full size.
+   Rather than clipping the calendar or pushing the events below the fold, trim
+   the chrome — padding, gaps, the "see more" link — so both stay on screen.
+   Under 600px tall there's nothing left to trim, so the page scrolls instead. */
+@media (min-width: 1024px) and (max-height: 1000px) {
+  .sched-col {
+    top: 1rem;
+    /* The column starts below the page's top padding, so its height has to
+       allow for that as well as the gap it keeps at the bottom. */
+    height: calc(100vh - 3.5rem);
+    min-height: 600px;
+    gap: 1rem;
+  }
+
+  .sched-col > section {
+    padding: 1.5rem;
+  }
+
+  .sched-col header {
+    margin-bottom: 1rem;
+  }
+
+  .sched-col [data-user-card] {
+    padding: 0 0.25rem 0.5rem;
+  }
+
+  .sched-col [data-divider] {
+    margin-block: 1.125rem;
+    margin-inline: -1.5rem;
+  }
+
+  .sched-col [data-more] {
+    display: none;
+  }
+
+  .sched-col [data-event] {
+    padding: 0.5rem;
+  }
+
+  .sched-col [data-event-tile] {
+    height: 2.5rem;
+    width: 2.5rem;
+  }
+}
+
+/* Tighter still on very short windows, so the day's events stay whole. */
+@media (min-width: 1024px) and (max-height: 760px) {
+  .sched-col header {
+    margin-bottom: 0.75rem;
+  }
+
+  .sched-col [data-divider] {
+    margin-block: 0.75rem;
+  }
+
+  /* Shrink the month grid rather than the gap under the day label — the
+     label needs to read as a heading for the list, not sit on top of it. */
+  .sched-col [data-day-cell] {
+    max-width: 4.35vh;
+  }
+
+  .sched-col [data-day-label] {
+    margin-bottom: 0.625rem;
+  }
+
+  .sched-col [data-schedule-list] {
+    gap: 0.5rem;
+  }
+
+  .sched-col [data-event] {
+    padding: 0.375rem;
+  }
+
+  .sched-col [data-event-tile] {
+    height: 2.25rem;
+    width: 2.25rem;
+  }
+}
+
+/* Backstop for the CSS-driven bits of the sidebar (tooltips, hover washes).
+   Framer Motion handles its own animations via useReducedMotion. */
+@media (prefers-reduced-motion: reduce) {
+  #sb *,
+  #sb *::before,
+  #sb *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }
