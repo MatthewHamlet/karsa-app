@@ -27,7 +27,11 @@ export default function CommunityDiscussions() {
                   </p>
                 </div>
 
-                <h3 className="mt-3.5 text-[15.5px] font-bold leading-6 tracking-tight text-neutral-900 xl:text-[16.5px]">
+                {/* Satoshi, not the display face: a thread title is a whole
+                    sentence — often a question — and Nohemi is drawn for short
+                    lines set large. It also has no Bold, so `font-bold` here
+                    was quietly rendering as Medium; Satoshi has a real 700. */}
+                <h3 className="mt-3.5 font-satoshi text-[15.5px] font-bold leading-6 tracking-tight text-neutral-900 xl:text-[16.5px]">
                   {thread.title}
                 </h3>
 

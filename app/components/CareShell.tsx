@@ -31,8 +31,9 @@ const PAD = "px-4 sm:px-6 md:px-8 xl:px-12";
 /** The header's upward pull, into the page's top padding. */
 const RISE = "-mt-20 md:-mt-10 xl:-mt-12";
 
-/** Matches the reference navbar's feel: quick, with just enough overshoot. */
-const SPRING = { type: "spring", stiffness: 330, damping: 30, mass: 0.7 } as const;
+/** Kept in step with `duration-200` in MORPH — the measuring gate below waits
+ *  this long before believing the header has stopped moving. */
+const MORPH_MS = 200;
 
 /** Anything shorter than this is the header mid-collapse, not its real size. */
 const FULL_FLOOR = 96;
@@ -46,16 +47,47 @@ const TABS: { key: CareTab; label: string; icon: typeof BarChart3 }[] = [
   { key: "chat", label: "Obrolan Tim", icon: MessageCircle },
 ];
 
-/* Every piece the two sizes have in common carries a `layoutId`, and only one
-   copy is ever mounted. That is what makes the collapse a movement instead of
-   a cross-fade: the avatar, the name, the mood chip and the active tab pill
-   are literally the same elements travelling to their smaller positions. */
-const ID = {
-  avatar: "care-avatar",
-  title: "care-title",
-  mood: "care-mood",
-  pill: "care-tab-pill",
-};
+/* Nothing in this header is framer-driven any more, including the tab pill.
+   Framer runs its own clock and its own easing, so while the box morphed under
+   CSS the pill was still projecting toward a box measured a frame ago — it
+   visibly trailed its own button, which is most of the stutter that was left.
+
+   Everything morphs with plain CSS transitions. Framer's `layout` measures
+   viewport rectangles, and this header lives inside a sticky host, so any
+   commit that changed the scroll position at the same time as the shape — a
+   tab switch shortening the document, a scroll landing on the threshold — fed
+   it a delta that was really the page moving, not the header. It answered with
+   a transform: the bar stranded half-open, or slid 240px down the page, or
+   projected the title to a stale box and left it invisible. CSS transitions
+   have no notion of "before" and "after" boxes to get wrong. */
+
+/** The shared morph.
+ *
+ *  200ms, not 420: this collapse travels 168px, and anything past ~250ms on a
+ *  move that short stops reading as motion and starts reading as lag — long
+ *  enough to catch a frame of it in a screenshot.
+ *
+ *  The property list is spelled out rather than `all`. Height changes here force
+ *  layout on the whole header subtree every frame, so the browser should not
+ *  also be diffing every other animatable property looking for work.
+ *
+ *  `box-shadow` is deliberately absent: tweening a blur radius repaints the
+ *  whole blurred region every frame, and the shadow only exists on one side of
+ *  the morph anyway — nobody sees it arrive. */
+const MORPH =
+  "transition-[height,width,padding,font-size,line-height,border-radius,color] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none";
+
+/** Blocks that only exist at full size. They mount into a box that is still
+ *  opening, so without this they spend the whole transition half-clipped — the
+ *  reveal lands them just behind the edge that uncovers them. */
+const REVEAL = "motion-safe:animate-[header-reveal_200ms_cubic-bezier(0.32,0.72,0,1)_both]";
+
+/* Hysteresis. A single 24px threshold sat exactly where a trackpad nudge
+   lives, so the header re-triggered its morph every few pixels and kept
+   getting stranded part-way. Collapsing and restoring now happen at different
+   scroll depths, and the gap between them is wider than any stray scroll. */
+const COLLAPSE_AT = 88;
+const RESTORE_AT = 28;
 
 function TabSwitcher({
   tab,
@@ -66,18 +98,28 @@ function TabSwitcher({
   onSelect: (next: CareTab) => void;
   compact?: boolean;
 }) {
-  const reduce = useReducedMotion();
-
+  /* Two equal columns, so the indicator is describable in percentages and needs
+     no measuring at all. The measured version re-ran its ResizeObserver on every
+     frame of the collapse — each frame handing the pill a brand-new target while
+     a 200ms transition toward the previous one was still running, which is
+     exactly the stutter you could see. A grid cell cannot drift from its own
+     column: the pill resizes with the container, in the same layout pass. */
   return (
-    /* `layout` on every block the header re-shapes: without it they inherit the
-       header's scale while it springs, and the text squashes with the box. */
-    <motion.div
-      layout
-      transition={reduce ? { duration: 0 } : SPRING}
+    <div
       role="tablist"
       aria-label="Tampilan perawatan"
-      className="inline-flex rounded-full bg-white/15 p-1 ring-1 ring-white/20"
+      className="relative inline-grid grid-cols-2 rounded-full bg-white/15 p-1 ring-1 ring-white/20"
     >
+      {/* The offset is written out rather than reached through `translate-x-full`:
+          that utility resolves through Tailwind's translate custom properties,
+          and here it was computing to 0% — the pill kept its width but never
+          left the first column. A plain transform has nothing to resolve. */}
+      <span
+        aria-hidden
+        style={{ transform: `translateX(${tab === TABS[1].key ? "100%" : "0%"})` }}
+        className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-white transition-transform duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+      />
+
       {TABS.map((item) => {
         const Icon = item.icon;
         const active = tab === item.key;
@@ -88,66 +130,57 @@ function TabSwitcher({
             type="button"
             aria-selected={active}
             onClick={() => onSelect(item.key)}
-            className={`relative inline-flex items-center gap-2 rounded-full font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
+            className={`relative inline-flex items-center justify-center gap-2 rounded-full font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${MORPH} ${
               compact ? "px-3 py-1.5 text-[12.5px]" : "px-4 py-2.5 text-[13.5px] sm:px-5"
             } ${active ? "" : "text-white/75 hover:text-white"}`}
             style={active ? { color: CLAY } : undefined}
           >
-            {active && (
-              <motion.span
-                layoutId={ID.pill}
-                transition={
-                  reduce ? { duration: 0 } : { type: "spring", stiffness: 460, damping: 38 }
-                }
-                className="absolute inset-0 rounded-full bg-white"
-              />
-            )}
-            <Icon size={compact ? 14 : 16} strokeWidth={2.2} className="relative" />
-            <span className={`relative whitespace-nowrap ${compact ? "hidden lg:inline" : ""}`}>
+            <Icon size={compact ? 14 : 16} strokeWidth={2.2} />
+            <span className={`whitespace-nowrap ${compact ? "hidden lg:inline" : ""}`}>
               {item.label}
             </span>
           </button>
         );
       })}
-    </motion.div>
+    </div>
   );
 }
 
-/** Name, mood and members — the identity block, at two sizes. */
+/** Name, mood and members — the identity block, at two sizes. The name, the
+ *  chip and the face are the *same* nodes in both, only re-sized: that is what
+ *  a CSS transition needs, and it is why nothing here re-mounts. */
 function GroupIdentity({ slim = false }: { slim?: boolean }) {
   const mood = MOOD_BY_KEY[MOOD_ENTRIES[0].mood];
-  const reduce = useReducedMotion();
 
   return (
-    <motion.div layout transition={reduce ? { duration: 0 } : SPRING} className="min-w-0">
+    <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {/* `leading-none` clipped the descenders of "Pendamping" against
             `truncate`'s overflow box — the line has to be taller than the glyphs. */}
-        <motion.p
-          layoutId={ID.title}
-          transition={reduce ? { duration: 0 } : SPRING}
-          className={`truncate font-bold tracking-tight text-white ${
+        <p
+          className={`truncate font-bold tracking-tight text-white ${MORPH} ${
             slim ? "text-[15px] leading-[1.55]" : "text-[22px] leading-[1.3] xl:text-[26px]"
           }`}
         >
           {CARE_GROUP.name}
-        </motion.p>
+        </p>
 
-        <motion.span
-          layoutId={ID.mood}
-          transition={reduce ? { duration: 0 } : SPRING}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold ${
+        <span
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold ${MORPH} ${
             slim ? "py-0.5 pl-0.5 pr-2 text-[11px]" : "py-1 pl-1 pr-3 text-[12.5px]"
           }`}
           style={{ backgroundColor: mood.soft, color: mood.ink }}
         >
-          <MoodFace mood={MOOD_ENTRIES[0].mood} className={slim ? "h-4 w-4" : "h-5 w-5"} />
+          <MoodFace
+            mood={MOOD_ENTRIES[0].mood}
+            className={`${MORPH} ${slim ? "h-4 w-4" : "h-5 w-5"}`}
+          />
           {mood.label}
-        </motion.span>
+        </span>
       </div>
 
       {!slim && (
-        <div className="mt-2.5 flex items-center gap-2.5">
+        <div className={`mt-2.5 flex items-center gap-2.5 ${REVEAL}`}>
           <div className="flex -space-x-2">
             {CARE_GROUP.members.map((member) => (
               <span
@@ -167,19 +200,13 @@ function GroupIdentity({ slim = false }: { slim?: boolean }) {
           </span>
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }
 
 function GroupActions() {
-  const reduce = useReducedMotion();
-
   return (
-    <motion.div
-      layout
-      transition={reduce ? { duration: 0 } : SPRING}
-      className="flex shrink-0 items-center gap-2"
-    >
+    <div className="flex shrink-0 items-center gap-2">
       <button
         type="button"
         className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[13.5px] font-semibold outline-none transition-colors duration-200 hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/70"
@@ -195,7 +222,7 @@ function GroupActions() {
       >
         <Settings size={17} strokeWidth={2} />
       </button>
-    </motion.div>
+    </div>
   );
 }
 
@@ -221,8 +248,14 @@ function ExpandToggle({ open, onClick }: { open: boolean; onClick: () => void })
   );
 }
 
-/** One header, rendered at two sizes. The chevron is only handed in once the
- *  header is pilled — at full size there is nothing to expand into. */
+/** One header at two sizes — and, crucially, *one* tree. The previous version
+ *  returned a different subtree per size, so every element was destroyed and
+ *  rebuilt on each collapse; that is what left framer animating from boxes that
+ *  no longer meant anything. Here the avatar, the identity and the tab group
+ *  keep their nodes and only change class, so the browser can tween them.
+ *
+ *  The rows come from `flex-wrap`: a `w-full` item claims a line to itself, so
+ *  dropping the eyebrow and the actions is what folds three rows into one. */
 function HeaderBody({
   slim,
   tab,
@@ -234,55 +267,52 @@ function HeaderBody({
   onSelect: (next: CareTab) => void;
   toggle?: ReactNode;
 }) {
-  const reduce = useReducedMotion();
-  const spring = reduce ? { duration: 0 } : SPRING;
-
-  if (slim) {
-    return (
-      <div className="flex h-14 items-center gap-3">
-        <motion.div layoutId={ID.avatar} transition={spring} className="shrink-0">
-          <ProfileAvatar className="h-9 w-9" />
-        </motion.div>
-        <GroupIdentity slim />
-        <motion.div layout transition={spring} className="ml-auto flex shrink-0 items-center gap-2">
-          <TabSwitcher tab={tab} onSelect={onSelect} compact />
-          {toggle}
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/60">
-        Perawatan
-      </p>
+    <div
+      className={`flex ${slim ? "h-14 items-center gap-3" : "flex-wrap items-center gap-x-6 gap-y-4"}`}
+    >
+      {!slim && (
+        <p
+          className={`w-full text-[11px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/60 ${REVEAL}`}
+        >
+          Perawatan
+        </p>
+      )}
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-4">
-        <motion.div layoutId={ID.avatar} transition={spring} className="shrink-0">
-          <ProfileAvatar className="h-16 w-16 xl:h-[72px] xl:w-[72px]" />
-        </motion.div>
-        <h1 className="sr-only">{CARE_GROUP.name}</h1>
-        <GroupIdentity />
-        <motion.div layout transition={spring} className="ml-auto flex items-center gap-2">
+      <ProfileAvatar
+        className={`${MORPH} ${slim ? "h-9 w-9" : "h-16 w-16 xl:h-[72px] xl:w-[72px]"}`}
+      />
+      <h1 className="sr-only">{CARE_GROUP.name}</h1>
+
+      <GroupIdentity slim={slim} />
+
+      {!slim && (
+        <div className={`ml-auto flex items-center gap-2 ${REVEAL}`}>
           <GroupActions />
           {toggle}
-        </motion.div>
+        </div>
+      )}
+
+      <div className={slim ? "ml-auto shrink-0" : "w-full"}>
+        <TabSwitcher tab={tab} onSelect={onSelect} compact={slim} />
       </div>
 
-      <motion.div layout transition={spring} className="mt-5">
-        <TabSwitcher tab={tab} onSelect={onSelect} />
-      </motion.div>
+      {slim && toggle}
     </div>
   );
 }
 
-const Blobs = () => (
+/* Fixed to the full height rather than `h-full`. Tied to the box it would be
+   re-rasterised at a new size on every frame of the collapse, which is exactly
+   the kind of per-frame paint work that shows up as stutter. Drawn once at full
+   size, the bar just clips it. */
+const Blobs = ({ height }: { height?: number }) => (
   <svg
     aria-hidden
     viewBox="0 0 600 200"
     preserveAspectRatio="xMaxYMid slice"
-    className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.13]"
+    style={{ height: height || undefined }}
+    className="pointer-events-none absolute inset-x-0 top-0 w-full opacity-[0.13]"
   >
     <circle cx="512" cy="18" r="118" fill="white" />
     <circle cx="596" cy="164" r="86" fill="white" />
@@ -302,10 +332,9 @@ export default function CareShell({
   const [expanded, setExpanded] = useState(false);
   const [fullH, setFullH] = useState(0);
   const [slimH, setSlimH] = useState(SLIM_BAR);
-  const headerRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 
-  const spring = reduce ? { duration: 0 } : SPRING;
   const fade = reduce ? { duration: 0 } : { duration: 0.24, ease: EASE };
 
   /* Chat owns the whole viewport, so the header starts out of its way: pilled
@@ -316,30 +345,61 @@ export default function CareShell({
   /** The 56px bar, or the header at full size. */
   const slim = pinned && !expanded;
 
-  /* The header is absolutely positioned, so its host has to hold its height
-     for it. Both sizes are worth keeping: `h-14` is rem-based, so the bar isn't
-     56px for a reader who has scaled their text up. */
+  /* Measure the *contents*, never the header. The header's height is set from
+     this, so measuring the header would be reading back its own output — it
+     could never discover that the full size had changed. Both sizes are worth
+     keeping: `h-14` is rem-based, so the bar isn't 56px for a reader who has
+     scaled their text up.
+
+     Only ever at rest, though. The avatar and the name resize over the whole
+     200ms, so the contents are a different height on every frame of it — and
+     every one of those frames was being committed as the header's real size.
+     That fed straight into the host's height, which is what everything below
+     the header stands on, so the entire page juddered up and down for the
+     length of the morph. One reading, once it has stopped moving. */
+  const settled = useRef(true);
+  const measureRef = useRef<() => void>(undefined);
+
   useIsoLayoutEffect(() => {
-    const node = headerRef.current;
+    const node = contentRef.current;
     if (!node) return;
 
     const sync = () => {
+      if (!settled.current) return;
       const height = node.offsetHeight;
       if (height >= FULL_FLOOR) setFullH(height);
       else if (height > 0) setSlimH(height);
     };
 
+    measureRef.current = sync;
     sync();
     const observer = new ResizeObserver(sync);
     observer.observe(node);
     return () => observer.disconnect();
   }, []);
 
+  /* Shut the tape off for the duration of a morph, then take one clean reading.
+     Skips its own first run, so the size is known from the very first paint. */
+  const wasSlim = useRef(slim);
+  useIsoLayoutEffect(() => {
+    if (wasSlim.current === slim) return;
+    wasSlim.current = slim;
+
+    settled.current = false;
+    const done = window.setTimeout(() => {
+      settled.current = true;
+      measureRef.current?.();
+    }, MORPH_MS + 60);
+
+    return () => window.clearTimeout(done);
+  }, [slim]);
+
   /* Deliberately not rAF-throttled: rAF stops firing whenever the page isn't
      compositing, which would strand the header in whichever state it was in. */
   useEffect(() => {
     const measure = () => {
-      setCollapsed(window.scrollY > 24);
+      const y = window.scrollY;
+      setCollapsed((was) => (was ? y > RESTORE_AT : y > COLLAPSE_AT));
       /* Scrolling again always returns the header to its bar — the expanded
          state is a peek, not a mode. */
       setExpanded(false);
@@ -393,19 +453,32 @@ export default function CareShell({
         className={`pointer-events-none sticky top-0 z-20 ${RISE} ${BLEED}`}
         style={{ height: hostH || undefined }}
       >
-        <motion.header
-          ref={headerRef}
-          layout
-          transition={spring}
-          className={`pointer-events-auto absolute inset-x-0 top-0 overflow-hidden ${PAD} ${
+        {/* Height is driven, not measured-and-animated: the contents are
+            free-flowing and get measured, then the box is told to be that tall,
+            so a plain CSS transition carries it between the two numbers.
+
+            The contents are taken *out of flow* to do it. In normal flow they
+            are the header's children, so every frame of a height change meant
+            re-laying out the whole subtree — the flex rows, the wrapping, the
+            text — which is what made a 168px slide stutter. Absolutely
+            positioned, their layout is settled once and the animation is
+            reduced to moving a clip edge. */}
+        <header
+          className={`pointer-events-auto absolute inset-x-0 top-0 overflow-hidden ${MORPH} ${
             slim
               ? "shadow-[0_10px_26px_-18px_rgba(24,32,24,0.65)]"
-              : "rounded-b-[32px] pb-6 pt-[72px] sm:rounded-b-[44px] md:pt-6 xl:pt-7"
+              : "rounded-b-[32px] sm:rounded-b-[44px]"
           }`}
-          style={{ backgroundColor: CLAY }}
+          style={{
+            backgroundColor: CLAY,
+            height: (slim ? slimH : fullH) || undefined,
+          }}
         >
-          <Blobs />
-          <div className="relative">
+          <Blobs height={fullH} />
+          <div
+            ref={contentRef}
+            className={`absolute inset-x-0 top-0 ${PAD} ${slim ? "" : "pb-6 pt-[72px] md:pt-6 xl:pt-7"}`}
+          >
             <HeaderBody
               slim={slim}
               tab={tab}
@@ -417,7 +490,7 @@ export default function CareShell({
               }
             />
           </div>
-        </motion.header>
+        </header>
       </div>
 
       {/* ── Panel ────────────────────────────────────────────────────────── */}

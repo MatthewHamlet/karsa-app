@@ -35,7 +35,7 @@ const NAV: { link: string; icon: LucideIcon; text: string; badge?: number }[] = 
   { link: "/", icon: Home, text: "Home" },
   { link: "/care", icon: HeartPulse, text: "Perawatan" },
   { link: "/community", icon: UsersRound, text: "Komunitas" },
-  { link: "/#maskot", icon: PawPrint, text: "Maskot Karsa" },
+  { link: "/mascot", icon: PawPrint, text: "Maskot Karsa" },
 ];
 
 type RailProps = {

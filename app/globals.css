@@ -117,18 +117,41 @@ body {
 /* Headings take the display face. Set here rather than on twenty components:
    an `h2` is a heading wherever it appears, and the rule can't drift. Anything
    that reads as a heading without being one — a stat's figure, a card's name —
-   takes `font-nohemi` on the element itself. */
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
-  font-family: var(--font-nohemi);
+   takes `font-nohemi` on the element itself.
+
+   It must live in `@layer base`. Unlayered CSS outranks every cascade layer no
+   matter the specificity, so as a bare rule this beat Tailwind's `.font-satoshi`
+   (which sits in `@layer utilities`) and made the utility a silent no-op on any
+   heading. In `base` it is still the default, and a utility can now opt out —
+   which some headings need, because a heading that runs to a full sentence
+   reads better in the text face than in the display one. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-nohemi);
+  }
 }
 
 #sb ul {
   list-style: none;
+}
+
+/* The Perawatan header's full-size-only rows, arriving while the box that holds
+   them is still opening. Kept to a few pixels of travel: this rides an existing
+   movement, it isn't one of its own. */
+@keyframes header-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* The pinned schedule column is sized to the viewport, and on a short desktop

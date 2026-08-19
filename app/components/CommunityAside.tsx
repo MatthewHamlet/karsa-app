@@ -39,7 +39,8 @@ function LiveSession() {
         <p className="text-[11px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/60">
           {LIVE_SESSION.eyebrow}
         </p>
-        <h2 className="mt-2 text-[19px] font-bold leading-7 tracking-tight">
+        {/* Same rule as a thread title — this one runs to three lines. */}
+        <h2 className="mt-2 font-satoshi text-[19px] font-bold leading-7 tracking-tight">
           {LIVE_SESSION.title}
         </h2>
         <p className="mt-2 text-[13.5px] leading-5 text-white/75">{LIVE_SESSION.blurb}</p>
