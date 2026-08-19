@@ -36,6 +36,8 @@ const SPRING = { type: "spring", stiffness: 330, damping: 30, mass: 0.7 } as con
 
 /** Anything shorter than this is the header mid-collapse, not its real size. */
 const FULL_FLOOR = 96;
+/** `h-14` — what the bar measures before it has been measured. */
+const SLIM_BAR = 56;
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
@@ -299,17 +301,24 @@ export default function CareShell({
   const [collapsed, setCollapsed] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [fullH, setFullH] = useState(0);
+  const [slimH, setSlimH] = useState(SLIM_BAR);
   const headerRef = useRef<HTMLElement>(null);
   const reduce = useReducedMotion();
 
   const spring = reduce ? { duration: 0 } : SPRING;
   const fade = reduce ? { duration: 0 } : { duration: 0.24, ease: EASE };
 
+  /* Chat owns the whole viewport, so the header starts out of its way: pilled
+     from the first frame, and openable only through the chevron — the tab
+     never scrolls, so scrolling can't collapse it back. */
+  const pinned = collapsed || tab === "chat";
+
   /** The 56px bar, or the header at full size. */
-  const slim = collapsed && !expanded;
+  const slim = pinned && !expanded;
 
   /* The header is absolutely positioned, so its host has to hold its height
-     for it. Anything short is the slim bar, not a real measurement. */
+     for it. Both sizes are worth keeping: `h-14` is rem-based, so the bar isn't
+     56px for a reader who has scaled their text up. */
   useIsoLayoutEffect(() => {
     const node = headerRef.current;
     if (!node) return;
@@ -317,6 +326,7 @@ export default function CareShell({
     const sync = () => {
       const height = node.offsetHeight;
       if (height >= FULL_FLOOR) setFullH(height);
+      else if (height > 0) setSlimH(height);
     };
 
     sync();
@@ -344,6 +354,33 @@ export default function CareShell({
     };
   }, []);
 
+  /* A peek doesn't survive the tab it was opened on. */
+  useEffect(() => setExpanded(false), [tab]);
+
+  /* A chat screen doesn't scroll — the thread inside it does. Locking the page
+     is also what keeps the composer on the fold: the shell reserves its height
+     in `vh` while this pane is measured in `dvh`, and on a phone the address
+     bar makes those two differ. Left scrollable, that difference shows up as a
+     strip of dead canvas under the composer. */
+  useEffect(() => {
+    if (tab !== "chat") return;
+
+    window.scrollTo({ top: 0 });
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, [tab]);
+
+  /* Each tab reserves one height and never changes it, so nothing under the
+     header ever resizes: the stats tab always holds the full header (collapsing
+     on scroll must not shift the page), and chat always holds just the bar. Open
+     the chat header and it drops *over* the thread — the conversation keeps its
+     size, and the peek costs nothing to close. */
+  const hostH = tab === "chat" ? slimH : fullH;
+
   return (
     <div>
       {/* ── Header ───────────────────────────────────────────────────────
@@ -354,7 +391,7 @@ export default function CareShell({
           for the rail's collapse handle, which straddles the edge). */}
       <div
         className={`pointer-events-none sticky top-0 z-20 ${RISE} ${BLEED}`}
-        style={{ height: fullH || undefined }}
+        style={{ height: hostH || undefined }}
       >
         <motion.header
           ref={headerRef}
@@ -374,7 +411,7 @@ export default function CareShell({
               tab={tab}
               onSelect={setTab}
               toggle={
-                collapsed ? (
+                pinned ? (
                   <ExpandToggle open={expanded} onClick={() => setExpanded((v) => !v)} />
                 ) : null
               }
@@ -397,13 +434,13 @@ export default function CareShell({
           <ImportantInfo />
         </motion.div>
       ) : (
-        /* Chat is not a card on a page — it *is* the page. Full-bleed, and the
-           `-mb-20` cancels the page's bottom padding so it ends at the fold. */
-        <div className={`mt-4 -mb-20 ${BLEED}`}>
-          <TeamChat
-            context={context}
-            height={fullH ? `calc(100dvh - ${fullH + 16}px)` : undefined}
-          />
+        /* Chat is not a card on a page — it *is* the page. Full-bleed and flush
+           against the header, so the wallpaper owns everything below it. The
+           negative margin cancels the page's own bottom padding — keep the pair
+           in step with `pb-10 xl:pb-12` in Care.tsx — so the composer lands on
+           the fold. No gap either side of it: nothing here is a card. */
+        <div className={`-mb-10 xl:-mb-12 ${BLEED}`}>
+          <TeamChat context={context} height={hostH ? `calc(100dvh - ${hostH}px)` : undefined} />
         </div>
       )}
     </div>

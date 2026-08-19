@@ -1,5 +1,35 @@
 @import "tailwindcss";
 
+/* ── Nohemi ─────────────────────────────────────────────────────────────────
+   The display face, self-hosted — it has no web CDN. Only two weights exist in
+   the distributed family, Regular and Medium; there is no Bold.
+
+   Hence the range on the second block. Every heading in the app asks for 600,
+   700 or 800, and a face declared at a flat `500` would leave the browser to
+   fake those by smearing the outlines. Claiming 500–800 makes each of those
+   requests match Medium exactly, so headings render as drawn.
+
+   The markup still says `font-bold`, and that is deliberate: the weight the
+   design wants is recorded there, the range here is the compromise. Drop a real
+   `Nohemi-Bold.woff2` in and give it `font-weight: 700` — the range narrows to
+   `500 600` and every heading gets its true weight back, with nothing else to
+   change. If the files go missing entirely, both stacks fall through to Manrope
+   at the weight the markup asked for. */
+@font-face {
+  font-family: "Nohemi";
+  src: url("/fonts/nohemi/Nohemi-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Nohemi";
+  src: url("/fonts/nohemi/Nohemi-Medium.woff2") format("woff2");
+  font-weight: 500 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -11,6 +41,12 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-manrope: var(--font-manrope);
+
+  /* Two faces, one job each: Nohemi announces, Satoshi is read. Manrope stays
+     in both stacks as the fallback — if a face fails to load, the page should
+     land on the type it already had rather than on a system grotesque. */
+  --font-nohemi: "Nohemi", var(--font-manrope), "Segoe UI", Helvetica, sans-serif;
+  --font-satoshi: "Satoshi", var(--font-manrope), "Segoe UI", Helvetica, sans-serif;
 
   /* Pulled from the Karsa logo. */
   --color-karsa: #56785d;
@@ -75,7 +111,20 @@ body {
   background: var(--color-karsa-canvas);
   color: #262626;
   overflow-x:hidden;
-  font-family: var(--font-manrope), Helvetica, sans-serif;
+  font-family: var(--font-satoshi);
+}
+
+/* Headings take the display face. Set here rather than on twenty components:
+   an `h2` is a heading wherever it appears, and the rule can't drift. Anything
+   that reads as a heading without being one — a stat's figure, a card's name —
+   takes `font-nohemi` on the element itself. */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-nohemi);
 }
 
 #sb ul {

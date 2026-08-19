@@ -275,3 +275,155 @@ export const SETTING_ITEMS = SETTINGS.flatMap((group) =>
 );
 
 export type ResolvedItem = (typeof SETTING_ITEMS)[number];
+
+/* ── Profile rail ─────────────────────────────────────────────────────────── */
+
+/** The three figures under the name. Deliberately not social counts — nobody
+ *  is here to gather followers. These are what the caregiver has actually put
+ *  in, which is the number worth showing them. */
+export const ACCOUNT_STATS: { label: string; value: string }[] = [
+  { label: "Hari mendampingi", value: "254" },
+  { label: "Tim perawatan", value: "1" },
+  { label: "Catatan", value: "1.284" },
+];
+
+/** The one warm card in the rail. It nudges the caregiver toward themselves,
+ *  not toward the app — the whole page is about their account, so this is the
+ *  right place to say the quiet thing. Phrased as an invitation: a caregiver
+ *  who has skipped their own rest does not need to be told off about it. */
+export const SELF_CARE = {
+  title: "Rawat dirimu juga",
+  body: "Luangkan 15 menit hari ini untuk diri sendiri. Itu bagian dari merawat, bukan jeda darinya.",
+  action: "Lihat Ruang Tenang",
+  href: "/community",
+};
+
+/* ── Contributions ────────────────────────────────────────────────────────── */
+
+/** What the caregiver has actually put in. The note under each figure is the
+ *  point: a bare count of 892 doses says nothing, "98% tepat waktu" is the
+ *  sentence they can be proud of. */
+export type Contribution = {
+  id: string;
+  label: string;
+  value: string;
+  note: string;
+  tone: Tone;
+};
+
+export const CONTRIBUTIONS: Contribution[] = [
+  {
+    id: "notes",
+    label: "Catatan harian",
+    value: "1.284",
+    note: "Sejak Desember 2025",
+    tone: "green",
+  },
+  {
+    id: "doses",
+    label: "Dosis dicatat",
+    value: "892",
+    note: "98% tepat waktu",
+    tone: "lavender",
+  },
+  {
+    id: "replies",
+    label: "Balasan di komunitas",
+    value: "64",
+    note: "Membantu 21 pendamping",
+    tone: "peach",
+  },
+  {
+    id: "streak",
+    label: "Hari beruntun",
+    value: "18",
+    note: "Rekor terpanjang 46",
+    tone: "blue",
+  },
+];
+
+/** Milestones, including one still out of reach. A locked badge with its
+ *  distance shown is the only honest way to say "keep going" — a wall of
+ *  earned badges tells the caregiver nothing they don't know. */
+export type Badge = {
+  id: string;
+  label: string;
+  note: string;
+  tone: Tone;
+  /** Present only while unearned: how far there is left to go. */
+  progress?: { current: number; target: number };
+};
+
+export const BADGES: Badge[] = [
+  { id: "steady", label: "Pendamping Tekun", note: "250 hari mendampingi", tone: "green" },
+  { id: "keeper", label: "Pencatat Setia", note: "1.000 catatan harian", tone: "peach" },
+  { id: "open", label: "Tangan Terbuka", note: "50 balasan di komunitas", tone: "lavender" },
+  {
+    id: "night",
+    label: "Penjaga Malam",
+    note: "100 catatan lewat tengah malam",
+    tone: "blue",
+    progress: { current: 73, target: 100 },
+  },
+];
+
+/* ── Quick settings ───────────────────────────────────────────────────────── */
+
+/** The few controls worth putting in front of the caregiver without making
+ *  them open a section first: the two reminders a day actually runs on, and the
+ *  switches that decide who can see Meimei's records.
+ *
+ *  References, not copies. Each points at a row that already exists further up,
+ *  so the switch shown here and the one inside its section are the same switch
+ *  — flip it in either place and both agree. */
+export const QUICK_SETTINGS: { itemId: string; rowId: string }[] = [
+  { itemId: "care-prefs", rowId: "med-reminder" },
+  { itemId: "notifications", rowId: "task" },
+  { itemId: "care-prefs", rowId: "quiet" },
+  { itemId: "patient-access", rowId: "team" },
+  { itemId: "patient-access", rowId: "sharing" },
+  { itemId: "security", rowId: "twofa" },
+];
+
+/* ── Overview cards ───────────────────────────────────────────────────────── */
+
+/** What the right column holds when no section is open. Each action opens a
+ *  real settings item, so the card is a shortcut rather than an advert. */
+export type OverviewCard = {
+  id: string;
+  title: string;
+  body: string;
+  actions: { label: string; target: string; primary?: boolean }[];
+};
+
+/** Three, not four: editing the profile already has two pencils and a rail row
+ *  pointing at it, and a card repeating that would be the fourth. */
+export const OVERVIEW: OverviewCard[] = [
+  {
+    id: "team",
+    title: "Merawat tidak harus sendirian",
+    body: "Atur siapa saja yang boleh melihat data Meimei dan seberapa jauh mereka bisa membantu.",
+    actions: [
+      { label: "Atur Akses Pasien", target: "patient-access", primary: true },
+      { label: "Preferensi Perawatan", target: "care-prefs" },
+    ],
+  },
+  {
+    id: "safety",
+    title: "Data kesehatan itu data paling pribadi",
+    body: "Verifikasi dua langkah dan kontrol privasi menjaga catatan Meimei tetap di tangan yang kamu percaya.",
+    actions: [
+      { label: "Keamanan", target: "security", primary: true },
+      { label: "Privasi", target: "privacy" },
+    ],
+  },
+  {
+    id: "help",
+    title: "Ada yang membingungkan?",
+    body: "Pusat bantuan, cara menghubungi tim Karsa, dan detail versi aplikasi yang sedang kamu pakai.",
+    actions: [
+      { label: "Pusat Bantuan", target: "help", primary: true },
+      { label: "Tentang Aplikasi", target: "about" },
+    ],
+  },
+];

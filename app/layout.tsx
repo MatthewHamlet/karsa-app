@@ -29,6 +29,21 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${manrope.variable} h-full antialiased`}
     >
+      {/* Satoshi comes from Fontshare's own CDN — it isn't on Google Fonts, so
+          `next/font/google` can't reach it. Nohemi has no CDN at all and is
+          self-hosted from `public/fonts/nohemi/`; both stacks fall back to
+          Manrope, which is why it stays loaded above. */}
+      <head>
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="" />
+        {/* `@1` is the variable roman, one file covering 300–900. The static
+            cuts skip 600, so `font-semibold` — which this UI leans on heavily —
+            would snap up to Bold and flatten the weight scale. */}
+        <link
+          rel="stylesheet"
+          href="https://api.fontshare.com/v2/css?f%5B%5D=satoshi@1&display=swap"
+        />
+      </head>
       {/* The rail is the app shell, so it lives in the layout rather than
           being re-mounted by every route. */}
       <body className="min-h-full flex flex-col">

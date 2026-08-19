@@ -78,7 +78,8 @@ export default function Homepage() {
   };
 
   return (
-    <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pb-14 md:pt-10 xl:pl-12 xl:pr-6 xl:pt-12">
+    /* Same rest at the foot of the page as every other route — see Care. */
+    <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pt-10 xl:pb-12 xl:pl-12 xl:pr-6 xl:pt-12">
       {/* No colour band on Home: the mascot's room is this page's colour, and
           stacking a second coloured field above it only crowded the top. */}
       {/* No max-width: the content owns the whole area beside the rail. The

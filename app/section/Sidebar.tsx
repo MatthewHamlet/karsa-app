@@ -34,7 +34,7 @@ const LOGO_CLOSED = 34;
 const NAV: { link: string; icon: LucideIcon; text: string; badge?: number }[] = [
   { link: "/", icon: Home, text: "Home" },
   { link: "/care", icon: HeartPulse, text: "Perawatan" },
-  { link: "/#komunitas", icon: UsersRound, text: "Komunitas" },
+  { link: "/community", icon: UsersRound, text: "Komunitas" },
   { link: "/#maskot", icon: PawPrint, text: "Maskot Karsa" },
 ];
 

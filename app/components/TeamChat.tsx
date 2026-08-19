@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BedDouble,
-  CircleAlert,
   Droplets,
   Gauge,
   Image as ImageIcon,
@@ -18,133 +17,162 @@ import {
 } from "lucide-react";
 import { EASE } from "./List";
 import { CHAT_DAY, ME, MESSAGES, SENDERS, type ChatMessage } from "../data/chat";
-import { FIXED_TONES } from "../data/careStats";
 import { CONTEXT_LABEL, type CareContextType } from "../data/care";
 
-/** Activity icons reuse the stat palette, so a dose in the thread looks like
- *  the same dose on the statistics tab. */
+/** Uncoloured on purpose — the log line is meant to recede, so the glyph is
+ *  only there to say which kind of entry it is at a glance. */
 const LOG_ICON = {
-  medication: { icon: Pill, bg: "#e6e0f7", ink: "#6a58ae" },
-  meal: { icon: Utensils, bg: "#f9e2cb", ink: "#b06c34" },
-  fluid: { icon: Droplets, bg: "#d5e5f4", ink: "#3f6a95" },
-  sleep: { icon: BedDouble, bg: "#dcdef4", ink: "#4a4f8f" },
-  vital: { icon: Gauge, bg: "#f9dde3", ink: "#a4495c" },
+  medication: Pill,
+  meal: Utensils,
+  fluid: Droplets,
+  sleep: BedDouble,
+  vital: Gauge,
 } as const;
 
 const mmss = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-/** The patient's own log, dropped into the conversation. Deliberately not a
- *  bubble — nobody said it, so it shouldn't look like speech. */
-function LogCard({ message }: { message: Extract<ChatMessage, { kind: "system" }> }) {
-  const { icon: Icon, bg, ink } = LOG_ICON[message.icon];
+/** The room the thread sits in: the page's own canvas, plus a sand dot grid
+ *  faint enough to read as paper grain. It's what lifts the white bubbles off
+ *  the background now that the chat runs edge to edge. */
+const WALLPAPER: CSSProperties = {
+  backgroundColor: "#f1ede3",
+  backgroundImage: "radial-gradient(rgba(109,86,71,0.07) 1px, transparent 1px)",
+  backgroundSize: "20px 20px",
+};
+
+/** The clock in the corner of a bubble. Sits on the last line of the text, so
+ *  a two-word message stays two words wide. */
+function Stamp({ time, mine }: { time: string; mine: boolean }) {
+  return (
+    <span
+      className={`shrink-0 translate-y-[1px] text-[11px] tabular-nums ${
+        mine ? "text-white/65" : "text-neutral-400"
+      }`}
+    >
+      {time}
+    </span>
+  );
+}
+
+/** The patient's own log, dropped into the conversation. Nobody said it, so it
+ *  isn't a bubble — and it isn't a card either: a card competes with the thread
+ *  for attention it doesn't deserve. It's a faint line the eye can skip, warm
+ *  grey so it belongs to the wallpaper rather than to the conversation. */
+function LogEntry({ message }: { message: Extract<ChatMessage, { kind: "system" }> }) {
+  const Icon = LOG_ICON[message.icon];
 
   return (
-    <li className="flex justify-center px-2">
-      <div className="flex w-full max-w-md items-center gap-3.5 rounded-2xl bg-white/80 px-4 py-3 ring-1 ring-karsa-line">
-        <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl"
-          style={{ backgroundColor: bg, color: ink }}
-        >
-          <Icon size={17} strokeWidth={2.1} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[13.5px] font-semibold leading-5 text-neutral-800">
-            {message.text}
-          </p>
-          {message.detail && (
-            <p className="text-[12px] leading-4 text-neutral-500">{message.detail}</p>
-          )}
-        </div>
-        <time className="shrink-0 text-[11.5px] tabular-nums text-neutral-400">
-          {message.time}
-        </time>
-      </div>
+    <li className="flex justify-center px-6 py-2.5">
+      <p
+        className="max-w-[85%] text-balance text-center text-[12px] leading-[1.55] sm:max-w-[68%]"
+        style={{ color: "rgba(92,76,60,0.62)" }}
+      >
+        <Icon
+          size={12}
+          strokeWidth={2.2}
+          className="mr-1.5 inline-block align-[-1.5px] opacity-75"
+        />
+        <span className="font-semibold">{message.text}</span>
+        {message.detail && <span className="opacity-80"> · {message.detail}</span>}
+        <span className="tabular-nums opacity-70"> · {message.time}</span>
+      </p>
     </li>
   );
 }
 
-function Bubble({ message }: { message: Exclude<ChatMessage, { kind: "system" }> }) {
+/** `head` marks the first message of a run from one sender. Only the head
+ *  carries the avatar, the name and the tail — everything after it is the same
+ *  person still talking, so it stacks tight and unlabelled. */
+function Bubble({
+  message,
+  head,
+}: {
+  message: Exclude<ChatMessage, { kind: "system" }>;
+  head: boolean;
+}) {
   const sender = SENDERS[message.from];
   const mine = message.from === ME;
 
   return (
-    <li className={`flex gap-2.5 px-2 ${mine ? "flex-row-reverse" : ""}`}>
-      {!mine && (
-        <span
-          className="mt-auto grid h-8 w-8 shrink-0 place-items-center rounded-full text-[12px] font-bold text-white"
-          style={{ backgroundColor: sender.color }}
-        >
-          {sender.initial}
-        </span>
-      )}
+    <li className={`flex gap-2 ${mine ? "flex-row-reverse" : ""} ${head ? "mt-2.5" : "mt-[3px]"}`}>
+      {!mine &&
+        (head ? (
+          <span
+            className="grid h-8 w-8 shrink-0 place-items-center self-start rounded-full text-[12px] font-bold text-white"
+            style={{ backgroundColor: sender.color }}
+          >
+            {sender.initial}
+          </span>
+        ) : (
+          /* Holds the avatar's column so the run stays in one line. */
+          <span aria-hidden className="w-8 shrink-0" />
+        ))}
 
-      <div className={`max-w-[76%] sm:max-w-[62%] ${mine ? "items-end" : ""}`}>
-        {!mine && (
-          <p className="mb-1 px-1 text-[12px] font-semibold" style={{ color: sender.color }}>
+      <div
+        className={`max-w-[82%] rounded-2xl px-3 py-1.5 shadow-[0_1px_2px_rgba(24,32,24,0.06)] sm:max-w-[68%] md:max-w-[56%] xl:max-w-[46%] ${
+          mine
+            ? `bg-karsa text-white ${head ? "rounded-tr-md" : ""}`
+            : `bg-white text-neutral-800 ring-1 ring-karsa-line ${head ? "rounded-tl-md" : ""}`
+        }`}
+      >
+        {head && !mine && (
+          <p
+            className="mb-0.5 text-[12.5px] font-semibold leading-4"
+            style={{ color: sender.color }}
+          >
             {sender.name}
           </p>
         )}
 
-        <div
-          className={`rounded-2xl px-4 py-2.5 shadow-[0_1px_2px_rgba(24,32,24,0.05)] ${
-            mine
-              ? "rounded-br-md bg-karsa text-white"
-              : "rounded-bl-md bg-white text-neutral-800 ring-1 ring-karsa-line"
-          }`}
-        >
-          {message.kind === "text" ? (
-            <p className="text-[14.5px] leading-6">{message.text}</p>
-          ) : (
-            <div className="flex items-center gap-3 py-0.5">
-              <span
-                className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${
-                  mine ? "bg-white/20 text-white" : "bg-karsa-soft text-karsa-dark"
-                }`}
-              >
-                <Play size={15} strokeWidth={2.4} className="ml-0.5" />
-              </span>
+        {message.kind === "text" ? (
+          /* Text and clock share the last line — `items-end` keeps the stamp on
+             the baseline of however many lines the message ran to. */
+          <div className="flex items-end gap-2">
+            <p className="min-w-0 text-[14.5px] leading-[1.45]">{message.text}</p>
+            <Stamp time={message.time} mine={mine} />
+          </div>
+        ) : (
+          <div className="flex items-end gap-3 py-0.5">
+            <span
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${
+                mine ? "bg-white/20 text-white" : "bg-karsa-soft text-karsa-dark"
+              }`}
+            >
+              <Play size={15} strokeWidth={2.4} className="ml-0.5" />
+            </span>
 
-              {/* A drawn waveform — it stands for audio, it doesn't analyse it. */}
-              <span aria-hidden className="flex h-7 items-center gap-[3px]">
-                {message.wave.map((height, i) => (
-                  <span
-                    key={i}
-                    className={`w-[3px] rounded-full ${mine ? "bg-white/55" : "bg-karsa/35"}`}
-                    style={{ height: `${Math.max(15, height * 100)}%` }}
-                  />
-                ))}
-              </span>
+            {/* A drawn waveform — it stands for audio, it doesn't analyse it. */}
+            <span aria-hidden className="flex h-7 items-center gap-[3px]">
+              {message.wave.map((height, i) => (
+                <span
+                  key={i}
+                  className={`w-[3px] rounded-full ${mine ? "bg-white/55" : "bg-karsa/35"}`}
+                  style={{ height: `${Math.max(15, height * 100)}%` }}
+                />
+              ))}
+            </span>
 
-              <span
-                className={`shrink-0 text-[12px] tabular-nums ${
-                  mine ? "text-white/75" : "text-neutral-500"
-                }`}
-              >
-                {mmss(message.length)}
-              </span>
-            </div>
-          )}
-
-          <p
-            className={`mt-0.5 text-right text-[11px] tabular-nums ${
-              mine ? "text-white/70" : "text-neutral-400"
-            }`}
-          >
-            {message.time}
-          </p>
-        </div>
+            <span
+              className={`shrink-0 text-[12px] tabular-nums ${
+                mine ? "text-white/75" : "text-neutral-500"
+              }`}
+            >
+              {mmss(message.length)}
+            </span>
+            <Stamp time={message.time} mine={mine} />
+          </div>
+        )}
       </div>
     </li>
   );
 }
 
-/** The page's padding, so the thread lines up with everything above it even
- *  though the cream runs edge to edge. */
-const PAD = "px-4 sm:px-6 md:px-8 xl:px-12";
-/** Wide enough to feel like a room, narrow enough that a one-line message
- *  isn't stretched across a 1700px monitor. */
-const COLUMN = "mx-auto w-full max-w-[980px]";
+/** Deliberately tighter than the page's own padding: the thread is a room, not
+ *  an article, so the bubbles run out to the edges and the width is spent on
+ *  the conversation instead of on gutters. Line length is held by the bubbles'
+ *  own max-widths, not by a centred column. */
+const PAD = "px-3 sm:px-4 md:px-6";
 
 export default function TeamChat({
   context,
@@ -162,6 +190,22 @@ export default function TeamChat({
 
   useEffect(() => setAttached(context ?? null), [context]);
 
+  /* A log card between two of Sinta's messages breaks the run — she has to
+     re-introduce herself on the other side of it, same as in any chat. */
+  const rows = useMemo(
+    () =>
+      MESSAGES.map((message, i) => {
+        const previous = MESSAGES[i - 1];
+        const head =
+          message.kind === "system" ||
+          !previous ||
+          previous.kind === "system" ||
+          previous.from !== message.from;
+        return { message, head };
+      }),
+    [],
+  );
+
   /** Open at the newest message, the way a chat should. Re-run when the shell
    *  hands down its measured height — the first pass lands before the pane has
    *  been sized, so there is nothing to scroll yet. */
@@ -172,74 +216,38 @@ export default function TeamChat({
 
   return (
     <section
-      className="flex h-[calc(100dvh-16rem)] min-h-[320px] flex-col bg-[#fbf9f1]"
-      style={height ? { height } : undefined}
+      className="flex h-[calc(100dvh-16rem)] min-h-[320px] flex-col"
+      style={height ? { ...WALLPAPER, height } : WALLPAPER}
     >
-      {/* The patient's live numbers, pinned above the thread — the context you
-          need while talking about her, without leaving the tab. */}
+      {/* `overscroll-contain` stops the bounce at the ends of the thread from
+          being handed to the page behind it. */}
       <div
-        className={`flex h-10 shrink-0 items-center gap-2 overflow-x-auto border-b border-karsa-line/70 ${PAD}`}
+        ref={streamRef}
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-4 ${PAD}`}
       >
-        <div className={`flex items-center gap-2 ${COLUMN}`}>
-          <span
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]"
-            style={{
-              backgroundColor: FIXED_TONES.fluid.bg,
-              boxShadow: `inset 0 0 0 1px ${FIXED_TONES.fluid.edge}`,
-            }}
-          >
-            <Droplets size={13} strokeWidth={2.2} style={{ color: FIXED_TONES.fluid.ink }} />
-            <span className="text-neutral-500">Cairan</span>
-            <span className="font-bold tabular-nums text-neutral-800">1.500 ml</span>
-          </span>
+        <p className="mx-auto mb-3 w-fit rounded-full bg-white/85 px-3.5 py-1 text-[12px] font-semibold text-neutral-500 shadow-[0_1px_2px_rgba(24,32,24,0.05)] ring-1 ring-karsa-line">
+          {CHAT_DAY}
+        </p>
 
-          <span
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px]"
-            style={{
-              backgroundColor: FIXED_TONES.medication.bg,
-              boxShadow: `inset 0 0 0 1px ${FIXED_TONES.medication.edge}`,
-            }}
-          >
-            <Pill size={13} strokeWidth={2.2} style={{ color: FIXED_TONES.medication.ink }} />
-            <span className="text-neutral-500">Obat</span>
-            <span className="font-bold tabular-nums text-neutral-800">2/3</span>
-          </span>
-
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-info-50 px-2.5 py-1 text-[12px] ring-1 ring-info-edge">
-            <CircleAlert size={13} strokeWidth={2.2} className="text-info-600" />
-            <span className="font-semibold text-neutral-700">
-              Obat diminum setelah makan
-            </span>
-          </span>
-        </div>
-      </div>
-
-      <div ref={streamRef} className={`min-h-0 flex-1 overflow-y-auto py-6 ${PAD}`}>
-        <div className={COLUMN}>
-          <p className="mx-auto mb-5 w-fit rounded-full bg-white/80 px-3.5 py-1.5 text-[12px] font-semibold text-neutral-500 ring-1 ring-karsa-line">
-            {CHAT_DAY}
-          </p>
-
-          <ul className="space-y-3.5">
-            {MESSAGES.map((message) =>
-              message.kind === "system" ? (
-                <LogCard key={message.id} message={message} />
-              ) : (
-                <Bubble key={message.id} message={message} />
-              ),
-            )}
-          </ul>
-        </div>
+        <ul>
+          {rows.map(({ message, head }) =>
+            message.kind === "system" ? (
+              <LogEntry key={message.id} message={message} />
+            ) : (
+              <Bubble key={message.id} message={message} head={head} />
+            ),
+          )}
+        </ul>
       </div>
 
       {/* ── Composer ──────────────────────────────────────────────────── */}
-      <div className={`shrink-0 border-t border-karsa-line bg-white/70 py-3 sm:py-4 ${PAD}`}>
+      <div className={`shrink-0 border-t border-karsa-line bg-karsa-cream py-2.5 sm:py-3 ${PAD}`}>
         {attached && (
           <motion.div
             initial={reduce ? false : { opacity: 0, y: 6 }}
             animate={{ opacity: 1, y: 0 }}
             transition={reduce ? { duration: 0 } : { duration: 0.2, ease: EASE }}
-            className={`mb-3 flex items-center gap-3 rounded-2xl bg-tint-sand px-4 py-3 ring-1 ring-edge-sand ${COLUMN}`}
+            className="mb-2.5 flex items-center gap-3 rounded-2xl bg-tint-sand px-4 py-3 ring-1 ring-edge-sand"
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white text-karsa-dark ring-1 ring-edge-sand">
               <Paperclip size={16} strokeWidth={2} />
@@ -271,7 +279,7 @@ export default function TeamChat({
             event.preventDefault();
             setDraft("");
           }}
-          className={`flex items-end gap-2 ${COLUMN}`}
+          className="flex items-end gap-2"
         >
           <div className="flex shrink-0 items-center gap-1">
             <button

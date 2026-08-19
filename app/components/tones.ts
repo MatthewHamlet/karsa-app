@@ -59,6 +59,18 @@ export const TONES = {
 
 export type Tone = keyof typeof TONES;
 
+/** The same palette again, as raw values: SVG art needs a `fill`, not a class.
+ *  Mirrors the custom properties in globals.css — change one, change both. */
+export const TONE_HEX = {
+  green: { tile: "#dbecdf", ink: "#45734e" },
+  lavender: { tile: "#e7e1f8", ink: "#6a58ae" },
+  peach: { tile: "#fae3cd", ink: "#b06c34" },
+  blue: { tile: "#d9e6f6", ink: "#3f6a95" },
+  cream: { tile: "#f8ebc8", ink: "#97722a" },
+  rose: { tile: "#ffe4e6", ink: "#e11d48" },
+  neutral: { tile: "#eef2ec", ink: "#3f5c46" },
+} as const satisfies Record<Tone, { tile: string; ink: string }>;
+
 /** Which hue each area of care owns. */
 export const CARE_TONE = {
   medication: "lavender",

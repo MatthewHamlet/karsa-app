@@ -22,7 +22,10 @@ export default function CarePage({
   const tab: CareTab = context || first(params.tab) === "obrolan" ? "chat" : "stats";
 
   return (
-    <div className="w-full px-4 pb-20 pt-20 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pt-12">
+    /* The bottom rest matches the top's, so a page ends on the same breath it
+       opened with. Anything more reads as the page having run out rather than
+       finished. CareShell's chat tab cancels this same pair. */
+    <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
       {/* No separate colour band: the clay is the hub's own background. */}
       <CareShell initialTab={tab} context={context} />
     </div>
