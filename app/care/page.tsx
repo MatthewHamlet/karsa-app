@@ -3,9 +3,9 @@ import CarePage from "../section/Care";
 
 export const metadata: Metadata = {
   title: "Perawatan · Karsa",
-  description: "Profil perawatan pasien: kebutuhan, informasi penting, dan tim perawatan.",
+  description: "Profil perawatan pasien: statistik, aktivitas, dan obrolan tim.",
 };
 
-export default function Care() {
-  return <CarePage />;
+export default async function Care({ searchParams }: PageProps<"/care">) {
+  return <CarePage params={await searchParams} />;
 }

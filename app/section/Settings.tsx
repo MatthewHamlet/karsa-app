@@ -83,7 +83,10 @@ export default function SettingsPage() {
 
   return (
     <div className="w-full px-4 pb-16 pt-20 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pt-12">
-      {/* The page wears its colour: a wash across the top, not a banner. */}
+      {/* The page wears its colour: a wash across the top, not a banner.
+          No "go home" arrow — the rail already does that. The only back
+          control left is the one that climbs out of a settings detail, which
+          mobile has no other way to do. */}
       <PageHeader
         tone="forest"
         eyebrow={selected ? selected.groupLabel : "Karsa"}
@@ -91,9 +94,8 @@ export default function SettingsPage() {
         subtitle={
           selected ? selected.description : "Kelola akun, preferensi, dan privasi aplikasi kamu."
         }
-        backHref={selected ? undefined : "/"}
         onBack={selected ? () => setSelectedId(null) : undefined}
-        backLabel={selected ? "Kembali ke semua pengaturan" : "Kembali ke beranda"}
+        backLabel="Kembali ke semua pengaturan"
       />
 
       <div className="grid gap-6 lg:grid-cols-[272px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[320px_minmax(0,1fr)] xl:gap-10">

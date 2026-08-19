@@ -7,12 +7,12 @@ import {
   UsersRound,
   Settings,
   PawPrint,
-  MessagesSquare,
   HeartPulse,
   ChevronsLeft,
   Menu,
   X,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -29,10 +29,11 @@ const DRAWER_WIDTH = 296;
 const LOGO_OPEN = 84;
 const LOGO_CLOSED = 34;
 
-const NAV = [
+/** `badge` is optional — nothing carries one right now, but the rail still
+ *  supports it. */
+const NAV: { link: string; icon: LucideIcon; text: string; badge?: number }[] = [
   { link: "/", icon: Home, text: "Home" },
   { link: "/care", icon: HeartPulse, text: "Perawatan" },
-  { link: "/chat", icon: MessagesSquare, text: "Grup", badge: 3 },
   { link: "/#komunitas", icon: UsersRound, text: "Komunitas" },
   { link: "/#maskot", icon: PawPrint, text: "Maskot Karsa" },
 ];
@@ -276,7 +277,9 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
           initial={{ width: isOpen ? RAIL_OPEN : RAIL_CLOSED }}
           animate={{ width: isOpen ? RAIL_OPEN : RAIL_CLOSED }}
           transition={size}
-          className="fixed inset-y-0 left-0 z-40 hidden border-r border-karsa-line md:block"
+          /* Above page chrome: the collapse handle straddles the rail's edge,
+             so anything pinned in the content column would otherwise cover it. */
+          className="fixed inset-y-0 left-0 z-50 hidden border-r border-karsa-line md:block"
         >
           <Rail
             isOpen={isOpen}

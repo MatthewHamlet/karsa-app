@@ -25,19 +25,21 @@ export type CareContext = {
   detail?: string;
 };
 
-/** Opens the Chat page with this care item attached as context. */
+/** Opens the care team's conversation with this item attached. The chat lives
+ *  inside the Perawatan page now, so this is a tab there rather than a route. */
 export function chatHref(context: CareContext) {
   const params = new URLSearchParams({
+    tab: "obrolan",
     ref: `${context.type}:${context.id}`,
     label: context.label,
   });
   if (context.detail) params.set("detail", context.detail);
-  return `/chat?${params.toString()}`;
+  return `/care?${params.toString()}`;
 }
 
-/** Opens the Chat page with a caregiver, no care item attached. */
+/** Opens the conversation with a caregiver, no care item attached. */
 export function caregiverChatHref(caregiver: { id: string; name: string }) {
-  return `/chat?to=${caregiver.id}&name=${encodeURIComponent(caregiver.name)}`;
+  return `/care?tab=obrolan&to=${caregiver.id}&name=${encodeURIComponent(caregiver.name)}`;
 }
 
 export const CONTEXT_LABEL: Record<CareContextType, string> = {

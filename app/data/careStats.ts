@@ -5,6 +5,10 @@
 
 export type Period = "daily" | "weekly" | "monthly";
 
+/** Fill levels are computed, never typed by hand — the wave has to agree with
+ *  the figure printed next to it. */
+const pct = (current: number, target: number) => Math.round((current / target) * 100);
+
 export const PERIODS: { key: Period; label: string }[] = [
   { key: "daily", label: "Harian" },
   { key: "weekly", label: "Mingguan" },
@@ -60,9 +64,9 @@ export const FIXED_STATS: Record<
   fluid: {
     title: "Cairan",
     byPeriod: {
-      daily: { value: "1.500 ml", caption: "dari 3.000 ml", progress: 50 },
-      weekly: { value: "16,4 L", caption: "dari 21 L", progress: 78 },
-      monthly: { value: "68 L", caption: "dari 90 L", progress: 76 },
+      daily: { value: "1.500 ml", caption: "dari 3.000 ml", progress: pct(1500, 3000) },
+      weekly: { value: "16,4 L", caption: "dari 21 L", progress: pct(16.4, 21) },
+      monthly: { value: "68 L", caption: "dari 90 L", progress: pct(68, 90) },
     },
   },
   meals: {
@@ -77,16 +81,16 @@ export const FIXED_STATS: Record<
           { label: "Makan malam", done: false },
         ],
       },
-      weekly: { value: "18 dari 21", caption: "makan minggu ini", progress: 86 },
-      monthly: { value: "79 dari 90", caption: "makan bulan ini", progress: 88 },
+      weekly: { value: "18 dari 21", caption: "makan minggu ini", progress: pct(18, 21) },
+      monthly: { value: "79 dari 90", caption: "makan bulan ini", progress: pct(79, 90) },
     },
   },
   medication: {
     title: "Obat",
     byPeriod: {
-      daily: { value: "2 dari 3", caption: "dosis hari ini", progress: 67 },
-      weekly: { value: "19 dari 21", caption: "dosis minggu ini", progress: 90 },
-      monthly: { value: "84 dari 90", caption: "dosis bulan ini", progress: 93 },
+      daily: { value: "2 dari 3", caption: "dosis hari ini", progress: pct(2, 3) },
+      weekly: { value: "19 dari 21", caption: "dosis minggu ini", progress: pct(19, 21) },
+      monthly: { value: "84 dari 90", caption: "dosis bulan ini", progress: pct(84, 90) },
     },
   },
   mood: {

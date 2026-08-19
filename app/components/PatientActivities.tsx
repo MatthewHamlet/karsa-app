@@ -2,19 +2,21 @@
 
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
+import Link from "next/link";
 import {
   ArrowRight,
   BedDouble,
   ChevronDown,
-  ChevronRight,
   Droplets,
   Gauge,
+  MessageSquare,
   Pill,
   Utensils,
 } from "lucide-react";
 import Modal from "./Modal";
 import { EASE } from "./List";
 import { MONTHS, WEEKDAYS } from "../data/dashboard";
+import { chatHref } from "../data/care";
 import {
   ACTIVITIES_BY_DATE,
   ACTIVITY_MONTH,
@@ -41,31 +43,36 @@ function ActivityRow({ activity }: { activity: PatientActivity }) {
   const { icon: Icon, bg, ink } = ICON[activity.icon];
 
   return (
-    <li>
-      <button
-        type="button"
-        className="group/act flex w-full items-center gap-3.5 rounded-2xl px-3 py-3 text-left outline-none transition-colors duration-200 hover:bg-karsa-canvas/70 focus-visible:ring-2 focus-visible:ring-karsa/40"
+    <li className="group/act flex items-center gap-3.5 rounded-2xl px-3 py-3 transition-colors duration-200 hover:bg-karsa-canvas/70">
+      <span
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+        style={{ backgroundColor: bg, color: ink }}
       >
-        <span
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
-          style={{ backgroundColor: bg, color: ink }}
-        >
-          <Icon size={18} strokeWidth={2.1} />
+        <Icon size={18} strokeWidth={2.1} />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[14.5px] font-medium text-neutral-800">
+          {activity.text}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14.5px] font-medium text-neutral-800">
-            {activity.text}
-          </span>
-          <span className="block text-[12.5px] tabular-nums text-neutral-500">
-            {activity.time}
-          </span>
+        <span className="block text-[12.5px] tabular-nums text-neutral-500">
+          {activity.time}
         </span>
-        <ChevronRight
-          size={17}
-          strokeWidth={2}
-          className="shrink-0 text-neutral-300 transition-transform duration-200 group-hover/act:translate-x-0.5"
-        />
-      </button>
+      </span>
+
+      <Link
+        href={chatHref({
+          type: "record",
+          id: activity.id,
+          label: activity.text,
+          detail: activity.time,
+        })}
+        aria-label={`Diskusikan: ${activity.text}`}
+        title="Diskusikan dengan tim perawatan"
+        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-neutral-400 outline-none transition-colors duration-200 hover:bg-white hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
+      >
+        <MessageSquare size={17} strokeWidth={2} />
+      </Link>
     </li>
   );
 }
