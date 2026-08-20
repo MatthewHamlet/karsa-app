@@ -1,27 +1,48 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import Mascot, { type Gaze } from "./Mascot";
 import type { MascotState } from "../data/mascot";
 
-/** The mascot, built from rounded CSS geometry rather than drawn paths.
+/** The mascot on the assistant page: the same character as everywhere else,
+ *  wrapped in the chrome this screen needs — an aura while it thinks, a bed of
+ *  light so it sits in a place rather than on a flat panel, and a ground shadow
+ *  that tightens as it rises.
  *
- *  Deliberately not an inline illustration: at this size a hand-authored face
- *  has to be *right*, and a face that is nearly right is worse than one that is
- *  plainly a character. Circles, a gradient and two eyes read as friendly at any
- *  scale, and every state is then a transform on real elements — which is also
- *  what lets the eyes actually look somewhere.
- *
- *  Keeps the identity the rest of the app already uses: karsa green, a sprout. */
+ *  The figure itself is `Mascot`. It used to be a second, hand-built character
+ *  living only here, which meant the app had two mascots that had to be kept
+ *  looking alike by hand — and didn't. Now the state just picks where it looks
+ *  and how hard the bulb is working. */
 
-const EYE = "absolute top-1/2 h-[22%] w-[13%] -translate-y-1/2 rounded-full bg-karsa-dark";
-
-/** Where the eyes point in each state. Thinking looks up and away, the way
- *  anyone does while working something out; presenting looks down at the cards. */
-const GAZE: Record<MascotState, { x: string; y: string }> = {
-  idle: { x: "0%", y: "0%" },
-  thinking: { x: "18%", y: "-22%" },
-  presenting: { x: "0%", y: "26%" },
+/** Thinking looks up and away, the way anyone does while working something out;
+ *  presenting looks down at the cards it just put on the table. */
+const GAZE: Record<MascotState, Gaze> = {
+  idle: "center",
+  thinking: "up",
+  presenting: "down",
 };
+
+/** The three beats of working something out: scribbling, the idea landing, and
+ *  the small shock of having found it. */
+type Beat = "math" | "bulb" | "shock";
+type Phase = "none" | Beat;
+
+const MATH_MS = 1300;
+const BULB_MS = 600;
+/** Kept in step with `THINKING_MS` in MascotAssistant — the sequence has to
+ *  finish before the answer arrives, or the jolt lands under a reply. */
+export const THINK_SEQUENCE_MS = MATH_MS + BULB_MS + 700;
+
+/** Nonsense on purpose. It is the *look* of hard sums, not a calculation — a
+ *  real formula invites reading, and there is nothing here to read. */
+const EQUATIONS = [
+  { text: "∫ x² dx", x: "4%", y: "10%", delay: 0 },
+  { text: "α + β = ?", x: "68%", y: "4%", delay: 0.12 },
+  { text: "√ 2·π", x: "-2%", y: "58%", delay: 0.24 },
+  { text: "Σ ƒ(n)", x: "74%", y: "50%", delay: 0.36 },
+  { text: "≈ 42 %", x: "34%", y: "-6%", delay: 0.48 },
+];
 
 export default function MascotAvatar({
   state,
@@ -31,25 +52,41 @@ export default function MascotAvatar({
   className?: string;
 }) {
   const reduce = useReducedMotion();
-  const gaze = GAZE[state];
+  const [beat, setBeat] = useState<Beat>("math");
+  const [seen, setSeen] = useState<MascotState>(state);
 
-  const float = reduce
+  /* Rewinding to the first beat during render, not in an effect: React's own
+     pattern for adjusting state when a prop changes. An effect runs a frame
+     late, and that frame would show the previous answer's shocked face sitting
+     under a question that was only just asked. */
+  if (state !== seen) {
+    setSeen(state);
+    setBeat("math");
+  }
+
+  /* The sequence runs on its own clock inside the thinking state — equations,
+     then the bulb, then the jolt. Timers rather than one keyframe timeline
+     because the three beats belong to different elements, and a shared
+     timeline would tie the bulb's spring to the equations' fade. */
+  useEffect(() => {
+    if (state !== "thinking" || reduce) return;
+
+    const timers = [
+      window.setTimeout(() => setBeat("bulb"), MATH_MS),
+      window.setTimeout(() => setBeat("shock"), MATH_MS + BULB_MS),
+    ];
+    return () => timers.forEach(window.clearTimeout);
+  }, [state, reduce]);
+
+  /* Derived, so nothing has to remember to switch it off when the answer
+     arrives — the sequence simply stops existing outside the thinking state. */
+  const phase: Phase = state === "thinking" && !reduce ? beat : "none";
+
+  const lean = reduce
     ? {}
-    : {
-        idle: { y: [0, -8, 0] },
-        thinking: { y: [0, -3, 0] },
-        presenting: { y: 0 },
-      }[state];
-
-  const floatTiming = reduce
-    ? { duration: 0 }
     : state === "presenting"
-      ? { type: "spring" as const, stiffness: 220, damping: 18 }
-      : {
-          duration: state === "thinking" ? 1.6 : 4.5,
-          repeat: Infinity,
-          ease: "easeInOut" as const,
-        };
+      ? { y: 4, scale: 0.97 }
+      : { y: 0, scale: 1 };
 
   return (
     <div className={`relative grid place-items-center ${className}`}>
@@ -80,8 +117,7 @@ export default function MascotAvatar({
         />
       ))}
 
-      {/* A soft bed of colour so the character sits in light rather than on a
-          flat panel. Warms up while presenting, cools while thinking. */}
+      {/* A soft bed of colour. Warms up while presenting, cools while thinking. */}
       <motion.span
         aria-hidden
         animate={{
@@ -93,90 +129,67 @@ export default function MascotAvatar({
       />
 
       <motion.div
-        animate={float}
-        transition={floatTiming}
-        className="relative aspect-square w-[68%]"
+        animate={lean}
+        transition={{ type: "spring", stiffness: 220, damping: 20 }}
+        className="relative grid aspect-square w-[78%] place-items-center"
       >
-        {/* Sprout. Two leaves off a stem — the app's mark, at character scale. */}
-        <span
-          aria-hidden
-          className="absolute -top-[15%] left-1/2 h-[16%] w-[2.5%] -translate-x-1/2 rounded-full bg-karsa-dark"
+        <Mascot
+          className="h-full w-full"
+          gaze={GAZE[state]}
+          mood={phase === "shock" ? "shock" : "normal"}
+          busy={state === "thinking"}
+          /* Tilts and hops belong to a character with nothing to do. Mid-answer
+             they read as not listening. */
+          idle={state === "idle"}
         />
-        <motion.span
-          aria-hidden
-          animate={reduce ? {} : { rotate: state === "thinking" ? [-8, 4, -8] : [-4, 2, -4] }}
-          transition={
-            reduce
-              ? { duration: 0 }
-              : { duration: state === "thinking" ? 1.6 : 4.5, repeat: Infinity, ease: "easeInOut" }
-          }
-          style={{ transformOrigin: "bottom right" }}
-          className="absolute -top-[24%] left-[30%] h-[14%] w-[20%] rounded-bl-full rounded-tr-full bg-karsa"
-        />
-        <motion.span
-          aria-hidden
-          animate={reduce ? {} : { rotate: state === "thinking" ? [8, -4, 8] : [4, -2, 4] }}
-          transition={
-            reduce
-              ? { duration: 0 }
-              : { duration: state === "thinking" ? 1.6 : 4.5, repeat: Infinity, ease: "easeInOut" }
-          }
-          style={{ transformOrigin: "bottom left" }}
-          className="absolute -top-[20%] left-1/2 h-[13%] w-[18%] rounded-br-full rounded-tl-full bg-karsa/80"
-        />
+      </motion.div>
 
-        {/* Body. The gradient does the modelling: light from the upper left,
-            a darker seat at the bottom, and a glass highlight over the top. */}
-        <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_30%_24%,#ffffff_0%,#eef2ec_38%,#cfdccb_78%,#b6c8b1_100%)] shadow-[inset_0_-10px_22px_rgba(63,92,70,0.22),inset_0_6px_14px_rgba(255,255,255,0.9),0_18px_40px_-18px_rgba(63,92,70,0.55)] ring-1 ring-karsa/15">
-          <span
-            aria-hidden
-            className="absolute left-[14%] top-[10%] h-[26%] w-[38%] rounded-full bg-white/70 blur-[6px]"
-          />
-        </div>
+      {/* ── Equations ───────────────────────────────────────────────────────
+          Sums drifting up past the head while it works. Staggered so they
+          arrive one at a time — all five at once is a background texture, one
+          after another is somebody thinking. */}
+      <AnimatePresence>
+        {phase === "math" &&
+          EQUATIONS.map((eq) => (
+            <motion.span
+              key={eq.text}
+              aria-hidden
+              initial={{ opacity: 0, y: 10, scale: 0.8 }}
+              animate={{ opacity: [0, 1, 1, 0], y: -18, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.5, delay: eq.delay, ease: "easeOut" }}
+              style={{ left: eq.x, top: eq.y }}
+              className="pointer-events-none absolute font-mono text-[13px] font-bold text-karsa-dark/45 xl:text-[15px]"
+            >
+              {eq.text}
+            </motion.span>
+          ))}
+      </AnimatePresence>
 
-        {/* Face. Eyes and blush ride one wrapper so the gaze moves together. */}
-        <motion.div
-          animate={{ x: gaze.x, y: gaze.y }}
-          transition={{ type: "spring", stiffness: 210, damping: 20 }}
-          className="absolute inset-0"
-        >
-          <motion.div
-            animate={reduce ? {} : { scaleY: [1, 1, 0.12, 1] }}
-            transition={
-              reduce
-                ? { duration: 0 }
-                : { duration: 5.2, repeat: Infinity, times: [0, 0.93, 0.96, 1] }
-            }
-            style={{ transformOrigin: "center 46%" }}
-            className="absolute inset-0"
-          >
-            <span aria-hidden className={`${EYE} left-[30%]`} />
-            <span aria-hidden className={`${EYE} right-[30%]`} />
-          </motion.div>
-
-          <span
-            aria-hidden
-            className="absolute left-[19%] top-[57%] h-[9%] w-[15%] rounded-full bg-karsa-sand/55 blur-[1px]"
-          />
-          <span
-            aria-hidden
-            className="absolute right-[19%] top-[57%] h-[9%] w-[15%] rounded-full bg-karsa-sand/55 blur-[1px]"
-          />
-
-          {/* Mouth. A closed curve at rest, an open oval while presenting —
-              the difference between listening and having something to say. */}
+      {/* ── The idea ────────────────────────────────────────────────────────
+          Pops above the head on a spring with a little overshoot, then holds
+          through the jolt. The rays are drawn, not glowed: a blur at this size
+          turns into a smudge. */}
+      <AnimatePresence>
+        {(phase === "bulb" || phase === "shock") && (
           <motion.span
             aria-hidden
-            animate={
-              state === "presenting"
-                ? { height: "11%", width: "13%", borderRadius: "999px" }
-                : { height: "5%", width: "16%", borderRadius: "0 0 999px 999px" }
-            }
-            transition={{ type: "spring", stiffness: 260, damping: 22 }}
-            className="absolute left-1/2 top-[63%] -translate-x-1/2 bg-karsa-dark/85"
-          />
-        </motion.div>
-      </motion.div>
+            initial={{ opacity: 0, scale: 0.3, y: 14 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.6, y: -6 }}
+            transition={{ type: "spring", stiffness: 420, damping: 16 }}
+            className="pointer-events-none absolute left-1/2 top-[2%] -translate-x-1/2"
+          >
+            <svg viewBox="0 0 40 44" className="h-9 w-9 xl:h-11 xl:w-11">
+              <g stroke="#e8b04b" strokeWidth="2.6" strokeLinecap="round">
+                <path d="M20 3v4M6 9l3 3M34 9l-3 3M3 22h4M33 22h4" />
+              </g>
+              <circle cx="20" cy="22" r="9.5" fill="#f7d98a" stroke="#e8b04b" strokeWidth="2" />
+              <path d="M16 32h8M17 36h6" stroke="#3f3a33" strokeWidth="2.4" strokeLinecap="round" />
+            </svg>
+          </motion.span>
+        )}
+      </AnimatePresence>
 
       {/* Ground shadow. Tightens as the character rises, which is what sells
           the float as height rather than drift. */}

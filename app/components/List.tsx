@@ -65,7 +65,6 @@ export default function List({
         href={link}
         onClick={() => onSelect?.(link)}
         aria-current={isActive ? "page" : undefined}
-        title={isOpen ? undefined : text}
         className={`group/item relative flex h-12 items-center rounded-xl px-3.5 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
           isActive
             ? "text-karsa-dark"

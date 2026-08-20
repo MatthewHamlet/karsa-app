@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarDays, Clock, Plus, Check } from "lucide-react";
+import { Bell, BellRing, CalendarDays, Clock, Plus, Check } from "lucide-react";
 import Panel from "./Panel";
 import { Avatar } from "./CommunityKit";
 import { TONES } from "./tones";
-import { HASHTAGS, LIVE_SESSION, PEOPLE, SUGGESTED } from "../data/community";
+import { HASHTAGS, LIVE_SESSION, PEOPLE, SUGGESTED, count } from "../data/community";
 
 /** The one loud colour on the page. Plum rather than another green: it has to
  *  read as a different kind of thing from the forest header above it, and it
@@ -28,6 +28,8 @@ const Shapes = () => (
 );
 
 function LiveSession() {
+  const [reminded, setReminded] = useState(false);
+
   return (
     <section
       className="relative overflow-hidden rounded-[20px] p-6 text-white shadow-[0_1px_2px_rgba(24,32,24,0.03),0_18px_36px_-28px_rgba(24,32,24,0.55)]"
@@ -65,25 +67,69 @@ function LiveSession() {
         >
           {LIVE_SESSION.cta}
         </button>
+
+        {/* Second, quieter action. Joining is a promise to be somewhere on a
+            Saturday evening; a reminder is not, and a caregiver who cannot
+            promise that yet should still have something to press. */}
+        <button
+          type="button"
+          onClick={() => setReminded((v) => !v)}
+          aria-pressed={reminded}
+          className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-[13.5px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
+            reminded
+              ? "bg-white/25 text-white ring-white/40"
+              : "bg-white/10 text-white/85 ring-white/25 hover:bg-white/20"
+          }`}
+        >
+          {reminded ? (
+            <BellRing size={15} strokeWidth={2.3} aria-hidden />
+          ) : (
+            <Bell size={15} strokeWidth={2.3} aria-hidden />
+          )}
+          {reminded ? "Pengingat aktif" : "Ingatkan Saya"}
+        </button>
       </div>
     </section>
   );
 }
 
-function TopicCloud() {
+/** Filter chips, not decoration. Each one writes its term into the page's
+ *  search box, so pressing a chip and typing the same word do the same thing —
+ *  and the caregiver can see, and edit, what the page is filtered by. */
+function TopicCloud({
+  onTopic,
+  active,
+}: {
+  onTopic: (term: string) => void;
+  active: string;
+}) {
+  const current = active.trim().toLowerCase().replace(/^#/, "");
+
   return (
     <Panel title="Topik Populer">
       <div className="flex flex-wrap gap-2">
         {HASHTAGS.map((tag) => {
           const t = TONES[tag.tone];
+          const on = current !== "" && current === tag.term;
+
           return (
-            <a
+            <button
               key={tag.label}
-              href="#"
-              className={`inline-flex items-center rounded-full px-3 py-1.5 text-[12.5px] font-semibold outline-none ring-1 transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-karsa/40 ${t.card} ${t.ring} ${t.ink}`}
+              type="button"
+              aria-pressed={on}
+              /* Pressing the chip that is already on clears the filter — the
+                 only other way back is emptying the search field, and a chip
+                 that can turn on but not off is a trap. */
+              onClick={() => onTopic(on ? "" : tag.term)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold outline-none ring-1 transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
+                on ? "bg-karsa text-white ring-karsa" : `${t.card} ${t.ring} ${t.ink}`
+              }`}
             >
               {tag.label}
-            </a>
+              <span className={`tabular-nums ${on ? "text-white/70" : "opacity-60"}`}>
+                {count(tag.threads)}
+              </span>
+            </button>
           );
         })}
       </div>
@@ -135,11 +181,17 @@ function PeopleToFollow() {
 
 /** The right-hand column: what's coming up, what people are talking about, and
  *  who to listen to — in that order, because only the first one expires. */
-export default function CommunityAside() {
+export default function CommunityAside({
+  onTopic,
+  active = "",
+}: {
+  onTopic: (term: string) => void;
+  active?: string;
+}) {
   return (
     <aside className="space-y-6 xl:space-y-8">
       <LiveSession />
-      <TopicCloud />
+      <TopicCloud onTopic={onTopic} active={active} />
       <PeopleToFollow />
     </aside>
   );

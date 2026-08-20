@@ -79,6 +79,7 @@ export default function PageHeader({
   onBack,
   backLabel = "Kembali",
   action,
+  children,
 }: {
   tone: HeaderTone;
   eyebrow?: string;
@@ -89,6 +90,9 @@ export default function PageHeader({
   onBack?: () => void;
   backLabel?: string;
   action?: ReactNode;
+  /** Sits under the subtitle, inside the colour. For the things that belong to
+   *  the page rather than to a card below it — a search field, a filter row. */
+  children?: ReactNode;
 }) {
   const t = TONE[tone];
   const backClasses = `grid h-10 w-10 shrink-0 place-items-center rounded-full outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 ${t.back}`;
@@ -134,6 +138,8 @@ export default function PageHeader({
 
         {action && <div className="shrink-0">{action}</div>}
       </div>
+
+      {children && <div className="relative mt-6">{children}</div>}
     </header>
   );
 }

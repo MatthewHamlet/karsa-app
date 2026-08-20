@@ -77,14 +77,18 @@ export default function Homepage() {
           stacking a second coloured field above it only crowded the top. */}
       {/* No max-width: the content owns the whole area beside the rail. The
           side column widens with the viewport so the left one never sprawls. */}
-      <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_336px] xl:gap-12 2xl:grid-cols-[minmax(0,1fr)_360px]">
+      {/* Every track is `minmax(0,…)`, never `1fr` or `auto`. Both of those are
+          floored at the items' min-content width, so one unshrinkable child —
+          here a fixed-size progress ring inside a flex row — widened the track
+          past the page and gave the phone a sideways scroll. */}
+      <div className="grid items-start gap-6 grid-cols-[minmax(0,1fr)] md:gap-8 lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_336px] xl:gap-12 2xl:grid-cols-[minmax(0,1fr)_360px]">
         {/* ── Left column ─────────────────────────────────────────────── */}
         <div className="@container min-w-0 space-y-6 md:space-y-7 xl:space-y-8">
           {/* Greeting — deliberately not a card. The room is its own warm
               background and melts into the page at the bottom, so the mascot
               reads as standing in the environment rather than inside a box.
               The mascot always sits left of the copy; it never stacks. */}
-          <section className="relative pb-10 pt-4 sm:pb-12 sm:pt-6 xl:pb-14">
+          <section className="relative pb-12 pt-6 sm:pb-12 sm:pt-6 xl:pb-14">
             {/* A radial mask instead of a straight one: it softens the sides
                 and top as well as the bottom, so the room has no edges at all
                 and simply dissolves before the next section starts. The layer
@@ -109,11 +113,15 @@ export default function Homepage() {
               <RoomScene />
             </div>
 
+            {/* The mascot sits left of the copy at every size and never
+                stacks. That costs the heading width on a phone, which is why
+                both are held to sizes that fit 343px on one line — a greeting
+                that wraps after the comma is worse than a smaller one. */}
             <div className="relative flex items-center justify-center gap-4 text-left sm:gap-8 xl:gap-10">
-              <Mascot className="h-28 w-28 sm:h-32 sm:w-32 xl:h-40 xl:w-40" />
+              <Mascot className="h-28 w-28 shrink-0 sm:h-32 sm:w-32 xl:h-40 xl:w-40" />
 
               <div className="min-w-0">
-                <p className="text-[13px] font-medium text-neutral-500 xl:text-sm">
+                <p className="text-[14px] font-medium text-neutral-500 xl:text-sm">
                   {todayLabel}
                 </p>
                 <h1 className="mt-1 text-[26px] font-extrabold leading-tight tracking-tight text-neutral-900 sm:text-4xl xl:text-[44px]">
@@ -143,7 +151,7 @@ export default function Homepage() {
           </section>
 
           {/* Tasks, with today's mood alongside — the sketch's pairing. */}
-          <div className="grid gap-6 @3xl:grid-cols-[1.6fr_0.85fr]">
+          <div className="grid gap-6 grid-cols-[minmax(0,1fr)] @3xl:grid-cols-[minmax(0,1.6fr)_minmax(0,0.85fr)]">
             <Panel
               eyebrow="Tugas harian"
               title="Tugas Kamu"
@@ -169,7 +177,7 @@ export default function Homepage() {
               <div className="flex flex-1 items-center gap-4 sm:gap-5 @3xl:gap-7">
                 {/* Fixed to three rows so the card never resizes as tasks are
                     ticked off, and the ring keeps its size and its place. */}
-                <ul className="h-[147px] min-w-0 flex-1 divide-y divide-edge-sand border-y border-edge-sand">
+                <ul className="h-[186px] min-w-0 flex-1 divide-y divide-edge-sand border-y border-edge-sand sm:h-[147px]">
                   <AnimatePresence initial={false}>
                     {pending.slice(0, VISIBLE_TASKS).map((task) => (
                       <TaskItem
@@ -186,7 +194,7 @@ export default function Homepage() {
                 <ProgressRing
                   value={progress}
                   label={`${done}/${TASKS.length}`}
-                  className="h-[104px] w-[104px] @md:h-[136px] @md:w-[136px] @3xl:h-[168px] @3xl:w-[168px]"
+                  className="h-[124px] w-[124px] @md:h-[136px] @md:w-[136px] @3xl:h-[168px] @3xl:w-[168px]"
                 />
               </div>
             </Panel>

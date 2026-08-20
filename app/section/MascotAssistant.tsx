@@ -6,6 +6,7 @@ import { History, MessageCircle, ShieldAlert, Sparkles } from "lucide-react";
 import AssistantChat, { type ChatTurn } from "../components/AssistantChat";
 import HealthPattern from "../components/HealthPattern";
 import MascotStage from "../components/MascotStage";
+import { THINK_SEQUENCE_MS } from "../components/MascotAvatar";
 import Modal from "../components/Modal";
 import {
   HISTORY,
@@ -20,7 +21,11 @@ import {
 
 /** How long the mascot spends thinking, and how long it holds its pointing pose
  *  before settling back. Both are stand-ins for a real request. */
-const THINKING_MS = 1500;
+/** Long enough for the whole thinking sequence to land — equations, the bulb,
+ *  then the jolt. Shorter and the answer arrives on top of the punchline.
+ *  `THINK_SEQUENCE_MS` is what the mascot actually needs; the extra beat lets
+ *  the shock read before the cards slide in. */
+const THINKING_MS = THINK_SEQUENCE_MS + 300;
 const PRESENTING_MS = 4200;
 
 /** Which canned answer a free-typed message gets. Keyword matching, not

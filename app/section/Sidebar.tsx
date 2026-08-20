@@ -206,7 +206,6 @@ function RailProfile({
     <Link
       href={href}
       onClick={() => onSelect?.(href)}
-      title={isOpen ? undefined : ACCOUNT.name}
       className="group/me relative flex h-12 items-center rounded-xl px-3.5 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40"
     >
       <span className="absolute inset-0 rounded-xl bg-neutral-900/0 transition-colors duration-200 group-hover/me:bg-neutral-900/[0.045]" />
