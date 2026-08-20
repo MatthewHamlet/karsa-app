@@ -2,14 +2,18 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { MessageCircle, ShieldAlert, Sparkles, Wifi } from "lucide-react";
+import { History, MessageCircle, ShieldAlert, Sparkles } from "lucide-react";
 import AssistantChat, { type ChatTurn } from "../components/AssistantChat";
+import HealthPattern from "../components/HealthPattern";
 import MascotStage from "../components/MascotStage";
+import Modal from "../components/Modal";
 import {
+  HISTORY,
   PATIENT,
   PROMPT_FOR,
   REPLIES,
   type ActionCard,
+  type HistorySession,
   type Intent,
   type MascotState,
 } from "../data/mascot";
@@ -38,6 +42,7 @@ export default function MascotAssistant() {
   const [state, setState] = useState<MascotState>("idle");
   const [cards, setCards] = useState<ActionCard[]>([]);
   const [view, setView] = useState<MobileView>("chat");
+  const [historyOpen, setHistoryOpen] = useState(false);
   const reduce = useReducedMotion();
 
   /* One turn is two timers deep, and either can outlive the component if the
@@ -77,6 +82,21 @@ export default function MascotAssistant() {
 
   const send = (text: string) => ask(text, intentFor(text));
 
+  /** Reopening a past session restores its whole thread. Any answer still in
+     flight is cancelled first — otherwise a reply from the conversation the
+     caregiver just left would land on top of the one they opened. */
+  const openSession = (session: HistorySession) => {
+    timers.current.forEach(window.clearTimeout);
+    timers.current = [];
+
+    setTurns(session.turns.map((turn, i) => ({ id: `${session.id}-${i}`, ...turn })));
+    setCards([]);
+    setState("idle");
+    setDraft("");
+    setHistoryOpen(false);
+    setView("chat");
+  };
+
   const quickAction = (intent: Intent) => {
     ask(PROMPT_FOR[intent], intent);
     /* On a phone the answer arrives on the other tab, so go with it. */
@@ -85,7 +105,7 @@ export default function MascotAssistant() {
 
   return (
     <div className="flex h-[100dvh] flex-col bg-karsa-canvas">
-      <PatientBanner />
+      <PatientBanner onHistory={() => setHistoryOpen(true)} />
 
       {/* Below `lg` the two panels are one at a time — a 40% stage on a phone is
           a strip, and a chat you cannot read is worse than a chat you switch to. */}
@@ -132,7 +152,14 @@ export default function MascotAssistant() {
 
       {/* ── Split stage ──────────────────────────────────────────────────── */}
       <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className={`min-h-0 ${view === "chat" ? "flex" : "hidden"} flex-col lg:flex`}>
+        {/* The thread's room. The wallpaper is scattered rather than tiled-
+            looking on purpose: this is the one screen a caregiver sits inside
+            for a while, and a bare canvas made it read like a form. */}
+        <div
+          className={`relative min-h-0 ${view === "chat" ? "flex" : "hidden"} flex-col lg:flex`}
+        >
+          <HealthPattern className="text-karsa-dark" opacity={0.14} />
+
           <AssistantChat
             turns={turns}
             draft={draft}
@@ -155,13 +182,95 @@ export default function MascotAssistant() {
           <MascotStage state={state} cards={cards} />
         </motion.aside>
       </div>
+
+      <HistoryModal
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onOpenSession={openSession}
+      />
     </div>
+  );
+}
+
+/** Past sessions, newest first, grouped by the day they happened on.
+ *
+ *  Each entry shows the caregiver's own opening line rather than a generated
+ *  title — you recognise a conversation by what you asked, not by what it was
+ *  filed as. Picking one loads the whole thread back into the page. */
+function HistoryModal({
+  open,
+  onClose,
+  onOpenSession,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onOpenSession: (session: HistorySession) => void;
+}) {
+  const days = HISTORY.reduce<{ day: string; sessions: HistorySession[] }[]>((acc, session) => {
+    const last = acc[acc.length - 1];
+    if (last && last.day === session.day) last.sessions.push(session);
+    else acc.push({ day: session.day, sessions: [session] });
+    return acc;
+  }, []);
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Riwayat percakapan"
+      description="Percakapan sebelumnya dengan Karsa. Pilih satu untuk membukanya kembali."
+      size="lg"
+    >
+      <div className="space-y-6">
+        {days.map((group) => (
+          <section key={group.day}>
+            <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
+              {group.day}
+            </h3>
+
+            <ul className="divide-y divide-karsa-line/70 overflow-hidden rounded-2xl bg-white ring-1 ring-karsa-line">
+              {group.sessions.map((session) => {
+                const opener = session.turns.find((turn) => turn.from === "me");
+
+                return (
+                  <li key={session.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSession(session)}
+                      className="group/row flex w-full items-start gap-3.5 px-4 py-3.5 text-left outline-none transition-colors duration-200 hover:bg-karsa-canvas/60 focus-visible:bg-karsa-canvas/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+                    >
+                      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-karsa-soft text-karsa-dark">
+                        <MessageCircle size={16} strokeWidth={2.2} />
+                      </span>
+
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14.5px] font-bold leading-5 text-neutral-800">
+                          {session.title}
+                        </span>
+                        {opener && (
+                          <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">
+                            {opener.text}
+                          </span>
+                        )}
+                        <span className="mt-1 block text-[12px] tabular-nums text-neutral-400">
+                          {session.time} · {session.turns.length} pesan
+                        </span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </Modal>
   );
 }
 
 /** Who this is about, and the two facts that change what is safe to suggest.
  *  Kept to one line so it can stay on screen the whole session. */
-function PatientBanner() {
+function PatientBanner({ onHistory }: { onHistory: () => void }) {
   return (
     <header className="shrink-0 border-b border-karsa-line bg-white/70 px-4 py-3 backdrop-blur-sm sm:px-6 xl:px-8">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -190,14 +299,17 @@ function PatientBanner() {
           ))}
         </ul>
 
-        <span className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-act-50 px-2.5 py-1 text-[11.5px] font-semibold text-act-600 ring-1 ring-act-edge">
-          <Wifi size={12} strokeWidth={2.4} />
-          Terhubung
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-act-600 opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-act-600" />
-          </span>
-        </span>
+        {/* Was a "Terhubung" status pill. A connection light is only worth the
+            corner when it is off, and this one never is — so the space goes to
+            the thing a caregiver actually reaches for: what Karsa said before. */}
+        <button
+          type="button"
+          onClick={onHistory}
+          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-neutral-700 outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
+        >
+          <History size={13} strokeWidth={2.4} />
+          Riwayat
+        </button>
       </div>
     </header>
   );

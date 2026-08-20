@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -33,19 +33,24 @@ import AccentIcon from "../components/AccentIcon";
 import PageHeader from "../components/PageHeader";
 import SettingRow from "../components/SettingRow";
 import Toggle from "../components/Toggle";
+import { AvatarField, FormActions, SelectField, TextField } from "../components/SettingsFields";
 import { EASE } from "../components/List";
 import { TONES, type Tone } from "../components/tones";
+import { CARE_GROUP } from "../data/careStats";
 import {
   ACCOUNT,
   ACCOUNT_STATS,
   BADGES,
   CONTRIBUTIONS,
   OVERVIEW,
+  PROFILE_FIELDS,
   QUICK_SETTINGS,
+  ROLE_OPTIONS,
   SELF_CARE,
   SETTINGS,
   SETTING_ITEMS,
   type IconKey,
+  type ResolvedItem,
 } from "../data/settings";
 
 const ICON: Record<IconKey, LucideIcon> = {
@@ -84,18 +89,41 @@ const BADGE_ICON: Record<string, LucideIcon> = {
   night: Moon,
 };
 
-/** Rounded list container — the shape every settings group shares. */
 const LIST =
   "overflow-hidden rounded-2xl bg-white ring-1 ring-karsa-line shadow-[0_1px_2px_rgba(24,32,24,0.03),0_14px_30px_-28px_rgba(24,32,24,0.35)]";
 
 const CARD =
   "rounded-[22px] bg-white ring-1 ring-karsa-line shadow-[0_1px_2px_rgba(24,32,24,0.03),0_18px_36px_-30px_rgba(24,32,24,0.4)]";
 
-export default function SettingsPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const reduce = useReducedMotion();
+/** The rail is a tablist, so every destination needs a stable id for the panel
+ *  to point back at. `null` is the overview, which is a destination too. */
+const tabId = (id: string | null) => `settings-tab-${id ?? "overview"}`;
+const PANEL_ID = "settings-panel";
 
-  /** Switch state lives here so a row can be flipped and stay flipped. */
+/** Every destination in rail order — what arrow keys walk along. */
+const TAB_ORDER: (string | null)[] = [null, ...SETTING_ITEMS.map((item) => item.id)];
+
+const first = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value;
+
+export default function SettingsPage({
+  params,
+}: {
+  params?: Record<string, string | string[] | undefined>;
+}) {
+  /* `?bagian=profile` opens straight onto a section. The rail's profile row
+     uses it, so that row lands somewhere different from the Pengaturan row
+     right under it — two links to the same blank page would be one link. */
+  const requested = first(params?.bagian);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    requested && SETTING_ITEMS.some((item) => item.id === requested) ? requested : null,
+  );
+  const reduce = useReducedMotion();
+  const mainRef = useRef<HTMLDivElement>(null);
+  const mounted = useRef(false);
+
+  /** Switch state lives here so a row can be flipped and stay flipped, and so
+   *  the quick list and the detail panel are the same switch twice over. */
   const [switches, setSwitches] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       SETTING_ITEMS.flatMap((item) =>
@@ -114,34 +142,57 @@ export default function SettingsPage() {
     [selectedId],
   );
 
+  /* Under `lg` the rail sits above the panel and is taller than the screen, so
+     picking a section would otherwise change something the caregiver cannot
+     see. Skipped on the first render — nobody asked for that one. */
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    mainRef.current?.scrollIntoView({
+      behavior: reduce ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [selectedId, reduce]);
+
   const fade = reduce ? { duration: 0 } : { duration: 0.24, ease: EASE };
 
   return (
     /* Same rest at the foot of the page as every other route — see Care. */
     <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
+      {/* The banner keeps saying "Pengaturan" whatever is open. The section's
+          own name belongs on the panel that shows it — swapping the page title
+          per selection left the caregiver with two headings competing to say
+          where they were. */}
       <PageHeader
         tone="forest"
-        eyebrow={selected ? selected.groupLabel : "Karsa"}
-        title={selected ? selected.title : "Pengaturan"}
-        subtitle={
-          selected ? selected.description : "Kelola akun, preferensi, dan privasi aplikasi kamu."
-        }
-        onBack={selected ? () => setSelectedId(null) : undefined}
-        backLabel="Kembali ke semua pengaturan"
+        eyebrow="Karsa"
+        title="Pengaturan"
+        subtitle="Kelola akun, preferensi, dan privasi aplikasi kamu."
       />
 
-      {/* The rail is the navigation at every size — on a phone it simply sits
-          above the content instead of beside it. That is why there is no second
-          copy of the settings list in the right column any more: one list, one
-          place, whatever the viewport. */}
-      <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[340px_minmax(0,1fr)] xl:gap-10">
+      {/* Centred, and capped at exactly what the two columns can use: 360 rail
+          + 40 gap + the panel's own 1280 ceiling. Without the cap the panel
+          column kept growing while the panel inside it stopped at 1280, so on a
+          wide screen every pixel of slack pooled on one side — 48px of margin
+          on the left against 529px on the right at 2560. The cap turns that
+          into a column that is full or centred, never lopsided. */}
+      <div className="mx-auto grid w-full max-w-[1680px] gap-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[360px_minmax(0,1fr)] xl:gap-10">
         <ProfileRail selectedId={selectedId} onSelect={setSelectedId} />
 
-        <div className="min-w-0">
-          {/* Keyed, so switching section remounts and replays the entrance.
-              Deliberately no AnimatePresence: `mode="wait"` would hold the new
-              panel back until the old one finished animating out, which puts a
-              delay on every click for no benefit. */}
+        {/* Capped rather than uncapped: past about 1280px a settings row puts
+            its control so far from its label that they stop reading as one
+            line. Below that it takes everything it is given. */}
+        <div
+          ref={mainRef}
+          id={PANEL_ID}
+          role="tabpanel"
+          aria-labelledby={tabId(selectedId)}
+          tabIndex={-1}
+          className="min-w-0 max-w-[1280px] scroll-mt-6 outline-none"
+        >
           <motion.div
             key={selectedId ?? "overview"}
             initial={reduce ? false : { opacity: 0, y: 6 }}
@@ -149,39 +200,11 @@ export default function SettingsPage() {
             transition={fade}
           >
             {selected ? (
-              <div className={LIST}>
-                <ul className="divide-y divide-karsa-line/70">
-                  {selected.rows.map((row) => {
-                    const key = `${selected.id}.${row.id}`;
-                    return (
-                      <li key={row.id}>
-                        {row.control.kind === "toggle" ? (
-                          <SettingRow
-                            title={row.title}
-                            description={row.description}
-                            trailing={
-                              <Toggle
-                                label={row.title}
-                                checked={switches[key] ?? false}
-                                onChange={(next) =>
-                                  setSwitches((prev) => ({ ...prev, [key]: next }))
-                                }
-                              />
-                            }
-                          />
-                        ) : (
-                          <SettingRow
-                            title={row.title}
-                            description={row.description}
-                            value={row.control.kind === "value" ? row.control.value : undefined}
-                            interactive
-                          />
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
+              <Detail
+                item={selected}
+                switches={switches}
+                onSwitch={(key, next) => setSwitches((prev) => ({ ...prev, [key]: next }))}
+              />
             ) : (
               <Overview
                 onSelect={setSelectedId}
@@ -205,10 +228,41 @@ function ProfileRail({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
+  /** Arrow keys walk the rail and take the selection with them, which is the
+   *  expected behaviour for a tablist whose panels are cheap to render. Home
+   *  and End jump the ends so a fifty-item rail is still one keystroke deep.
+   *
+   *  Focus moves by id rather than through a map of refs: every tab is always
+   *  mounted and already carries the id the panel points at, so there is
+   *  nothing a ref would know that `tabId` does not. */
+  const onKeyDown = (event: React.KeyboardEvent) => {
+    const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
+    if (!keys.includes(event.key)) return;
+
+    const current = TAB_ORDER.indexOf(selectedId);
+    const last = TAB_ORDER.length - 1;
+    const next =
+      event.key === "ArrowDown"
+        ? Math.min(current + 1, last)
+        : event.key === "ArrowUp"
+          ? Math.max(current - 1, 0)
+          : event.key === "Home"
+            ? 0
+            : last;
+
+    if (next === current) return;
+    event.preventDefault();
+
+    const target = TAB_ORDER[next];
+    onSelect(target);
+    document.getElementById(tabId(target))?.focus();
+  };
+
   return (
-    <aside className="lg:sticky lg:top-10 lg:self-start">
-      {/* Identity. The pencils are real: both open the profile section, which
-          is where a name actually gets changed. */}
+    /* Its own scroller on desktop: the rail is far taller than a screen and
+       nothing in it should push the panel beside it down. `overscroll-contain`
+       stops the page taking over once the rail hits an end. */
+    <aside className="lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-3 scrollbar-slim">
       <div className="flex flex-col items-start">
         <span className="relative inline-block">
           <span className="grid h-20 w-20 place-items-center rounded-full bg-karsa text-[28px] font-bold text-white xl:h-24 xl:w-24 xl:text-[32px]">
@@ -244,8 +298,6 @@ function ProfileRail({
         </p>
       </div>
 
-      {/* Three figures, evenly spaced — the shape the reference uses for
-          follower counts, carrying something worth counting instead. */}
       <dl className="mt-5 flex gap-6">
         {ACCOUNT_STATS.map((stat) => (
           <div key={stat.label} className="min-w-0">
@@ -257,7 +309,6 @@ function ProfileRail({
         ))}
       </dl>
 
-      {/* The one warm block in the column. */}
       <Link
         href={SELF_CARE.href}
         className={`mt-6 flex gap-3.5 rounded-2xl p-4 outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${TONES.cream.card} ${TONES.cream.ring} hover:brightness-[0.985]`}
@@ -276,57 +327,65 @@ function ProfileRail({
         </span>
       </Link>
 
-      <nav className="mt-6">
-        <ul>
-          <li>
-            <NavRow
-              icon={SettingsIcon}
-              tone="neutral"
-              label="Semua pengaturan"
-              active={selectedId === null}
-              onClick={() => onSelect(null)}
-            />
-          </li>
-        </ul>
+      <div
+        role="tablist"
+        aria-orientation="vertical"
+        aria-label="Bagian pengaturan"
+        onKeyDown={onKeyDown}
+        className="mt-6 pb-2"
+      >
+        <NavRow
+          id={tabId(null)}
+          icon={SettingsIcon}
+          tone="neutral"
+          label="Semua pengaturan"
+          active={selectedId === null}
+          onClick={() => onSelect(null)}
+        />
 
         {SETTINGS.map((group) => (
-          <div key={group.id} className="mt-5">
-            <p className="mb-2 px-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
+          <div key={group.id} className="mt-5" role="presentation">
+            <p
+              role="presentation"
+              className="mb-2 px-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400"
+            >
               {group.label}
             </p>
-            <ul className="space-y-1.5">
+            <div className="space-y-1.5">
               {group.items.map((item) => (
-                <li key={item.id}>
-                  <NavRow
-                    icon={ICON[item.icon]}
-                    tone={group.tone}
-                    label={item.title}
-                    active={selectedId === item.id}
-                    onClick={() => onSelect(item.id)}
-                  />
-                </li>
+                <NavRow
+                  key={item.id}
+                  id={tabId(item.id)}
+                  icon={ICON[item.icon]}
+                  tone={group.tone}
+                  label={item.title}
+                  active={selectedId === item.id}
+                  onClick={() => onSelect(item.id)}
+                />
               ))}
-            </ul>
+            </div>
           </div>
         ))}
 
         <div className="mt-6 border-t border-karsa-line pt-4">
           <LogOutButton />
         </div>
-      </nav>
+      </div>
     </aside>
   );
 }
 
-/** A rail entry: filled row, icon, label, chevron. Filled rather than plain so
- *  the column reads as a list of destinations against the canvas. */
+/** A rail entry. Only the selected tab is in the tab order — arrow keys move
+ *  between the rest, which is how a tablist is meant to be walked. */
 function NavRow({
+  id,
   icon,
   tone,
   label,
   active,
   onClick,
 }: {
+  id: string;
   icon: LucideIcon;
   tone: Tone;
   label: string;
@@ -335,9 +394,13 @@ function NavRow({
 }) {
   return (
     <button
+      id={id}
       type="button"
+      role="tab"
+      aria-selected={active}
+      aria-controls={PANEL_ID}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
-      aria-current={active ? "page" : undefined}
       className={`group/row flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
         active ? "bg-karsa-soft ring-1 ring-act-edge" : "bg-karsa-cream hover:bg-white"
       }`}
@@ -375,14 +438,238 @@ function LogOutButton() {
   );
 }
 
-/* ── Right column ─────────────────────────────────────────────────────────── */
+/* ── Detail panels ────────────────────────────────────────────────────────── */
 
-/** The handful of controls that carry the day, hoisted out of their sections.
- *
- *  These are the real rows, not copies of them: the toggles read and write the
- *  same state the detail panels do, so flipping one here and then opening its
- *  section shows it already flipped. Rows that aren't switches open their
- *  section instead, since a time range needs a picker this card doesn't have. */
+/** The frame every section shares: who you are looking at, then the controls.
+ *  The heading lives here rather than in the page banner so the panel can be
+ *  read on its own. */
+function DetailShell({
+  item,
+  children,
+  bodyClassName = "px-6 py-6 sm:px-8 sm:py-7",
+}: {
+  item: ResolvedItem;
+  children: ReactNode;
+  bodyClassName?: string;
+}) {
+  return (
+    <section className={CARD}>
+      <header className="flex items-start gap-4 border-b border-karsa-line px-6 py-5 sm:px-8 sm:py-6">
+        <AccentIcon icon={ICON[item.icon]} tone={item.tone} size="lg" />
+        <div className="min-w-0">
+          <h2 className="text-[21px] font-bold leading-7 tracking-tight text-neutral-900 xl:text-[23px]">
+            {item.title}
+          </h2>
+          <p className="mt-1 text-[14px] leading-5 text-neutral-500">{item.description}</p>
+        </div>
+      </header>
+      <div className={bodyClassName}>{children}</div>
+    </section>
+  );
+}
+
+function Detail({
+  item,
+  switches,
+  onSwitch,
+}: {
+  item: ResolvedItem;
+  switches: Record<string, boolean>;
+  onSwitch: (key: string, next: boolean) => void;
+}) {
+  if (item.id === "profile") return <ProfileForm item={item} />;
+  if (item.id === "personal") return <PersonalForm item={item} />;
+
+  return (
+    <DetailShell item={item} bodyClassName="">
+      <ul className="divide-y divide-karsa-line/70">
+        {item.rows.map((row) => {
+          const key = `${item.id}.${row.id}`;
+
+          return (
+            <li key={row.id} className="px-1 sm:px-3">
+              {row.control.kind === "toggle" ? (
+                <SettingRow
+                  title={row.title}
+                  description={row.description}
+                  trailing={
+                    <Toggle
+                      label={row.title}
+                      checked={switches[key] ?? false}
+                      onChange={(next) => onSwitch(key, next)}
+                    />
+                  }
+                />
+              ) : (
+                <SettingRow
+                  title={row.title}
+                  description={row.description}
+                  value={row.control.kind === "value" ? row.control.value : undefined}
+                  interactive
+                />
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </DetailShell>
+  );
+}
+
+/** Two forms, one shape. `saved` is the last committed state and `draft` what
+ *  is on screen; Cancel is just a copy of one onto the other, which is why it
+ *  needs no confirmation of its own. */
+function useDraft<T extends Record<string, string>>(initial: T) {
+  const [saved, setSaved] = useState(initial);
+  const [draft, setDraft] = useState(initial);
+  const [justSaved, setJustSaved] = useState(false);
+
+  const dirty = (Object.keys(saved) as (keyof T)[]).some((key) => saved[key] !== draft[key]);
+
+  const set = (key: keyof T) => (next: string) => {
+    setDraft((prev) => ({ ...prev, [key]: next }));
+    setJustSaved(false);
+  };
+
+  const save = () => {
+    setSaved(draft);
+    setJustSaved(true);
+  };
+
+  const cancel = () => {
+    setDraft(saved);
+    setJustSaved(false);
+  };
+
+  return { draft, dirty, justSaved, set, save, cancel };
+}
+
+const FORM_DIVIDER = "mt-7 flex flex-col gap-4 border-t border-karsa-line pt-6";
+
+function ProfileForm({ item }: { item: ResolvedItem }) {
+  const form = useDraft({
+    name: PROFILE_FIELDS.name,
+    email: PROFILE_FIELDS.email,
+    role: PROFILE_FIELDS.role,
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    form.save();
+  };
+
+  return (
+    <DetailShell item={item}>
+      <form onSubmit={submit} noValidate>
+        <AvatarField initial={ACCOUNT.initial} />
+
+        {/* Two columns from `sm` up. The role selector takes the full row: it
+            is the field that changes what the rest of the app lets you do. */}
+        <div className="mt-7 grid gap-5 sm:grid-cols-2">
+          <TextField
+            label="Nama lengkap"
+            value={form.draft.name}
+            onChange={form.set("name")}
+            autoComplete="name"
+          />
+          <TextField
+            label="Email"
+            type="email"
+            value={form.draft.email}
+            onChange={form.set("email")}
+            autoComplete="email"
+            hint="Dipakai untuk masuk dan pemberitahuan penting."
+          />
+          <div className="sm:col-span-2">
+            <SelectField
+              label="Peran pendamping"
+              value={form.draft.role}
+              options={ROLE_OPTIONS}
+              onChange={form.set("role")}
+              hint="Menentukan seberapa jauh kamu bisa mengubah data perawatan Meimei."
+            />
+          </div>
+        </div>
+
+        <div className={FORM_DIVIDER}>
+          <FormActions
+            dirty={form.dirty}
+            saved={form.justSaved}
+            onSave={form.save}
+            onCancel={form.cancel}
+          />
+        </div>
+      </form>
+    </DetailShell>
+  );
+}
+
+function PersonalForm({ item }: { item: ResolvedItem }) {
+  const form = useDraft({
+    phone: PROFILE_FIELDS.phone,
+    birth: PROFILE_FIELDS.birth,
+    address: PROFILE_FIELDS.address,
+    emergency: PROFILE_FIELDS.emergency,
+  });
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    form.save();
+  };
+
+  return (
+    <DetailShell item={item}>
+      <form onSubmit={submit} noValidate>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <TextField
+            label="Nomor telepon"
+            type="tel"
+            value={form.draft.phone}
+            onChange={form.set("phone")}
+            autoComplete="tel"
+          />
+          <TextField
+            label="Tanggal lahir"
+            type="date"
+            value={form.draft.birth}
+            onChange={form.set("birth")}
+          />
+          <div className="sm:col-span-2">
+            <TextField
+              label="Alamat"
+              value={form.draft.address}
+              onChange={form.set("address")}
+              autoComplete="street-address"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            {/* Drawn from the care team rather than typed: an emergency contact
+                who is not in the group is one the app cannot actually reach. */}
+            <SelectField
+              label="Kontak darurat"
+              value={form.draft.emergency}
+              options={CARE_GROUP.members.map((member) => member.name)}
+              onChange={form.set("emergency")}
+              hint="Dihubungi lebih dulu bila terjadi keadaan mendesak."
+            />
+          </div>
+        </div>
+
+        <div className={FORM_DIVIDER}>
+          <FormActions
+            dirty={form.dirty}
+            saved={form.justSaved}
+            onSave={form.save}
+            onCancel={form.cancel}
+          />
+        </div>
+      </form>
+    </DetailShell>
+  );
+}
+
+/* ── Overview ─────────────────────────────────────────────────────────────── */
+
 function QuickSettings({
   onSelect,
   switches,
@@ -442,9 +729,6 @@ function QuickSettings({
   );
 }
 
-/** What the caregiver has put in, counted. The figure leads and the label sits
- *  under it — the number is the reward, and burying it under its own caption
- *  would waste the only line here that means anything. */
 function Contributions() {
   return (
     <section className={`${CARD} p-6 sm:p-7 xl:p-8`}>
@@ -457,24 +741,24 @@ function Contributions() {
         </p>
       </header>
 
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {CONTRIBUTIONS.map((item) => {
-          const t = TONES[item.tone];
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {CONTRIBUTIONS.map((entry) => {
+          const t = TONES[entry.tone];
 
           return (
             <li
-              key={item.id}
+              key={entry.id}
               className={`flex items-start gap-3.5 rounded-2xl p-4 ring-1 ${t.card} ${t.ring}`}
             >
-              <AccentIcon icon={CONTRIBUTION_ICON[item.id]} tone={item.tone} size="md" />
+              <AccentIcon icon={CONTRIBUTION_ICON[entry.id]} tone={entry.tone} size="md" />
               <div className="min-w-0">
                 <p className="text-[23px] font-bold leading-8 tabular-nums text-neutral-900">
-                  {item.value}
+                  {entry.value}
                 </p>
                 <p className="text-[13.5px] font-semibold leading-5 text-neutral-700">
-                  {item.label}
+                  {entry.label}
                 </p>
-                <p className="mt-0.5 text-[12.5px] leading-4 text-neutral-500">{item.note}</p>
+                <p className="mt-0.5 text-[12.5px] leading-4 text-neutral-500">{entry.note}</p>
               </div>
             </li>
           );
@@ -484,8 +768,6 @@ function Contributions() {
   );
 }
 
-/** Milestones. The unearned one is kept in the list rather than hidden: seeing
- *  73 of 100 is the only part of this card that can still change anything. */
 function Badges() {
   return (
     <section className={`${CARD} p-6 sm:p-7 xl:p-8`}>
@@ -559,9 +841,6 @@ function Badges() {
   );
 }
 
-/** Stacked cards, each one centred and short. The reference uses this shape for
- *  things you have not done yet; here it holds the decisions worth making on a
- *  settings page, so the column is a way in rather than a place to read. */
 function Overview({
   onSelect,
   switches,
@@ -577,41 +856,48 @@ function Overview({
       <QuickSettings onSelect={onSelect} switches={switches} onSwitch={onSwitch} />
       <Badges />
 
-      {OVERVIEW.map((card) => {
-        const face = OVERVIEW_FACE[card.id];
+      {/* Side by side once there is room — three full-width cards in a column
+          was most of the empty space this page used to end on. */}
+      <div className="grid gap-5 xl:grid-cols-3 xl:gap-6">
+        {OVERVIEW.map((card) => {
+          const face = OVERVIEW_FACE[card.id];
 
-        return (
-          <section key={card.id} className={`${CARD} px-6 py-8 text-center sm:px-10 xl:py-10`}>
-            <span className="inline-grid">
-              <AccentIcon icon={face.icon} tone={face.tone} size="lg" />
-            </span>
+          return (
+            <section
+              key={card.id}
+              className={`${CARD} flex flex-col px-6 py-8 text-center sm:px-8 xl:py-9`}
+            >
+              <span className="mx-auto inline-grid">
+                <AccentIcon icon={face.icon} tone={face.tone} size="lg" />
+              </span>
 
-            <h2 className="mx-auto mt-4 max-w-[30ch] text-[19px] font-bold leading-7 tracking-tight text-neutral-900 xl:text-[21px]">
-              {card.title}
-            </h2>
-            <p className="mx-auto mt-2 max-w-[52ch] text-[14.5px] leading-6 text-neutral-500">
-              {card.body}
-            </p>
+              <h2 className="mx-auto mt-4 max-w-[30ch] text-[18px] font-bold leading-6 tracking-tight text-neutral-900">
+                {card.title}
+              </h2>
+              <p className="mx-auto mt-2 max-w-[46ch] text-[14px] leading-6 text-neutral-500">
+                {card.body}
+              </p>
 
-            <div className="mt-6 flex flex-wrap justify-center gap-2.5">
-              {card.actions.map((action) => (
-                <button
-                  key={action.target}
-                  type="button"
-                  onClick={() => onSelect(action.target)}
-                  className={`rounded-full px-5 py-2.5 text-[14px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 ${
-                    action.primary
-                      ? "bg-karsa text-white hover:bg-karsa-dark"
-                      : "bg-tint-sand text-karsa-dark ring-1 ring-edge-sand hover:bg-karsa-soft"
-                  }`}
-                >
-                  {action.label}
-                </button>
-              ))}
-            </div>
-          </section>
-        );
-      })}
+              <div className="mt-6 flex flex-wrap justify-center gap-2.5 pt-0 xl:mt-auto xl:pt-6">
+                {card.actions.map((action) => (
+                  <button
+                    key={action.target}
+                    type="button"
+                    onClick={() => onSelect(action.target)}
+                    className={`rounded-full px-4 py-2.5 text-[13.5px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 ${
+                      action.primary
+                        ? "bg-karsa text-white hover:bg-karsa-dark"
+                        : "bg-tint-sand text-karsa-dark ring-1 ring-edge-sand hover:bg-karsa-soft"
+                    }`}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
     </div>
   );
 }

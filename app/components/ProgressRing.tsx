@@ -4,11 +4,19 @@ export default function ProgressRing({
   value,
   label,
   className = "h-28 w-28",
+  color,
+  track,
+  caption,
 }: {
   /** 0–100. */
   value: number;
   label?: string;
   className?: string;
+  /** Overrides the default karsa green — a stat card rings in its own hue. */
+  color?: string;
+  track?: string;
+  /** Replaces the percentage in the middle. */
+  caption?: string;
 }) {
   const R = 44;
   const circumference = 2 * Math.PI * R;
@@ -17,7 +25,15 @@ export default function ProgressRing({
   return (
     <div className={`@container relative shrink-0 ${className}`}>
       <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" aria-hidden>
-        <circle cx="50" cy="50" r={R} fill="none" strokeWidth="9" className="stroke-white/75" />
+        <circle
+          cx="50"
+          cy="50"
+          r={R}
+          fill="none"
+          strokeWidth="9"
+          stroke={track}
+          className={track ? undefined : "stroke-white/75"}
+        />
         <circle
           cx="50"
           cy="50"
@@ -26,13 +42,16 @@ export default function ProgressRing({
           strokeWidth="9"
           strokeLinecap="round"
           strokeDasharray={`${dash} ${circumference}`}
-          className="stroke-karsa transition-[stroke-dasharray] duration-500 ease-out"
+          stroke={color}
+          className={`transition-[stroke-dasharray] duration-500 ease-out ${
+            color ? "" : "stroke-karsa"
+          }`}
         />
       </svg>
 
       <div className="absolute inset-0 grid place-content-center text-center">
         <span className="text-[clamp(20px,26cqw,34px)] font-extrabold leading-none tabular-nums text-neutral-900">
-          {Math.round(value)}%
+          {caption ?? `${Math.round(value)}%`}
         </span>
         {label && (
           <span className="mt-1 text-[clamp(11px,10cqw,14px)] font-medium leading-none text-neutral-500">

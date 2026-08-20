@@ -136,6 +136,33 @@ body {
   }
 }
 
+/* A scrollbar for panes that scroll inside the page rather than with it. The
+   track stays invisible and the thumb is inset by its own transparent border,
+   so the bar reads as part of the pane rather than as chrome bolted to its
+   edge. Firefox gets the two properties it understands, WebKit the drawn
+   version. Unlayered on purpose — these are element pseudo-parts, so there is
+   no utility for them to collide with. */
+.scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: #d8d3c6 transparent;
+}
+.scrollbar-slim::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: #d8d3c6;
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+  background-color: #c0b8a6;
+}
+
 #sb ul {
   list-style: none;
 }

@@ -427,3 +427,26 @@ export const OVERVIEW: OverviewCard[] = [
     ],
   },
 ];
+
+/* ── Form options ─────────────────────────────────────────────────────────── */
+
+/** What a caregiver can be to the person they look after. Ordered by how much
+ *  of the day it takes, because that is what the list is really asking. */
+export const ROLE_OPTIONS = [
+  "Pendamping utama",
+  "Pendamping pendukung",
+  "Keluarga",
+  "Perawat profesional",
+];
+
+/** Seed values for the profile form. Separate from `ACCOUNT` so editing the
+ *  form never mutates the identity the rail reads from. */
+export const PROFILE_FIELDS = {
+  name: ACCOUNT.name,
+  email: ACCOUNT.email,
+  role: ACCOUNT.role,
+  phone: "+62 812 3456 7890",
+  birth: "1990-05-12",
+  emergency: "Sinta",
+  address: "Jl. Melati No. 24, Bandung",
+};

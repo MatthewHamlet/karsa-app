@@ -44,7 +44,12 @@ export default function AssistantChat({
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" aria-label="Percakapan dengan Karsa">
+    /* `relative` lifts the thread above the wallpaper the page paints behind
+       it — an absolutely positioned sibling would otherwise sit on top. */
+    <section
+      className="relative flex min-h-0 flex-1 flex-col"
+      aria-label="Percakapan dengan Karsa"
+    >
       {/* ── Stream ──────────────────────────────────────────────────────── */}
       <div ref={streamRef} className="min-h-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 xl:px-8">
         <div className="mx-auto w-full max-w-[760px] space-y-5">

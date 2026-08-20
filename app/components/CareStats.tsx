@@ -6,7 +6,9 @@ import { Check, ChevronDown, Plus, X } from "lucide-react";
 import Modal from "./Modal";
 import MoodFace from "./MoodFace";
 import StatArt from "./StatArt";
+import StatPeriodBody from "./StatPeriod";
 import { EASE } from "./List";
+import { TRENDS } from "../data/careTrends";
 import {
   FIXED_STATS,
   FIXED_TONES,
@@ -32,6 +34,8 @@ function StatCard({
   onRemove,
   removeLabel,
   className = "",
+  swapKey,
+  tall = false,
 }: {
   tone: StatTone;
   /** The card's illustration — upper-left, above the statistic. */
@@ -43,18 +47,57 @@ function StatCard({
   onRemove?: () => void;
   removeLabel?: string;
   className?: string;
+  /** Changing this swaps the body: the old one leaves, the card resizes, the
+   *  new one arrives. The card itself never unmounts, so the illustration and
+   *  the colour stay put and only the statistic moves. */
+  swapKey?: string;
+  /** One fixed height for every card in a period view. A chart, a donut and a
+   *  month of days all want different amounts of room, and letting each take
+   *  what it wants is what broke the grid's rows — so they all get the same
+   *  and distribute inside it. A day's cards stay compact. */
+  tall?: boolean;
 }) {
+  const reduce = useReducedMotion();
+
   return (
-    <article
+    <motion.article
+      layout={!reduce}
+      transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 34 }}
       aria-label={label}
-      className={`group/stat relative flex min-h-[176px] flex-col overflow-hidden rounded-3xl p-5 xl:p-6 ${className}`}
+      className={`group/stat relative flex flex-col overflow-hidden rounded-3xl p-5 xl:p-6 ${
+        tall ? "h-[292px] xl:h-[304px]" : "min-h-[176px]"
+      } ${className}`}
       style={{ backgroundColor: tone.bg, boxShadow: `inset 0 0 0 1px ${tone.edge}` }}
     >
       {backdrop}
 
-      <div className="relative z-10">{art}</div>
+      <div className="relative z-10 shrink-0">{art}</div>
 
-      <div className="relative z-10 mt-4 flex flex-1 flex-col justify-end">{children}</div>
+      <div className="relative z-10 mt-4 flex min-h-0 flex-1 flex-col">
+        {/* `popLayout`, deliberately not `wait`. Under `wait` the incoming body
+            is held back until the outgoing one finishes animating away — which
+            makes what the card *says* depend on an animation completing. Switch
+            period and background the tab and rAF stops: the old statistic stays
+            on screen under the new card's label, with no error anywhere. Here
+            the new body mounts at once and the old one is pulled out of layout
+            while it leaves, so the card resizes cleanly and never lies. */}
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.div
+            key={swapKey ?? "static"}
+            layout={!reduce}
+            initial={reduce ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.16, ease: EASE }}
+            /* Fills the card so a body can distribute itself top-to-bottom;
+               `justify-end` keeps a day's short body sitting on the floor of
+               the card the way it always has. */
+            className="flex min-h-0 flex-1 flex-col justify-end"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {onRemove && (
         <button
@@ -67,7 +110,7 @@ function StatCard({
           <X size={14} strokeWidth={2.6} />
         </button>
       )}
-    </article>
+    </motion.article>
   );
 }
 
@@ -109,6 +152,10 @@ export default function CareStats() {
 
   const fluid = FIXED_STATS.fluid.byPeriod[period];
   const meals = FIXED_STATS.meals.byPeriod[period];
+
+  /** Null on a day, and the whole period's detail otherwise. Narrowed once
+   *  here so every card below can just ask whether there is a trend to draw. */
+  const trend = period === "daily" ? null : TRENDS[period];
 
   return (
     <section>
@@ -187,14 +234,23 @@ export default function CareStats() {
         </div>
       </header>
 
+      {/* The grid itself never re-keys. Switching period used to remount the
+          whole thing, which read as the page blinking; now each card keeps its
+          colour and its illustration and swaps only the statistic inside. */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
         {/* Water keeps its liquid: the card is the glass, filled to the level
             the figure states. No bar underneath — the fill is the bar. */}
         <StatCard
+          swapKey={period}
+          tall={Boolean(trend)}
           tone={FIXED_TONES.fluid}
           art={<StatArt kind="fluid" tone={FIXED_TONES.fluid} />}
           label={`${FIXED_STATS.fluid.title}: ${fluid.value} ${fluid.caption}`}
           backdrop={
+            /* The glass fills only on a day. A week is seven glasses, and a
+               single level behind a chart of them would be a second, quieter
+               claim about the same numbers. */
+            trend ? undefined : (
             <div
               aria-hidden
               className="pointer-events-none absolute inset-x-0 bottom-0 z-0 opacity-40"
@@ -214,21 +270,39 @@ export default function CareStats() {
               </svg>
               <div className="h-full w-full" style={{ backgroundColor: FIXED_TONES.fluid.ink }} />
             </div>
+            )
           }
         >
-          <StatFigure
-            data={{ value: fluid.value, caption: fluid.caption }}
-            tone={FIXED_TONES.fluid}
-          />
+          {trend ? (
+            <StatPeriodBody
+              detail={trend.fluid}
+              tone={FIXED_TONES.fluid}
+              title={FIXED_STATS.fluid.title}
+            />
+          ) : (
+            <StatFigure
+              data={{ value: fluid.value, caption: fluid.caption }}
+              tone={FIXED_TONES.fluid}
+            />
+          )}
         </StatCard>
 
         {/* Meals are the patient's own record — shown, never edited here. */}
         <StatCard
+          swapKey={period}
+          tall={Boolean(trend)}
           tone={FIXED_TONES.meals}
           art={<StatArt kind="meals" tone={FIXED_TONES.meals} />}
           label={`${FIXED_STATS.meals.title}: ${meals.value} ${meals.caption}`}
         >
-          {period === "daily" ? (
+          {trend ? (
+            <StatPeriodBody
+              detail={trend.meals}
+              tone={FIXED_TONES.meals}
+              title={FIXED_STATS.meals.title}
+              unit="porsi makan"
+            />
+          ) : (
             <ul className="space-y-2.5">
               {meals.meals!.map((meal) => (
                 <li key={meal.label} className="flex items-center gap-2.5">
@@ -253,43 +327,73 @@ export default function CareStats() {
                 </li>
               ))}
             </ul>
-          ) : (
-            <StatFigure data={meals} tone={FIXED_TONES.meals} />
           )}
         </StatCard>
 
         <StatCard
+          swapKey={period}
+          tall={Boolean(trend)}
           tone={FIXED_TONES.medication}
           art={<StatArt kind="medication" tone={FIXED_TONES.medication} />}
           label={`${FIXED_STATS.medication.title}: ${FIXED_STATS.medication.byPeriod[period].value}`}
         >
-          <StatFigure
-            data={FIXED_STATS.medication.byPeriod[period]}
-            tone={FIXED_TONES.medication}
-          />
+          {trend ? (
+            <StatPeriodBody
+              detail={trend.medication}
+              tone={FIXED_TONES.medication}
+              title={FIXED_STATS.medication.title}
+              unit="dosis"
+            />
+          ) : (
+            <StatFigure
+              data={FIXED_STATS.medication.byPeriod[period]}
+              tone={FIXED_TONES.medication}
+            />
+          )}
         </StatCard>
 
-        {/* The face is this card's icon, so it stands in for the glyph. */}
-        <article
-          aria-label={`${FIXED_STATS.mood.title}: ${FIXED_STATS.mood.byPeriod[period].value}`}
-          className="relative flex min-h-[176px] flex-col overflow-hidden rounded-3xl p-5 xl:p-6"
-          style={{
-            backgroundColor: FIXED_TONES.mood.bg,
-            boxShadow: `inset 0 0 0 1px ${FIXED_TONES.mood.edge}`,
-          }}
+        {/* The face is this card's icon, so it stands in for the glyph — which
+            is the only reason this one used to be a hand-built article. It is a
+            StatCard like the rest now, so it swaps its body the same way. */}
+        <StatCard
+          swapKey={period}
+          tall={Boolean(trend)}
+          tone={FIXED_TONES.mood}
+          art={
+            <MoodFace
+              mood={trend ? trend.mood.mood!.dominant : todayMood.mood}
+              className="h-11 w-11 shrink-0 xl:h-12 xl:w-12"
+            />
+          }
+          label={`${FIXED_STATS.mood.title}: ${FIXED_STATS.mood.byPeriod[period].value}`}
         >
-          <MoodFace mood={todayMood.mood} className="h-11 w-11 shrink-0 xl:h-12 xl:w-12" />
-          <div className="mt-4 flex flex-1 flex-col justify-end">
+          {trend ? (
+            <StatPeriodBody
+              detail={trend.mood}
+              tone={FIXED_TONES.mood}
+              title={FIXED_STATS.mood.title}
+            />
+          ) : (
             <StatFigure data={FIXED_STATS.mood.byPeriod[period]} tone={FIXED_TONES.mood} />
-          </div>
-        </article>
+          )}
+        </StatCard>
 
         <StatCard
+          swapKey={period}
+          tall={Boolean(trend)}
           tone={FIXED_TONES.sleep}
           art={<StatArt kind="sleep" tone={FIXED_TONES.sleep} />}
           label={`${FIXED_STATS.sleep.title}: ${FIXED_STATS.sleep.byPeriod[period].value}`}
         >
-          <StatFigure data={FIXED_STATS.sleep.byPeriod[period]} tone={FIXED_TONES.sleep} />
+          {trend ? (
+            <StatPeriodBody
+              detail={trend.sleep}
+              tone={FIXED_TONES.sleep}
+              title={FIXED_STATS.sleep.title}
+            />
+          ) : (
+            <StatFigure data={FIXED_STATS.sleep.byPeriod[period]} tone={FIXED_TONES.sleep} />
+          )}
         </StatCard>
 
         {/* Added monitoring stats sit in the same grid as the fixed ones. */}
@@ -306,6 +410,8 @@ export default function CareStats() {
                 transition={fade}
               >
                 <StatCard
+                  swapKey={period}
+                  tall={Boolean(trend)}
                   tone={stat.tone}
                   art={<StatArt kind={stat.key} tone={stat.tone} />}
                   label={`${stat.title}: ${stat.byPeriod[period].value}`}
@@ -313,7 +419,15 @@ export default function CareStats() {
                   removeLabel={`Hapus ${stat.title}`}
                   className="h-full"
                 >
-                  <StatFigure data={stat.byPeriod[period]} tone={stat.tone} />
+                  {trend ? (
+                    <StatPeriodBody
+                      detail={trend[stat.key]}
+                      tone={stat.tone}
+                      title={stat.title}
+                    />
+                  ) : (
+                    <StatFigure data={stat.byPeriod[period]} tone={stat.tone} />
+                  )}
                 </StatCard>
               </motion.div>
             );
@@ -324,7 +438,11 @@ export default function CareStats() {
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          className="group/add flex min-h-[176px] flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-karsa-line bg-white/40 p-5 text-center outline-none transition-colors duration-200 hover:border-karsa/40 hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-karsa/40"
+          /* Matches whatever the cards are doing, so it sits on the same
+             baseline instead of leaving a short tile at the end of the row. */
+          className={`group/add flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-karsa-line bg-white/40 p-5 text-center outline-none transition-colors duration-200 hover:border-karsa/40 hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
+            trend ? "h-[292px] xl:h-[304px]" : "min-h-[176px]"
+          }`}
         >
           <span className="grid h-11 w-11 place-items-center rounded-full bg-white text-karsa-dark ring-1 ring-karsa-line transition-transform duration-200 group-hover/add:scale-110">
             <Plus size={20} strokeWidth={2.4} />

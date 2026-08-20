@@ -127,7 +127,7 @@ export default function Calendar({ selected, onSelect, className = "" }: Calenda
                     isSelected
                       ? "text-white"
                       : isToday
-                        ? "text-karsa-dark hover:bg-white/70"
+                        ? "text-neutral-900"
                         : "text-neutral-600 hover:bg-white/70"
                   }`}
                 >
@@ -138,8 +138,14 @@ export default function Calendar({ selected, onSelect, className = "" }: Calenda
                       className="absolute inset-0 rounded-full bg-karsa shadow-[0_4px_10px_-4px_rgba(86,120,93,0.8)]"
                     />
                   )}
+                  {/* Today is a quiet grey disc, not a green outline. Green is
+                      what the calendar uses to say "this is the day you are
+                      looking at" — spending it on "this is the day it happens
+                      to be" made two different claims in one colour, and the
+                      ring competed with the selected pill for attention it
+                      does not need. */}
                   {!isSelected && isToday && (
-                    <span className="absolute inset-0 rounded-full ring-1 ring-karsa/45" />
+                    <span className="absolute inset-0 rounded-full bg-neutral-900/[0.07] transition-colors duration-200 group-hover/day:bg-neutral-900/[0.11]" />
                   )}
 
                   {/* Dead centre in the pill — `leading-none` so the glyph box

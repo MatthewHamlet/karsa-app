@@ -165,3 +165,74 @@ export const REPLIES: Record<Intent, { text: string; cards: ActionCard[] }> = {
 /** Reads as a person talking, not a form being filled. */
 export const GREETING =
   "Halo, aku Karsa. Aku ikut menemani Meimei hari ini — tanya apa saja, atau pilih salah satu di bawah untuk mulai cepat.";
+
+/* ── Riwayat percakapan ───────────────────────────────────────────────────── */
+
+/** Sessions the caregiver has had with Karsa before. Each carries its whole
+ *  thread, so reopening one restores the conversation rather than showing a
+ *  summary of it — a caregiver looking up what they were told last Tuesday
+ *  needs the words, not a title. */
+export type HistorySession = {
+  id: string;
+  /** Grouping label, already resolved — the page does no date maths. */
+  day: string;
+  time: string;
+  title: string;
+  turns: { from: "me" | "karsa"; text: string }[];
+};
+
+export const HISTORY: HistorySession[] = [
+  {
+    id: "h1",
+    day: "Hari ini",
+    time: "08:12",
+    title: "Metformin pagi tertunda",
+    turns: [
+      { from: "me", text: "Meimei belum minum Metformin pagi, sudah lewat 2 jam. Aman?" },
+      {
+        from: "karsa",
+        text: "Masih aman. Metformin pagi boleh diminum sampai sebelum makan siang, asal jaraknya tidak terlalu dekat dengan dosis berikutnya. Aku catat keterlambatannya ya.",
+      },
+    ],
+  },
+  {
+    id: "h2",
+    day: "Kemarin",
+    time: "20:40",
+    title: "Tensi naik setelah makan malam",
+    turns: [
+      { from: "me", text: "Tensi Meimei 150/95 tadi. Biasanya 130-an." },
+      {
+        from: "karsa",
+        text: "Satu kali pengukuran tinggi belum tentu berarti. Coba ukur ulang 15 menit lagi dalam posisi duduk tenang. Kalau masih di atas 150/95, itu layak dibawa ke dr. Anindya besok.",
+      },
+      { from: "me", text: "Oke, aku ukur ulang." },
+    ],
+  },
+  {
+    id: "h3",
+    day: "Kemarin",
+    time: "13:05",
+    title: "Menu makan siang rendah garam",
+    turns: [
+      { from: "me", text: "Ide menu makan siang yang rendah garam tapi Meimei masih mau makan?" },
+      {
+        from: "karsa",
+        text: "Coba pepes ikan dengan daun kemangi — rasanya kuat dari rempah, bukan dari garam. Tambah tumis labu siam dan nasi merah setengah porsi.",
+      },
+    ],
+  },
+  {
+    id: "h4",
+    day: "17 Agustus",
+    time: "06:30",
+    title: "Meimei susah tidur tiga malam",
+    turns: [
+      { from: "me", text: "Tiga malam ini Meimei baru tidur jam 2. Ada yang bisa dibantu?" },
+      {
+        from: "karsa",
+        text: "Pola tidurnya memang bergeser sejak Sabtu. Biasanya yang menolong: matikan layar satu jam sebelum tidur, jaga kamar tetap gelap, dan jangan tidur siang lewat jam 3. Kalau lewat seminggu masih begini, sebaiknya dibicarakan dengan dokternya.",
+      },
+    ],
+  },
+];

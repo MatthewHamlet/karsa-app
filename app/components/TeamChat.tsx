@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BedDouble,
@@ -15,6 +15,7 @@ import {
   Utensils,
   X,
 } from "lucide-react";
+import HealthPattern from "./HealthPattern";
 import { EASE } from "./List";
 import { CHAT_DAY, ME, MESSAGES, SENDERS, type ChatMessage } from "../data/chat";
 import { CONTEXT_LABEL, type CareContextType } from "../data/care";
@@ -32,14 +33,14 @@ const LOG_ICON = {
 const mmss = (seconds: number) =>
   `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
-/** The room the thread sits in: the page's own canvas, plus a sand dot grid
- *  faint enough to read as paper grain. It's what lifts the white bubbles off
- *  the background now that the chat runs edge to edge. */
-const WALLPAPER: CSSProperties = {
-  backgroundColor: "#f1ede3",
-  backgroundImage: "radial-gradient(rgba(109,86,71,0.07) 1px, transparent 1px)",
-  backgroundSize: "20px 20px",
-};
+/** The room the thread sits in. The floor is a shade under the page's canvas so
+ *  the white bubbles lift off it; the scattered health glyphs on top are the
+ *  same wallpaper the assistant screen uses, in clay instead of green — this is
+ *  a room in the same house, talking about the same person. */
+const WALLPAPER = "#f1ede3";
+/** Written out rather than built from a constant: Tailwind reads the source as
+ *  text, so an interpolated class name compiles to nothing at all. */
+const WALLPAPER_INK = "text-[#6d5647]";
 
 /** The clock in the corner of a bubble. Sits on the last line of the text, so
  *  a two-word message stays two words wide. */
@@ -216,14 +217,18 @@ export default function TeamChat({
 
   return (
     <section
-      className="flex h-[calc(100dvh-16rem)] min-h-[320px] flex-col"
-      style={height ? { ...WALLPAPER, height } : WALLPAPER}
+      className="relative flex h-[calc(100dvh-16rem)] min-h-[320px] flex-col"
+      style={{ backgroundColor: WALLPAPER, ...(height ? { height } : null) }}
     >
+      {/* Pinned to the room, not to the thread: it sits outside the scroller,
+          so the wallpaper stays put while the messages travel over it. */}
+      <HealthPattern className={WALLPAPER_INK} opacity={0.13} />
+
       {/* `overscroll-contain` stops the bounce at the ends of the thread from
           being handed to the page behind it. */}
       <div
         ref={streamRef}
-        className={`min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-4 ${PAD}`}
+        className={`relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain py-4 ${PAD}`}
       >
         <p className="mx-auto mb-3 w-fit rounded-full bg-white/85 px-3.5 py-1 text-[12px] font-semibold text-neutral-500 shadow-[0_1px_2px_rgba(24,32,24,0.05)] ring-1 ring-karsa-line">
           {CHAT_DAY}
@@ -241,7 +246,9 @@ export default function TeamChat({
       </div>
 
       {/* ── Composer ──────────────────────────────────────────────────── */}
-      <div className={`shrink-0 border-t border-karsa-line bg-karsa-cream py-2.5 sm:py-3 ${PAD}`}>
+      <div
+        className={`relative shrink-0 border-t border-karsa-line bg-karsa-cream py-2.5 sm:py-3 ${PAD}`}
+      >
         {attached && (
           <motion.div
             initial={reduce ? false : { opacity: 0, y: 6 }}

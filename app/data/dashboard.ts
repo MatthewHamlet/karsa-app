@@ -150,3 +150,41 @@ export const SCHEDULE: Record<string, ScheduleEvent[]> = {
     { id: "s5", title: "Cek darah", start: "07:30", end: "08:30", kind: "checkup" },
   ],
 };
+
+/* ── Care recipients ──────────────────────────────────────────────────────── */
+
+/** Who the dashboard is about. A caregiver often looks after more than one
+ *  person, and every figure on this page belongs to exactly one of them — so
+ *  the switcher sits at the top of the column the figures are in, not buried
+ *  in settings.
+ *
+ *  `relation` is how the caregiver refers to them, not a clinical role: the
+ *  word that tells them at a glance whose day they are reading. */
+export type Patient = {
+  id: string;
+  name: string;
+  relation: string;
+  initial: string;
+  color: string;
+  /** The short line under the name in the open list. */
+  note: string;
+};
+
+export const PATIENTS: Patient[] = [
+  {
+    id: "meimei",
+    name: "Meimei",
+    relation: "Ibu",
+    initial: "M",
+    color: "#56785d",
+    note: "72 tahun · Diabetes tipe 2",
+  },
+  {
+    id: "hadi",
+    name: "Pak Hadi",
+    relation: "Ayah",
+    initial: "H",
+    color: "#8a76bd",
+    note: "76 tahun · Pasca-stroke",
+  },
+];

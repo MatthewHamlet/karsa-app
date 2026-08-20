@@ -17,6 +17,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import List, { EASE, RAIL_SPRING } from "../components/List";
+import { ACCOUNT } from "../data/settings";
 
 /** Collapsed width is not arbitrary: rail padding (14) + item padding (14)
  *  + half the icon cell (14) = 42, so every icon centreline lands exactly on
@@ -85,51 +86,9 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps
 
       <div className="mx-3.5 h-px bg-karsa-line" />
 
-      {/* Profile */}
-      <div className="px-3.5 pt-3.5">
-        <Link
-          href="/#user"
-          onClick={() => onSelect("/#user")}
-          className={`group/item relative flex h-14 items-center rounded-xl px-3.5 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
-            active === "/#user"
-              ? "bg-white shadow-[0_1px_2px_rgba(24,32,24,0.06)] ring-1 ring-karsa-line"
-              : "hover:bg-neutral-900/[0.045]"
-          }`}
-        >
-          <span className="relative grid w-7 shrink-0 place-items-center">
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-karsa text-[11px] font-bold text-white transition-transform duration-200 group-hover/item:scale-110">
-              M
-            </span>
-            <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-karsa-cream" />
-          </span>
-
-          <motion.div
-            animate={{
-              width: isOpen ? "auto" : 0,
-              opacity: isOpen ? 1 : 0,
-              x: isOpen ? 0 : -8,
-            }}
-            transition={
-              reduce
-                ? { duration: 0 }
-                : {
-                    width: { duration: 0.28, ease: EASE },
-                    x: { duration: 0.28, ease: EASE },
-                    opacity: {
-                      duration: isOpen ? 0.18 : 0.1,
-                      delay: isOpen ? 0.08 : 0,
-                    },
-                  }
-            }
-            className="overflow-hidden whitespace-nowrap"
-          >
-            <p className="ml-3.5 text-[15px] font-semibold text-neutral-800">
-              Meimei Tole tole
-            </p>
-            <p className="ml-3.5 text-xs text-neutral-500">Lihat profil</p>
-          </motion.div>
-        </Link>
-      </div>
+      {/* The profile used to sit here, under the logo. It is at the foot of
+          the rail now, directly above Pengaturan — see `RailProfile`. The top
+          is the logo and the collapse handle, nothing else. */}
 
       {/* Section label — fades out when collapsed but keeps its slot,
           so the nav below never jumps. */}
@@ -165,7 +124,15 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps
 
       <div className="mx-3.5 h-px bg-karsa-line" />
 
-      <ul className="space-y-1.5 px-3.5 py-3.5">
+      {/* The account, at the foot of the rail where an account belongs — and
+          directly above Pengaturan, because "who am I" and "change how this
+          works for me" are the same errand. It used to sit in the top-right of
+          the dashboard, over a column of somebody else's numbers. */}
+      <div className="px-3.5 pb-1 pt-3.5">
+        <RailProfile isOpen={isOpen} onSelect={onSelect} />
+      </div>
+
+      <ul className="space-y-1.5 px-3.5 pb-3.5 pt-1.5">
         <List
           link="/settings"
           icon={Settings}
@@ -211,6 +178,72 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps
         </motion.button>
       )}
     </div>
+  );
+}
+
+/** The caregiver's own row. Built here rather than reusing `List` because that
+ *  takes a line icon, and a person is a face — but the collapse behaviour is
+ *  copied from it exactly, so the two rows shrink as one block. */
+function RailProfile({
+  isOpen,
+  onSelect,
+}: {
+  isOpen: boolean;
+  onSelect?: (link: string) => void;
+}) {
+  const reduce = useReducedMotion();
+  const href = "/settings?bagian=profile";
+
+  const label = reduce
+    ? { duration: 0 }
+    : {
+        width: { duration: 0.28, ease: EASE },
+        x: { duration: 0.28, ease: EASE },
+        opacity: { duration: isOpen ? 0.18 : 0.1, delay: isOpen ? 0.08 : 0 },
+      };
+
+  return (
+    <Link
+      href={href}
+      onClick={() => onSelect?.(href)}
+      title={isOpen ? undefined : ACCOUNT.name}
+      className="group/me relative flex h-12 items-center rounded-xl px-3.5 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40"
+    >
+      <span className="absolute inset-0 rounded-xl bg-neutral-900/0 transition-colors duration-200 group-hover/me:bg-neutral-900/[0.045]" />
+
+      <span className="relative z-10 grid w-7 shrink-0 place-items-center">
+        <span className="relative">
+          <span className="grid h-8 w-8 place-items-center rounded-full bg-karsa text-[13px] font-bold text-white">
+            {ACCOUNT.initial}
+          </span>
+          <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-karsa-cream" />
+        </span>
+      </span>
+
+      <motion.span
+        animate={{ width: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0, x: isOpen ? 0 : -8 }}
+        transition={label}
+        className="relative z-10 overflow-hidden whitespace-nowrap"
+      >
+        <span className="ml-3.5 block">
+          <span className="block truncate text-[15px] font-semibold leading-5 text-neutral-800">
+            {ACCOUNT.name}
+          </span>
+          <span className="block truncate text-[12.5px] leading-4 text-neutral-500">
+            {ACCOUNT.role}
+          </span>
+        </span>
+      </motion.span>
+
+      {!isOpen && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute left-[calc(100%+16px)] top-1/2 z-50 -translate-x-1 -translate-y-1/2 scale-95 whitespace-nowrap rounded-lg bg-neutral-900 px-3 py-2 text-[13px] font-medium text-white opacity-0 shadow-lg transition-all duration-150 ease-out group-hover/me:translate-x-0 group-hover/me:scale-100 group-hover/me:opacity-100"
+        >
+          {ACCOUNT.name}
+        </span>
+      )}
+    </Link>
   );
 }
 

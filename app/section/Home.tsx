@@ -3,15 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import {
-  ArrowRight,
-  Bell,
-  Check,
-  Clock,
-  HeartPulse,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Check, Clock, HeartPulse, Plus, Sparkles } from "lucide-react";
 
 import Mascot from "../components/Mascot";
 import MoodFace from "../components/MoodFace";
@@ -23,6 +15,7 @@ import TaskItem from "../components/TaskItem";
 import ActivityItem from "../components/ActivityItem";
 import Calendar, { type Selection } from "../components/Calendar";
 import ScheduleItem from "../components/ScheduleItem";
+import PatientSwitcher from "../components/PatientSwitcher";
 import { EASE } from "../components/List";
 import {
   ACTIVITIES,
@@ -282,34 +275,9 @@ export default function Homepage() {
             on a short window the page scrolls rather than clipping the grid.
             Below `lg` it unpins and flows with the page. */}
         <aside className="sched-col flex min-w-0 flex-col gap-5 md:gap-6 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] lg:min-h-[730px] xl:top-10 xl:h-[calc(100vh-5rem)] xl:min-h-[790px] xl:gap-7">
-          {/* User — an open header, not a card. */}
-          <div
-            data-user-card
-            className="flex shrink-0 items-center gap-3.5 border-b border-karsa-line/80 px-1 pb-4"
-          >
-            <span className="relative shrink-0">
-              <span className="grid h-12 w-12 place-items-center rounded-full bg-karsa text-[15px] font-bold text-white">
-                M
-              </span>
-              <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 ring-2 ring-karsa-canvas" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[16.5px] font-semibold text-neutral-800">
-                Meimei Tole tole
-              </span>
-              <span className="block truncate text-[13px] text-neutral-500">
-                Perawat utama
-              </span>
-            </span>
-            <button
-              type="button"
-              aria-label="Notifikasi"
-              className="relative grid h-10 w-10 shrink-0 place-items-center rounded-xl text-neutral-500 outline-none transition-colors duration-200 hover:bg-karsa-soft hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
-            >
-              <Bell size={20} strokeWidth={2} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-karsa ring-2 ring-karsa-canvas" />
-            </button>
-          </div>
+          {/* Who this column is about, and the bell. The caregiver's own name
+              used to sit here; it lives at the foot of the rail now. */}
+          <PatientSwitcher />
 
           {/* Scheduling */}
           <Panel

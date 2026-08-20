@@ -6,6 +6,6 @@ export const metadata: Metadata = {
   description: "Kelola akun, preferensi, notifikasi, dan privasi aplikasi.",
 };
 
-export default function Settings() {
-  return <SettingsPage />;
+export default async function Settings({ searchParams }: PageProps<"/settings">) {
+  return <SettingsPage params={await searchParams} />;
 }
