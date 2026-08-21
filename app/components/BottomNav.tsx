@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
-import { HeartPulse, Home, LayoutGrid, PawPrint, ScanText } from "lucide-react";
+import {
+  HeartPulse,
+  Home,
+  LayoutGrid,
+  MessagesSquare,
+  NotebookPen,
+  PawPrint,
+  ScanText,
+  Sparkles,
+  UserRound,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 /** Phone navigation. A drawer costs a tap to open before it can be read; a bar
@@ -22,6 +32,18 @@ const ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/mascot", icon: PawPrint, label: "Maskot" },
 ];
 
+/** The patient app's own bar. Five equal destinations, no raised disc and no
+ *  "Lainnya": there is nothing here urgent enough to promote and little enough
+ *  to hide. Kept in this file rather than a second component so both bars share
+ *  one idea of what a tab looks like. */
+const PATIENT_ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
+  { link: "/pasien", icon: Home, label: "Beranda" },
+  { link: "/pasien/jurnal", icon: NotebookPen, label: "Jurnal" },
+  { link: "/pasien/komunitas", icon: MessagesSquare, label: "Komunitas" },
+  { link: "/pasien/maskot", icon: Sparkles, label: "Maskot" },
+  { link: "/pasien/profil", icon: UserRound, label: "Profil" },
+];
+
 /** `/care` must not light up for `/careers`, and `/` must not light up for
  *  everything — so the root is matched exactly and the rest by segment. */
 const isActive = (pathname: string, link: string) =>
@@ -38,6 +60,62 @@ export default function BottomNav({
 }) {
   const reduce = useReducedMotion();
 
+  /* The patient app is a different product on the same domain. It gets the same
+     tab language and its own destinations — and a floating bar, because it is
+     the only screen here a person sits in rather than passes through. */
+  if (pathname.startsWith("/pasien")) {
+    return (
+      <nav
+        aria-label="Navigasi utama"
+        className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 rounded-[26px] bg-karsa-cream/95 shadow-[0_16px_40px_-12px_rgba(24,32,24,0.4)] ring-1 ring-karsa-line backdrop-blur-xl md:hidden"
+      >
+        <ul className="grid grid-cols-5">
+          {PATIENT_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active =
+              item.link === "/pasien" ? pathname === "/pasien" : pathname.startsWith(item.link);
+
+            return (
+              <li key={item.link}>
+                <Link
+                  href={item.link}
+                  aria-current={active ? "page" : undefined}
+                  className="group/tab relative flex h-[70px] flex-col items-center justify-center gap-1 rounded-[26px] outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="patient-nav-pill"
+                      transition={
+                        reduce ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 36 }
+                      }
+                      aria-hidden
+                      className="absolute top-2.5 h-9 w-14 rounded-full bg-karsa-soft"
+                    />
+                  )}
+
+                  <Icon
+                    size={23}
+                    strokeWidth={active ? 2.5 : 2}
+                    className={`relative transition-colors duration-200 ${
+                      active ? "text-karsa-dark" : "text-neutral-400"
+                    }`}
+                  />
+                  <span
+                    className={`relative text-[11px] leading-3 transition-colors duration-200 ${
+                      active ? "font-bold text-karsa-dark" : "font-medium text-neutral-500"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    );
+  }
+
   return (
     <nav
       aria-label="Navigasi utama"
@@ -52,11 +130,43 @@ export default function BottomNav({
           const active = isActive(pathname, item.link) && !moreOpen;
 
           return (
+            /* Scan is not a fifth equal destination. It is the one thing done
+               standing up, one-handed, in front of a pharmacist — so it leaves
+               the row, sits in a filled disc that rises above the bar, and is
+               the only coloured thing down here. The ring is the page's own
+               canvas, which is what makes the disc read as punched through the
+               bar rather than floating over it. */
+            item.link === "/scan" ? (
+              <li key={item.link} className="relative">
+                <Link
+                  href={item.link}
+                  aria-current={active ? "page" : undefined}
+                  className="group/scan flex h-[72px] flex-col items-center justify-end gap-1 pb-2.5 outline-none"
+                >
+                  <span
+                    className={`absolute -top-5 grid h-[58px] w-[58px] place-items-center rounded-full ring-[5px] ring-karsa-canvas transition-transform duration-200 group-active/scan:scale-95 group-focus-visible/scan:ring-karsa ${
+                      active
+                        ? "bg-karsa-dark shadow-[0_10px_24px_-6px_rgba(63,92,70,0.75)]"
+                        : "bg-karsa shadow-[0_8px_20px_-6px_rgba(63,92,70,0.6)]"
+                    }`}
+                  >
+                    <Icon size={26} strokeWidth={2.3} className="text-white" />
+                  </span>
+                  <span
+                    className={`text-[11.5px] leading-3 transition-colors duration-200 ${
+                      active ? "font-bold text-karsa-dark" : "font-semibold text-karsa"
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              </li>
+            ) : (
             <li key={item.link}>
               <Link
                 href={item.link}
                 aria-current={active ? "page" : undefined}
-                className="group/tab relative flex h-16 flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+                className="group/tab relative flex h-[72px] flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
               >
                 {/* The pill sits behind the icon rather than under the label:
                     a bar this short has no room for an underline that reads. */}
@@ -67,19 +177,19 @@ export default function BottomNav({
                       reduce ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 36 }
                     }
                     aria-hidden
-                    className="absolute top-2 h-8 w-12 rounded-full bg-karsa-soft"
+                    className="absolute top-2.5 h-9 w-14 rounded-full bg-karsa-soft"
                   />
                 )}
 
                 <Icon
-                  size={21}
+                  size={23}
                   strokeWidth={active ? 2.5 : 2}
                   className={`relative transition-colors duration-200 ${
                     active ? "text-karsa-dark" : "text-neutral-400 group-hover/tab:text-neutral-600"
                   }`}
                 />
                 <span
-                  className={`relative text-[10.5px] leading-3 transition-colors duration-200 ${
+                  className={`relative text-[11.5px] leading-3 transition-colors duration-200 ${
                     active ? "font-bold text-karsa-dark" : "font-medium text-neutral-500"
                   }`}
                 >
@@ -87,6 +197,7 @@ export default function BottomNav({
                 </span>
               </Link>
             </li>
+            )
           );
         })}
 
@@ -97,7 +208,7 @@ export default function BottomNav({
             type="button"
             onClick={onMore}
             aria-expanded={moreOpen}
-            className="group/tab relative flex h-16 w-full flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+            className="group/tab relative flex h-[72px] w-full flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
           >
             {moreOpen && (
               <motion.span
@@ -106,19 +217,19 @@ export default function BottomNav({
                   reduce ? { duration: 0 } : { type: "spring", stiffness: 480, damping: 36 }
                 }
                 aria-hidden
-                className="absolute top-2 h-8 w-12 rounded-full bg-karsa-soft"
+                className="absolute top-2.5 h-9 w-14 rounded-full bg-karsa-soft"
               />
             )}
 
             <LayoutGrid
-              size={21}
+              size={23}
               strokeWidth={moreOpen ? 2.5 : 2}
               className={`relative transition-colors duration-200 ${
                 moreOpen ? "text-karsa-dark" : "text-neutral-400 group-hover/tab:text-neutral-600"
               }`}
             />
             <span
-              className={`relative text-[10.5px] leading-3 transition-colors duration-200 ${
+              className={`relative text-[11.5px] leading-3 transition-colors duration-200 ${
                 moreOpen ? "font-bold text-karsa-dark" : "font-medium text-neutral-500"
               }`}
             >

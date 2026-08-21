@@ -53,10 +53,20 @@ const LOOK: Record<Gaze, { x: number; y: number }> = {
   down: { x: 0, y: 5 },
 };
 
-/** `shock` is the face at the end of the thinking sequence: eyes wide, blink
- *  suspended. A character that keeps blinking on its beat while startled reads
- *  as unbothered, which is the opposite of the point. */
-export type Mood = "normal" | "shock";
+/** Held expressions. Each one suspends the blink, because a character that
+ *  keeps blinking on its usual beat while startled — or while worn out — reads
+ *  as unbothered, which is the opposite of the point.
+ *
+ *  The eyes are two bars, so an expression is just their shape: squashed reads
+ *  as a smiling squint, stretched as alarm. Cheap, and it survives being 24px
+ *  wide in a corner. */
+export type Mood = "normal" | "shock" | "happy" | "tired";
+
+const EXPRESSION: Record<Exclude<Mood, "normal">, { scaleY: number; scaleX: number }> = {
+  shock: { scaleY: 1.5, scaleX: 1.3 },
+  happy: { scaleY: 0.42, scaleX: 1.18 },
+  tired: { scaleY: 0.26, scaleX: 0.88 },
+};
 
 export default function Mascot({
   className = "h-24 w-24",
@@ -119,6 +129,7 @@ export default function Mascot({
      at once — but clearing it from an effect means a second render just to
      undo state we can simply decline to read. */
   const act = idle ? pending : null;
+  const held = mood === "normal" ? null : EXPRESSION[mood];
   const shocked = mood === "shock";
 
   const action = (() => {
@@ -201,8 +212,8 @@ export default function Mascot({
                 animate={
                   reduce
                     ? undefined
-                    : shocked
-                      ? { scaleY: 1.5, scaleX: 1.3, x: 0, y: 0 }
+                    : held
+                      ? { ...held, x: 0, y: 0 }
                       : {
                           scaleY: BLINK.scaleY,
                           scaleX: 1,
@@ -213,8 +224,8 @@ export default function Mascot({
                 transition={
                   reduce
                     ? undefined
-                    : shocked
-                      ? { type: "spring", stiffness: 500, damping: 18 }
+                    : held
+                      ? { type: "spring", stiffness: 420, damping: 22 }
                       : {
                           scaleY: { duration: 7, repeat: Infinity, times: BLINK.times },
                           scaleX: { duration: 0.3 },

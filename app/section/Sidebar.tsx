@@ -9,6 +9,7 @@ import {
   PawPrint,
   HeartPulse,
   ChevronsLeft,
+  NotebookPen,
   ScanText,
   X,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { usePathname } from "next/navigation";
 import List, { EASE, RAIL_SPRING } from "../components/List";
 import BottomNav from "../components/BottomNav";
 import { ACCOUNT } from "../data/settings";
+import { PATIENT } from "../data/patient";
 
 /** Collapsed width is not arbitrary: rail padding (14) + item padding (14)
  *  + half the icon cell (14) = 42, so every icon centreline lands exactly on
@@ -33,12 +35,28 @@ const LOGO_CLOSED = 34;
 
 /** `badge` is optional — nothing carries one right now, but the rail still
  *  supports it. */
-const NAV: { link: string; icon: LucideIcon; text: string; badge?: number }[] = [
+type NavItem = { link: string; icon: LucideIcon; text: string; badge?: number };
+
+const NAV: NavItem[] = [
   { link: "/", icon: Home, text: "Home" },
   { link: "/care", icon: HeartPulse, text: "Perawatan" },
   { link: "/scan", icon: ScanText, text: "Scan Resep" },
   { link: "/community", icon: UsersRound, text: "Komunitas" },
   { link: "/mascot", icon: PawPrint, text: "Maskot Karsa" },
+];
+
+/** The same rail, pointed somewhere else.
+ *
+ *  `/pasien` is a different product for a different person, and the caregiver's
+ *  destinations are meaningless there — a patient has no "Scan Resep" and no
+ *  compliance page about themselves. What stays identical is the rail itself:
+ *  the logo, the collapse handle, the pill, the row heights. Only the list of
+ *  places changes, so someone who has seen one app can use the other. */
+const PATIENT_NAV: NavItem[] = [
+  { link: "/pasien", icon: Home, text: "Beranda" },
+  { link: "/pasien/jurnal", icon: NotebookPen, text: "Jurnal" },
+  { link: "/pasien/komunitas", icon: UsersRound, text: "Komunitas" },
+  { link: "/pasien/maskot", icon: PawPrint, text: "Maskot Karsa" },
 ];
 
 type RailProps = {
@@ -48,10 +66,18 @@ type RailProps = {
   onSelect: (link: string) => void;
   onToggle?: () => void;
   onClose?: () => void;
+  /** Whether we are inside the patient app. Swaps the destinations and whose
+   *  name is at the foot — not the rail's design. */
+  patientApp?: boolean;
 };
 
-function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps) {
+function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp }: RailProps) {
   const reduce = useReducedMotion();
+  const items = patientApp ? PATIENT_NAV : NAV;
+  const settingsLink = patientApp ? "/pasien/pengaturan" : "/settings";
+  const me = patientApp
+    ? { name: PATIENT.greeting, role: "Pasien", initial: PATIENT.initial, href: "/pasien/profil" }
+    : { name: ACCOUNT.name, role: ACCOUNT.role, initial: ACCOUNT.initial, href: "/settings?bagian=profile" };
   const size = reduce ? { duration: 0 } : RAIL_SPRING;
   const fade = reduce ? { duration: 0 } : { duration: 0.2, ease: EASE };
 
@@ -106,7 +132,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps
 
       <nav>
         <ul className="space-y-1.5 px-3.5">
-          {NAV.map((item) => (
+          {items.map((item) => (
             <List
               key={item.link}
               link={item.link}
@@ -131,17 +157,17 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps
           works for me" are the same errand. It used to sit in the top-right of
           the dashboard, over a column of somebody else's numbers. */}
       <div className="px-3.5 pb-1 pt-3.5">
-        <RailProfile isOpen={isOpen} onSelect={onSelect} />
+        <RailProfile isOpen={isOpen} onSelect={onSelect} {...me} />
       </div>
 
       <ul className="space-y-1.5 px-3.5 pb-3.5 pt-1.5">
         <List
-          link="/settings"
+          link={settingsLink}
           icon={Settings}
           text="Pengaturan"
           isOpen={isOpen}
           railId={railId}
-          isActive={active === "/settings"}
+          isActive={active === settingsLink}
           onSelect={onSelect}
         />
       </ul>
@@ -189,12 +215,19 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose }: RailProps
 function RailProfile({
   isOpen,
   onSelect,
+  name,
+  role,
+  initial,
+  href,
 }: {
   isOpen: boolean;
   onSelect?: (link: string) => void;
+  name: string;
+  role: string;
+  initial: string;
+  href: string;
 }) {
   const reduce = useReducedMotion();
-  const href = "/settings?bagian=profile";
 
   const label = reduce
     ? { duration: 0 }
@@ -215,7 +248,7 @@ function RailProfile({
       <span className="relative z-10 grid w-7 shrink-0 place-items-center">
         <span className="relative">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-karsa text-[13px] font-bold text-white">
-            {ACCOUNT.initial}
+            {initial}
           </span>
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-karsa-cream" />
         </span>
@@ -228,10 +261,10 @@ function RailProfile({
       >
         <span className="ml-3.5 block">
           <span className="block truncate text-[15px] font-semibold leading-5 text-neutral-800">
-            {ACCOUNT.name}
+            {name}
           </span>
           <span className="block truncate text-[12.5px] leading-4 text-neutral-500">
-            {ACCOUNT.role}
+            {role}
           </span>
         </span>
       </motion.span>
@@ -241,7 +274,7 @@ function RailProfile({
           role="tooltip"
           className="pointer-events-none absolute left-[calc(100%+16px)] top-1/2 z-50 -translate-x-1 -translate-y-1/2 scale-95 whitespace-nowrap rounded-lg bg-neutral-900 px-3 py-2 text-[13px] font-medium text-white opacity-0 shadow-lg transition-all duration-150 ease-out group-hover/me:translate-x-0 group-hover/me:scale-100 group-hover/me:opacity-100"
         >
-          {ACCOUNT.name}
+          {name}
         </span>
       )}
     </Link>
@@ -253,14 +286,25 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const [active, setActive] = useState(pathname);
+  const [seenPath, setSeenPath] = useState(pathname);
   const reduce = useReducedMotion();
+  const patientApp = pathname.startsWith("/pasien");
 
   /* The rail lives in the layout and survives navigation, so the highlight has
      to follow the route. Keyed on pathname only: in-page hash links leave it
-     alone, which lets the local click state stand. */
-  useEffect(() => {
+     alone, which lets the local click state stand.
+
+     Adjusted during render rather than in an effect. A click sets `active`
+     optimistically so the pill moves before the route does; the route then
+     confirms it. Doing that in an effect means React commits the stale
+     highlight, paints it, and only then corrects — one visible frame of the
+     pill in the wrong place, plus the cascading-render lint. Comparing against
+     the last pathname we handled is the documented way to derive state from a
+     changing input. */
+  if (pathname !== seenPath) {
+    setSeenPath(pathname);
     setActive(pathname);
-  }, [pathname]);
+  }
 
   const size = reduce ? { duration: 0 } : RAIL_SPRING;
 
@@ -317,6 +361,7 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
             active={active}
             onSelect={handleSelect}
             onToggle={() => setIsOpen((v) => !v)}
+            patientApp={patientApp}
           />
         </motion.aside>
 
@@ -351,6 +396,7 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
                   active={active}
                   onSelect={handleSelect}
                   onClose={() => setMobileOpen(false)}
+                  patientApp={patientApp}
                 />
               </motion.aside>
             </>
@@ -361,7 +407,19 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
       {/* Content area. The rail itself is fixed, so this spacer — and not a
           margin — is what keeps the page clear of it, and it animates with
           the same spring. On mobile the rail overlays, so there's no spacer. */}
-      <div className="flex min-h-screen bg-karsa-canvas">
+      {/* The patient app is locked to the viewport from `lg` up: one screen, no
+          page scrollbar, and only the task list scrolls inside itself. It is
+          done here rather than inside the page because `h-full` needs a
+          definite height to inherit, and `min-h-screen` is not one — a page
+          asking for "the height of the window" would otherwise get "auto".
+          Below `lg` it stays a normal scrolling column: seven tasks and a room
+          do not fit on a phone, and forcing them to would mean shrinking the
+          text for the one audience that cannot spare it. */}
+      <div
+        className={`flex bg-karsa-canvas ${
+          patientApp ? "min-h-screen lg:h-screen lg:overflow-hidden" : "min-h-screen"
+        }`}
+      >
         <motion.div
           aria-hidden
           initial={{ width: isOpen ? RAIL_OPEN : RAIL_CLOSED }}
@@ -372,7 +430,13 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
         {/* `--bottom-nav` is the bar's height (0 from `md` up — see globals).
             Pages that fill the viewport subtract it; everything else just needs
             its last row to clear the bar. */}
-        <main className="min-w-0 flex-1 pb-[var(--bottom-nav)]">{children}</main>
+        <main
+          className={`min-w-0 flex-1 pb-[var(--bottom-nav)] ${
+            patientApp ? "lg:h-full lg:min-h-0 lg:pb-0" : ""
+          }`}
+        >
+          {children}
+        </main>
       </div>
     </>
   );

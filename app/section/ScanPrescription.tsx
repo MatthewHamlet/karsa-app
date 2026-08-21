@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Camera, Check, History, Image as ImageIcon } from "lucide-react";
+import { Camera, Check, Image as ImageIcon } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import Mascot from "../components/Mascot";
 import RecipeOCRScanner from "../components/RecipeOCRScanner";
 import RecipeHistory from "../components/RecipeHistory";
-import SlideOver from "../components/SlideOver";
 import type { Medicine } from "../data/prescriptions";
 
 type Source = "camera" | "gallery";
@@ -15,7 +14,6 @@ type Source = "camera" | "gallery";
 export default function ScanPrescriptionPage() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [source, setSource] = useState<Source | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [saved, setSaved] = useState<Medicine[] | null>(null);
   const reduce = useReducedMotion();
 
@@ -25,7 +23,13 @@ export default function ScanPrescriptionPage() {
   };
 
   return (
-    <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
+    /* A phone gets a fixed-height column so the scanner can sit in the middle
+       of what is left between the Riwayat button and the drawer. The bottom
+       scanner fills it. The drawer and the slide-over that used to share this
+       screen are gone, so nothing is reserved at the bottom any more and the
+       card simply takes what is there. From `lg` none of this applies: the page
+       goes back to flowing and the history is a column, not a drawer. */
+    <div className="flex min-h-[calc(100dvh-var(--bottom-nav))] w-full flex-col px-4 pb-6 pt-6 sm:px-6 md:px-8 md:pt-10 lg:block lg:min-h-0 lg:pb-10 xl:px-12 xl:pb-12 xl:pt-12">
       <PageHeader
         tone="amber"
         eyebrow="Karsa"
@@ -33,38 +37,26 @@ export default function ScanPrescriptionPage() {
         subtitle="Foto resep dokter, dan Karsa membaca obat serta jadwalnya untukmu."
       />
 
-      {/* Below `lg` the history is a panel you pull out, not a column — a phone
-          has room for one thing at a time, and the one thing is the scanner. */}
-      <div className="mb-4 flex justify-end lg:hidden">
-        <button
-          type="button"
-          onClick={() => setHistoryOpen(true)}
-          className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13.5px] font-semibold text-neutral-700 outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
-        >
-          <History size={15} strokeWidth={2.4} aria-hidden />
-          Riwayat
-        </button>
-      </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
+      <div className="grid min-h-0 flex-1 items-stretch gap-6 lg:flex-none lg:items-start lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
         {/* ── The one thing this page does ─────────────────────────────────
             The whole panel is the button. A card with a small action inside it
             makes the caregiver aim; this way the target is the size of the
             screen. */}
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-col lg:block">
           <button
             type="button"
             onClick={() => setPickerOpen(true)}
-            className="group/scan relative flex w-full flex-col items-center justify-center overflow-hidden rounded-3xl border-2 border-dashed border-karsa/35 bg-white/70 px-6 py-12 text-center outline-none transition-colors duration-200 hover:border-karsa hover:bg-karsa-soft/40 focus-visible:ring-2 focus-visible:ring-karsa focus-visible:ring-offset-2 sm:py-16 lg:py-20"
+            className="group/scan relative flex w-full flex-1 flex-col items-center justify-center overflow-hidden rounded-3xl border-2 border-dashed lg:flex-none border-karsa/35 bg-white/70 px-6 py-12 text-center outline-none transition-colors duration-200 hover:border-karsa hover:bg-karsa-soft/40 focus-visible:ring-2 focus-visible:ring-karsa focus-visible:ring-offset-2 sm:py-14 lg:py-20"
           >
             <span
               aria-hidden
               className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-karsa/10 blur-3xl"
             />
 
-            <Mascot className="relative h-28 w-28 sm:h-32 sm:w-32 lg:h-40 lg:w-40" />
+            <Mascot className="relative h-32 w-32 sm:h-36 sm:w-36 lg:h-40 lg:w-40" />
 
-            <span className="relative mt-5 block font-nohemi text-[20px] font-bold tracking-tight text-neutral-900 sm:text-[24px] lg:text-[28px]">
+            <span className="relative mt-5 block font-nohemi text-[22px] font-bold tracking-tight text-neutral-900 sm:text-[24px] lg:text-[28px]">
               Klik untuk mulai scan
             </span>
             <span className="relative mt-2 block max-w-[34ch] text-[13.5px] leading-5 text-neutral-500 sm:text-[14.5px]">
@@ -109,9 +101,6 @@ export default function ScanPrescriptionPage() {
         </aside>
       </div>
 
-      <SlideOver open={historyOpen} onClose={() => setHistoryOpen(false)} title="Riwayat Scan">
-        <RecipeHistory />
-      </SlideOver>
 
       <SourcePicker
         open={pickerOpen}

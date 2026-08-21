@@ -117,7 +117,7 @@
 
 @media (max-width: 767px) {
   :root {
-    --bottom-nav: calc(4rem + env(safe-area-inset-bottom));
+    --bottom-nav: calc(4.5rem + env(safe-area-inset-bottom));
   }
 }
 

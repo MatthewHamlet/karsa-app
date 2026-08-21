@@ -75,7 +75,7 @@ export default function Homepage() {
 
   return (
     /* Same rest at the foot of the page as every other route — see Care. */
-    <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:pb-12 xl:pl-12 xl:pr-6 xl:pt-12">
+    <div className="w-full px-4 pb-10 pt-4 sm:px-6 md:px-8 md:pt-10 xl:pb-12 xl:pl-12 xl:pr-6 xl:pt-12">
       {/* No colour band on Home: the mascot's room is this page's colour, and
           stacking a second coloured field above it only crowded the top. */}
       {/* No max-width: the content owns the whole area beside the rail. The
@@ -108,7 +108,15 @@ export default function Homepage() {
           {/* Padding kept small: `justify-center` inside `flex-1` already does
               the spacing, and on a short window every fixed pixel here is one
               the tasks lose. */}
-          <section className="relative flex flex-1 flex-col justify-center pb-6 pt-2 xl:pb-8">
+          {/* 488px is everything that sits below the greeting on a phone, added
+              up: the 72px nav bar, 16 of page padding, the 24 gap, the ~352 the
+              tasks card measures, and the 24 that keeps Perasaan's top edge
+              exactly at the nav rather than peeking above it. So the greeting
+              takes what is left and no more — the air goes under the tasks
+              card, where it reads as room, instead of over the mascot, where it
+              read as the page starting late. Only below `sm`: from `lg` the
+              wrapper's own `min-h` does this job for the whole column. */}
+          <section className="relative flex min-h-[calc(100dvh-488px)] flex-1 flex-col justify-center pb-4 pt-1 sm:min-h-0 sm:pb-6 sm:pt-2 xl:pb-8">
             {/* A radial mask instead of a straight one: it softens the sides
                 and top as well as the bottom, so the room has no edges at all
                 and simply dissolves before the next section starts. The layer
@@ -138,7 +146,7 @@ export default function Homepage() {
                 both are held to sizes that fit 343px on one line — a greeting
                 that wraps after the comma is worse than a smaller one. */}
             <div className="relative flex items-center justify-center gap-4 text-left sm:gap-8 xl:gap-10">
-              <Mascot className="h-36 w-36 shrink-0 sm:h-44 sm:w-44 lg:h-48 lg:w-48 xl:h-56 xl:w-56" />
+              <Mascot className="h-40 w-40 shrink-0 sm:h-44 sm:w-44 lg:h-48 lg:w-48 xl:h-56 xl:w-56" />
 
               <div className="min-w-0">
                 <p className="text-[14px] font-medium text-neutral-500 xl:text-[16px]">
@@ -197,7 +205,7 @@ export default function Homepage() {
               <div className="flex flex-1 items-center gap-4 sm:gap-5 @3xl:gap-7">
                 {/* Fixed to three rows so the card never resizes as tasks are
                     ticked off, and the ring keeps its size and its place. */}
-                <ul className="h-[186px] min-w-0 flex-1 divide-y divide-edge-sand border-y border-edge-sand sm:h-[147px]">
+                <ul className="h-[236px] min-w-0 flex-1 divide-y divide-edge-sand border-y border-edge-sand sm:h-[147px]">
                   <AnimatePresence initial={false}>
                     {pending.slice(0, VISIBLE_TASKS).map((task) => (
                       <TaskItem
@@ -214,7 +222,7 @@ export default function Homepage() {
                 <ProgressRing
                   value={progress}
                   label={`${done}/${TASKS.length}`}
-                  className="h-[124px] w-[124px] @md:h-[136px] @md:w-[136px] @3xl:h-[168px] @3xl:w-[168px]"
+                  className="h-[148px] w-[148px] @md:h-[136px] @md:w-[136px] @3xl:h-[168px] @3xl:w-[168px]"
                 />
               </div>
             </Panel>
