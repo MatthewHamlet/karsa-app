@@ -48,9 +48,13 @@ export type HeaderTone = keyof typeof TONE;
 
 /** Cancels the page's own padding so the colour reaches the edges, then puts
  *  the padding back inside. Assumes the page root uses the standard
- *  `px-4 sm:px-6 md:px-8 xl:px-12` / `pt-20 md:pt-10 xl:pt-12`. */
+ *  `px-4 sm:px-6 md:px-8 xl:px-12` / `pt-6 md:pt-10 xl:pt-12`.
+ *
+ *  The phone figure used to be `pt-20` — 80px of clearance for the floating
+ *  hamburger that used to sit at the top-left. Navigation moved to a bar at
+ *  the bottom, so that space was holding nothing up. */
 const BLEED =
-  "-mx-4 -mt-20 px-4 pt-20 sm:-mx-6 sm:px-6 md:-mx-8 md:-mt-10 md:px-8 md:pt-10 xl:-mx-12 xl:px-12 xl:-mt-12 xl:pt-12";
+  "-mx-4 -mt-6 px-4 pt-6 sm:-mx-6 sm:px-6 md:-mx-8 md:-mt-10 md:px-8 md:pt-10 xl:-mx-12 xl:px-12 xl:-mt-12 xl:pt-12";
 
 const CURVE = "rounded-b-[32px] sm:rounded-b-[44px]";
 
@@ -101,7 +105,7 @@ export default function PageHeader({
     // In normal flow on purpose. A negative z-index would slip behind the
     // canvas background painted by an ancestor, and the colour would vanish.
     <header
-      className={`relative mb-8 overflow-hidden pb-9 sm:pb-10 xl:mb-10 xl:pb-12 ${BLEED} ${CURVE}`}
+      className={`relative mb-6 overflow-hidden pb-7 sm:mb-8 sm:pb-10 xl:mb-10 xl:pb-12 ${BLEED} ${CURVE}`}
       style={{ backgroundColor: t.wash }}
     >
       <Shapes />
@@ -127,7 +131,7 @@ export default function PageHeader({
             </p>
           )}
           <h1
-            className={`mt-1.5 text-[28px] font-bold leading-none tracking-tight sm:text-[32px] xl:text-[38px] ${t.ink}`}
+            className={`mt-1.5 text-[24px] font-bold leading-none tracking-tight sm:text-[32px] xl:text-[38px] ${t.ink}`}
           >
             {title}
           </h1>

@@ -217,7 +217,7 @@ export default function TeamChat({
 
   return (
     <section
-      className="relative flex h-[calc(100dvh-16rem)] min-h-[320px] flex-col"
+      className="relative flex h-[calc(100dvh-16rem-var(--bottom-nav))] min-h-[320px] flex-col"
       style={{ backgroundColor: WALLPAPER, ...(height ? { height } : null) }}
     >
       {/* Pinned to the room, not to the thread: it sits outside the scroller,

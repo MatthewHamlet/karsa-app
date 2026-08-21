@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { History, MessageCircle, ShieldAlert, Sparkles } from "lucide-react";
+import { History, MessageCircle, ShieldAlert } from "lucide-react";
 import AssistantChat, { type ChatTurn } from "../components/AssistantChat";
 import HealthPattern from "../components/HealthPattern";
 import MascotStage from "../components/MascotStage";
@@ -13,7 +13,6 @@ import {
   PATIENT,
   PROMPT_FOR,
   REPLIES,
-  type ActionCard,
   type HistorySession,
   type Intent,
   type MascotState,
@@ -39,14 +38,10 @@ function intentFor(text: string): Intent {
   return "general";
 }
 
-type MobileView = "chat" | "stage";
-
 export default function MascotAssistant() {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState("");
   const [state, setState] = useState<MascotState>("idle");
-  const [cards, setCards] = useState<ActionCard[]>([]);
-  const [view, setView] = useState<MobileView>("chat");
   const [historyOpen, setHistoryOpen] = useState(false);
   const reduce = useReducedMotion();
 
@@ -63,21 +58,27 @@ export default function MascotAssistant() {
 
     setTurns((prev) => [...prev, { id: `me-${Date.now()}`, from: "me", text }]);
     setDraft("");
-    setCards([]);
     setState("thinking");
 
     timers.current.push(
       window.setTimeout(() => {
         const reply = REPLIES[intent];
+        /* The cards ride on the reply. Past answers keep theirs, so scrolling
+           back up finds the whole exchange intact rather than a bare sentence
+           whose buttons were replaced by the next question's. */
         setTurns((prev) => [
           ...prev,
-          { id: `karsa-${Date.now()}`, from: "karsa", text: reply.text },
+          {
+            id: `karsa-${Date.now()}`,
+            from: "karsa",
+            text: reply.text,
+            cards: reply.cards,
+          },
         ]);
-        setCards(reply.cards);
         setState("presenting");
 
         /* The pose is a gesture, not a mode: it hands the cards over and then
-           goes back to waiting. The cards stay. */
+           goes back to waiting. */
         timers.current.push(
           window.setTimeout(() => setState("idle"), PRESENTING_MS),
         );
@@ -95,74 +96,27 @@ export default function MascotAssistant() {
     timers.current = [];
 
     setTurns(session.turns.map((turn, i) => ({ id: `${session.id}-${i}`, ...turn })));
-    setCards([]);
     setState("idle");
     setDraft("");
     setHistoryOpen(false);
-    setView("chat");
   };
 
-  const quickAction = (intent: Intent) => {
-    ask(PROMPT_FOR[intent], intent);
-    /* On a phone the answer arrives on the other tab, so go with it. */
-    setView("stage");
-  };
+  const quickAction = (intent: Intent) => ask(PROMPT_FOR[intent], intent);
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-karsa-canvas">
+    <div className="flex h-[calc(100dvh-var(--bottom-nav))] flex-col bg-karsa-canvas">
       <PatientBanner onHistory={() => setHistoryOpen(true)} />
 
-      {/* Below `lg` the two panels are one at a time — a 40% stage on a phone is
-          a strip, and a chat you cannot read is worse than a chat you switch to. */}
-      <div className="shrink-0 border-b border-karsa-line bg-white/60 px-4 py-2 backdrop-blur-sm lg:hidden">
-        <div
-          role="tablist"
-          aria-label="Tampilan asisten"
-          className="relative grid grid-cols-2 rounded-full bg-karsa-soft p-1"
-        >
-          <span
-            aria-hidden
-            style={{ transform: `translateX(${view === "stage" ? "100%" : "0%"})` }}
-            className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full bg-white shadow-[0_1px_3px_rgba(24,32,24,0.12)] transition-transform duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
-          />
-          {(
-            [
-              { key: "chat", label: "Percakapan", icon: MessageCircle },
-              { key: "stage", label: "Karsa & Tindakan", icon: Sparkles },
-            ] as const
-          ).map((item) => {
-            const Icon = item.icon;
-            const active = view === item.key;
-            return (
-              <button
-                key={item.key}
-                role="tab"
-                type="button"
-                aria-selected={active}
-                onClick={() => setView(item.key)}
-                className={`relative inline-flex items-center justify-center gap-2 rounded-full py-2 text-[13px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
-                  active ? "text-karsa-dark" : "text-neutral-500"
-                }`}
-              >
-                <Icon size={15} strokeWidth={2.2} />
-                {item.label}
-                {item.key === "stage" && cards.length > 0 && !active && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-karsa" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── Split stage ──────────────────────────────────────────────────── */}
+      {/* ── Stage ────────────────────────────────────────────────────────
+          One column on a phone. The tab switcher that used to sit here paid a
+          row of chrome for a second panel, and the only thing on that panel a
+          caregiver needed — the action cards — now arrives in the thread under
+          the answer that produced it. Nothing left to switch to. */}
       <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         {/* The thread's room. The wallpaper is scattered rather than tiled-
             looking on purpose: this is the one screen a caregiver sits inside
             for a while, and a bare canvas made it read like a form. */}
-        <div
-          className={`relative min-h-0 ${view === "chat" ? "flex" : "hidden"} flex-col lg:flex`}
-        >
+        <div className="relative flex min-h-0 flex-col">
           <HealthPattern className="text-karsa-dark" opacity={0.14} />
 
           <AssistantChat
@@ -175,16 +129,18 @@ export default function MascotAssistant() {
           />
         </div>
 
+        {/* Karsa keeps a presence beside the thread from `lg` — where there is
+            width going spare — and nowhere else. */}
         <motion.aside
-          aria-label="Karsa dan kartu tindakan"
+          aria-label="Karsa"
           initial={false}
           animate={{
             backgroundColor: state === "thinking" ? "#f0f4ee" : "#f7f5ee",
           }}
           transition={reduce ? { duration: 0 } : { duration: 0.5 }}
-          className={`min-h-0 ${view === "stage" ? "flex" : "hidden"} flex-col border-karsa-line lg:flex lg:border-l`}
+          className="hidden min-h-0 flex-col border-karsa-line lg:flex lg:border-l"
         >
-          <MascotStage state={state} cards={cards} />
+          <MascotStage state={state} />
         </motion.aside>
       </div>
 
@@ -276,33 +232,81 @@ function HistoryModal({
 /** Who this is about, and the two facts that change what is safe to suggest.
  *  Kept to one line so it can stay on screen the whole session. */
 function PatientBanner({ onHistory }: { onHistory: () => void }) {
+  const [alertsOpen, setAlertsOpen] = useState(false);
+  const alertsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!alertsOpen) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAlertsOpen(false);
+    };
+    const onPointer = (event: PointerEvent) => {
+      if (!alertsRef.current?.contains(event.target as Node)) setAlertsOpen(false);
+    };
+
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [alertsOpen]);
+
   return (
-    <header className="shrink-0 border-b border-karsa-line bg-white/70 px-4 py-3 backdrop-blur-sm sm:px-6 xl:px-8">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <h1 className="font-nohemi text-[16px] font-bold tracking-tight text-neutral-800">
+    /* One line, always. The alerts used to sit out here as two full pills and
+       wrapped to a second row on a phone, which cost the thread a chunk of the
+       screen to say something that doesn't change all day. They live behind the
+       count now — present, and one tap from being read in full. */
+    <header className="shrink-0 border-b border-karsa-line bg-white/70 px-4 py-2 backdrop-blur-sm sm:px-6 xl:px-8">
+      <div className="flex items-center gap-2.5">
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-nohemi text-[15px] font-bold leading-5 tracking-tight text-neutral-800">
             Maskot Karsa
           </h1>
-          <span className="hidden h-4 w-px bg-karsa-line sm:block" />
-          <p className="truncate text-[13px] text-neutral-600">
+          <p className="truncate text-[12px] leading-4 text-neutral-500">
             Merawat{" "}
-            <span className="font-semibold text-neutral-800">
+            <span className="font-semibold text-neutral-700">
               {PATIENT.name}, {PATIENT.age}
             </span>
           </p>
         </div>
 
-        <ul className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {PATIENT.alerts.map((alert) => (
-            <li
-              key={alert}
-              className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1 text-[11.5px] font-semibold text-rose-700 ring-1 ring-rose-100"
+        <div ref={alertsRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setAlertsOpen((open) => !open)}
+            aria-expanded={alertsOpen}
+            aria-label={`Peringatan medis (${PATIENT.alerts.length})`}
+            className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1.5 text-[12px] font-bold text-rose-700 outline-none ring-1 ring-rose-100 transition-colors duration-200 hover:bg-rose-100 focus-visible:ring-2 focus-visible:ring-rose-300"
+          >
+            <ShieldAlert size={14} strokeWidth={2.4} aria-hidden />
+            <span className="tabular-nums">{PATIENT.alerts.length}</span>
+          </button>
+
+          {alertsOpen && (
+            <div
+              role="dialog"
+              aria-label="Peringatan medis"
+              className="absolute right-0 z-40 mt-2 w-[15rem] rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_44px_-24px_rgba(24,32,24,0.45)] ring-1 ring-karsa-line"
             >
-              <ShieldAlert size={12} strokeWidth={2.4} />
-              {alert}
-            </li>
-          ))}
-        </ul>
+              <p className="px-1 pb-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
+                Perlu diperhatikan
+              </p>
+              <ul className="space-y-1.5">
+                {PATIENT.alerts.map((alert) => (
+                  <li
+                    key={alert}
+                    className="flex items-start gap-2 rounded-xl bg-rose-50 px-2.5 py-2 text-[13px] font-semibold leading-5 text-rose-700 ring-1 ring-rose-100"
+                  >
+                    <ShieldAlert size={14} strokeWidth={2.4} className="mt-0.5 shrink-0" />
+                    {alert}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
 
         {/* Was a "Terhubung" status pill. A connection light is only worth the
             corner when it is off, and this one never is — so the space goes to
@@ -310,10 +314,11 @@ function PatientBanner({ onHistory }: { onHistory: () => void }) {
         <button
           type="button"
           onClick={onHistory}
-          className="ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[12px] font-semibold text-neutral-700 outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
+          aria-label="Riwayat percakapan"
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2.5 py-1.5 text-[12px] font-semibold text-neutral-700 outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 sm:px-3"
         >
-          <History size={13} strokeWidth={2.4} />
-          Riwayat
+          <History size={14} strokeWidth={2.4} aria-hidden />
+          <span className="hidden sm:inline">Riwayat</span>
         </button>
       </div>
     </header>

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Check, Clock, HeartPulse, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarDays, Check, Clock, HeartPulse, Plus, Sparkles } from "lucide-react";
 
 import Mascot from "../components/Mascot";
 import MoodFace from "../components/MoodFace";
@@ -16,6 +16,7 @@ import ActivityItem from "../components/ActivityItem";
 import Calendar, { type Selection } from "../components/Calendar";
 import ScheduleItem from "../components/ScheduleItem";
 import PatientSwitcher from "../components/PatientSwitcher";
+import SlideOver from "../components/SlideOver";
 import { EASE } from "../components/List";
 import {
   ACTIVITIES,
@@ -46,6 +47,8 @@ export default function Homepage() {
   /** Ticked, striking through, not yet removed. */
   const [striking, setStriking] = useState<string[]>([]);
   const [selected, setSelected] = useState<Selection>({ ...TODAY });
+  /** Phone only — from `lg` the same column is pinned beside the page. */
+  const [scheduleOpen, setScheduleOpen] = useState(false);
   const reduce = useReducedMotion();
 
   /** Completed tasks are hidden — the card is a list of what's left to do. */
@@ -72,7 +75,7 @@ export default function Homepage() {
 
   return (
     /* Same rest at the foot of the page as every other route — see Care. */
-    <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pt-10 xl:pb-12 xl:pl-12 xl:pr-6 xl:pt-12">
+    <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:pb-12 xl:pl-12 xl:pr-6 xl:pt-12">
       {/* No colour band on Home: the mascot's room is this page's colour, and
           stacking a second coloured field above it only crowded the top. */}
       {/* No max-width: the content owns the whole area beside the rail. The
@@ -84,11 +87,28 @@ export default function Homepage() {
       <div className="grid items-start gap-6 grid-cols-[minmax(0,1fr)] md:gap-8 lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-10 xl:grid-cols-[minmax(0,1fr)_336px] xl:gap-12 2xl:grid-cols-[minmax(0,1fr)_360px]">
         {/* ── Left column ─────────────────────────────────────────────── */}
         <div className="@container min-w-0 space-y-6 md:space-y-7 xl:space-y-8">
+          {/* The first screen: greeting and tasks together, sized to the fold.
+              They coexist — the point of the height is only that "Aktivitas"
+              below them never shows as a sliver. The greeting takes `flex-1`,
+              so whatever the tasks don't need becomes room for the mascot
+              rather than a gap; on a short window it simply gives it back. */}
+          {/* Page padding off the top, then a little air under the tasks so the
+              fold isn't sitting on their edge.
+
+              That air has to stay *under* the gap to the next section (28px at
+              `md`, 32 at `xl`), because the two subtract from the same place:
+              take off more than the gap and Aktivitas is pulled back above the
+              fold, which is the sliver this was meant to remove. 4px short of
+              the gap leaves the next card just below the edge. */}
+          <div className="flex flex-col gap-6 md:gap-7 xl:gap-8 lg:min-h-[calc(100dvh-2.5rem-1.5rem)] xl:min-h-[calc(100dvh-3rem-1.75rem)]">
           {/* Greeting — deliberately not a card. The room is its own warm
               background and melts into the page at the bottom, so the mascot
               reads as standing in the environment rather than inside a box.
               The mascot always sits left of the copy; it never stacks. */}
-          <section className="relative pb-12 pt-6 sm:pb-12 sm:pt-6 xl:pb-14">
+          {/* Padding kept small: `justify-center` inside `flex-1` already does
+              the spacing, and on a short window every fixed pixel here is one
+              the tasks lose. */}
+          <section className="relative flex flex-1 flex-col justify-center pb-6 pt-2 xl:pb-8">
             {/* A radial mask instead of a straight one: it softens the sides
                 and top as well as the bottom, so the room has no edges at all
                 and simply dissolves before the next section starts. The layer
@@ -118,30 +138,30 @@ export default function Homepage() {
                 both are held to sizes that fit 343px on one line — a greeting
                 that wraps after the comma is worse than a smaller one. */}
             <div className="relative flex items-center justify-center gap-4 text-left sm:gap-8 xl:gap-10">
-              <Mascot className="h-28 w-28 shrink-0 sm:h-32 sm:w-32 xl:h-40 xl:w-40" />
+              <Mascot className="h-36 w-36 shrink-0 sm:h-44 sm:w-44 lg:h-48 lg:w-48 xl:h-56 xl:w-56" />
 
               <div className="min-w-0">
-                <p className="text-[14px] font-medium text-neutral-500 xl:text-sm">
+                <p className="text-[14px] font-medium text-neutral-500 xl:text-[16px]">
                   {todayLabel}
                 </p>
-                <h1 className="mt-1 text-[26px] font-extrabold leading-tight tracking-tight text-neutral-900 sm:text-4xl xl:text-[44px]">
+                <h1 className="mt-1 text-[30px] font-extrabold leading-tight tracking-tight text-neutral-900 sm:text-[40px] lg:text-[46px] xl:text-[54px]">
                   Howdy, Meimei!
                 </h1>
 
-                <ul className="mt-4 space-y-2 xl:mt-5">
-                  <li className="flex items-center gap-2.5 text-[15.5px] text-neutral-600 xl:text-[17px]">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600 xl:h-7 xl:w-7">
-                      <HeartPulse size={14} strokeWidth={2.6} />
+                <ul className="mt-4 space-y-2.5 xl:mt-6 xl:space-y-3">
+                  <li className="flex items-center gap-2.5 text-[16px] text-neutral-600 sm:text-[17px] xl:text-[19px]">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-emerald-100 text-emerald-600 xl:h-9 xl:w-9">
+                      <HeartPulse size={16} strokeWidth={2.6} />
                     </span>
                     <span className="font-semibold text-neutral-800">Kondisi baik</span>
-                    <span className="inline-flex items-center gap-1 text-[13px] tabular-nums text-neutral-400">
-                      <Clock size={13} strokeWidth={2.4} />
+                    <span className="inline-flex items-center gap-1 text-[14px] tabular-nums text-neutral-400 xl:text-[15px]">
+                      <Clock size={14} strokeWidth={2.4} />
                       {NOW_TIME}
                     </span>
                   </li>
-                  <li className="flex items-center gap-2.5 text-[15.5px] text-neutral-600 xl:text-[17px]">
-                    <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-karsa-soft text-karsa-dark xl:h-7 xl:w-7">
-                      <Check size={14} strokeWidth={3} />
+                  <li className="flex items-center gap-2.5 text-[16px] text-neutral-600 sm:text-[17px] xl:text-[19px]">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-karsa-soft text-karsa-dark xl:h-9 xl:w-9">
+                      <Check size={16} strokeWidth={3} />
                     </span>
                     Tidak ada keluhan baru
                   </li>
@@ -200,6 +220,7 @@ export default function Homepage() {
             </Panel>
 
             <TodayMood />
+          </div>
           </div>
 
           {/* Activity */}
@@ -281,78 +302,128 @@ export default function Homepage() {
             on screen at once — picking a date never means scrolling to find
             out what's on it. `min-h` is the floor the calendar actually needs:
             on a short window the page scrolls rather than clipping the grid.
-            Below `lg` it unpins and flows with the page. */}
-        <aside className="sched-col flex min-w-0 flex-col gap-5 md:gap-6 lg:sticky lg:top-8 lg:h-[calc(100vh-4rem)] lg:min-h-[730px] xl:top-10 xl:h-[calc(100vh-5rem)] xl:min-h-[790px] xl:gap-7">
-          {/* Who this column is about, and the bell. The caregiver's own name
-              used to sit here; it lives at the foot of the rail now. */}
-          <PatientSwitcher />
-
-          {/* Scheduling */}
-          <Panel
-            eyebrow="Penjadwalan"
-            title="Jadwal"
-            tone="lilac"
-            className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
-            bodyClassName="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
-            action={
-              <button
-                type="button"
-                aria-label="Tambah jadwal"
-                className="grid h-9 w-9 place-items-center rounded-lg bg-white/80 text-karsa-dark ring-1 ring-edge-lilac outline-none transition-all duration-200 hover:bg-karsa hover:text-white hover:ring-karsa focus-visible:ring-2 focus-visible:ring-karsa/40 active:scale-95"
-              >
-                <Plus size={18} strokeWidth={2.6} />
-              </button>
-            }
-          >
-            {/* The month grid takes whatever height is going spare; the day
-                list under it keeps its own scroll so it's always in view. */}
-            <Calendar selected={selected} onSelect={setSelected} className="shrink-0" />
-
-            {/* Bleeds to the card edge, so the divider matches the padding. */}
-            <div
-              data-divider
-              className="-mx-6 my-6 h-px shrink-0 bg-edge-lilac sm:-mx-7 xl:-mx-8"
-            />
-
-            <p
-              data-day-label
-              className="mb-3.5 shrink-0 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400 xl:text-xs"
-            >
-              {isSelectedToday
-                ? "Hari ini"
-                : `${selected.d} ${MONTHS[selected.m]}`}
-            </p>
-
-            {/* Gutters so the cards' hover shadow isn't clipped by the scroll box. */}
-            <div className="-mx-2 px-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-              {events.length > 0 ? (
-                <ul data-schedule-list className="flex flex-col gap-3">
-                  {events.map((event) => (
-                    <ScheduleItem key={event.id} event={event} />
-                  ))}
-                </ul>
-              ) : (
-                <p className="rounded-2xl bg-white/60 px-4 py-6 text-center text-sm text-neutral-500">
-                  Tidak ada jadwal di tanggal ini.
-                </p>
-              )}
-            </div>
-
-            <button
-              type="button"
-              data-more
-              className="group/more mt-4 flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-karsa-dark underline underline-offset-4 outline-none transition-colors hover:text-karsa focus-visible:ring-2 focus-visible:ring-karsa/40 xl:text-sm"
-            >
-              Lihat jadwal lainnya
-              <ArrowRight
-                size={15}
-                strokeWidth={2.5}
-                className="transition-transform duration-200 group-hover/more:translate-x-0.5"
-              />
-            </button>
-          </Panel>
+            Below `lg` it is gone from the flow entirely and lives in the
+            slide-over instead — see the trigger at the foot of this file. */}
+        <aside className="sched-col hidden min-w-0 flex-col gap-5 md:gap-6 lg:sticky lg:top-8 lg:flex lg:h-[calc(100vh-4rem)] lg:min-h-[730px] xl:top-10 xl:h-[calc(100vh-5rem)] xl:min-h-[790px] xl:gap-7">
+          <ScheduleColumn
+            selected={selected}
+            onSelect={setSelected}
+            events={events}
+            isSelectedToday={isSelectedToday}
+          />
         </aside>
       </div>
+
+      {/* ── Schedule, on a phone ─────────────────────────────────────────
+          The same column, reached from a button instead of three screens of
+          scrolling. `lg:hidden` on both, so only one of the two ever exists. */}
+      <button
+        type="button"
+        onClick={() => setScheduleOpen(true)}
+        aria-label="Buka jadwal"
+        className="fixed bottom-[calc(var(--bottom-nav)+1rem)] right-4 z-30 grid h-14 w-14 place-items-center rounded-full bg-karsa text-white shadow-[0_10px_28px_-8px_rgba(63,92,70,0.7)] outline-none transition-transform duration-200 active:scale-95 focus-visible:ring-2 focus-visible:ring-karsa focus-visible:ring-offset-2 lg:hidden"
+      >
+        <CalendarDays size={23} strokeWidth={2.2} />
+      </button>
+
+      <SlideOver
+        open={scheduleOpen}
+        onClose={() => setScheduleOpen(false)}
+        title="Jadwal"
+      >
+        <div className="flex flex-col gap-5">
+          <ScheduleColumn
+            selected={selected}
+            onSelect={setSelected}
+            events={events}
+            isSelectedToday={isSelectedToday}
+          />
+        </div>
+      </SlideOver>
     </div>
+  );
+}
+
+/** The patient card and the month, in that order. Rendered twice — pinned in
+ *  the right column from `lg`, and inside the slide-over below it — so the two
+ *  can never drift apart. Every height rule in here is `lg:`-only: in the sheet
+ *  the content simply flows, and the sheet does the scrolling. */
+function ScheduleColumn({
+  selected,
+  onSelect,
+  events,
+  isSelectedToday,
+}: {
+  selected: Selection;
+  onSelect: (next: Selection) => void;
+  events: (typeof SCHEDULE)[string];
+  isSelectedToday: boolean;
+}) {
+  return (
+    <>
+      {/* Who this column is about, and the bell. The caregiver's own name
+          used to sit here; it lives at the foot of the rail now. */}
+      <PatientSwitcher />
+
+      {/* Scheduling */}
+      <Panel
+        eyebrow="Penjadwalan"
+        title="Jadwal"
+        tone="lilac"
+        className="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+        bodyClassName="lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
+        action={
+          <button
+            type="button"
+            aria-label="Tambah jadwal"
+            className="grid h-9 w-9 place-items-center rounded-lg bg-white/80 text-karsa-dark ring-1 ring-edge-lilac outline-none transition-all duration-200 hover:bg-karsa hover:text-white hover:ring-karsa focus-visible:ring-2 focus-visible:ring-karsa/40 active:scale-95"
+          >
+            <Plus size={18} strokeWidth={2.6} />
+          </button>
+        }
+      >
+        {/* The month grid takes whatever height is going spare; the day
+            list under it keeps its own scroll so it's always in view. */}
+        <Calendar selected={selected} onSelect={onSelect} className="shrink-0" />
+
+        {/* Bleeds to the card edge, so the divider matches the padding. */}
+        <div data-divider className="-mx-6 my-6 h-px shrink-0 bg-edge-lilac sm:-mx-7 xl:-mx-8" />
+
+        <p
+          data-day-label
+          className="mb-3.5 shrink-0 px-0.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-400 xl:text-xs"
+        >
+          {isSelectedToday ? "Hari ini" : `${selected.d} ${MONTHS[selected.m]}`}
+        </p>
+
+        {/* Gutters so the cards' hover shadow isn't clipped by the scroll box. */}
+        <div className="-mx-2 px-2 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          {events.length > 0 ? (
+            <ul data-schedule-list className="flex flex-col gap-3">
+              {events.map((event) => (
+                <ScheduleItem key={event.id} event={event} />
+              ))}
+            </ul>
+          ) : (
+            <p className="rounded-2xl bg-white/60 px-4 py-6 text-center text-sm text-neutral-500">
+              Tidak ada jadwal di tanggal ini.
+            </p>
+          )}
+        </div>
+
+        <button
+          type="button"
+          data-more
+          className="group/more mt-4 flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg px-2 py-1 text-[13px] font-semibold text-karsa-dark underline underline-offset-4 outline-none transition-colors hover:text-karsa focus-visible:ring-2 focus-visible:ring-karsa/40 xl:text-sm"
+        >
+          Lihat jadwal lainnya
+          <ArrowRight
+            size={15}
+            strokeWidth={2.5}
+            className="transition-transform duration-200 group-hover/more:translate-x-0.5"
+          />
+        </button>
+      </Panel>
+    </>
   );
 }

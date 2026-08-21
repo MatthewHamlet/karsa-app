@@ -28,8 +28,10 @@ const CLAY = "#6d5647";
 /** The page's own padding, and the negative margins that cancel it. */
 const BLEED = "-mx-4 sm:-mx-6 md:-mx-8 xl:-mx-12";
 const PAD = "px-4 sm:px-6 md:px-8 xl:px-12";
-/** The header's upward pull, into the page's top padding. */
-const RISE = "-mt-20 md:-mt-10 xl:-mt-12";
+/** The header's upward pull, into the page's top padding. Matches the page
+ *  root's `pt-6 md:pt-10 xl:pt-12` exactly — the phone figure used to be 80px
+ *  of clearance for a floating hamburger that no longer exists. */
+const RISE = "-mt-6 md:-mt-10 xl:-mt-12";
 
 /** Kept in step with `duration-200` in MORPH — the measuring gate below waits
  *  this long before believing the header has stopped moving. */
@@ -131,7 +133,9 @@ function TabSwitcher({
             aria-selected={active}
             onClick={() => onSelect(item.key)}
             className={`relative inline-flex items-center justify-center gap-2 rounded-full font-semibold outline-none focus-visible:ring-2 focus-visible:ring-white/70 ${MORPH} ${
-              compact ? "px-3 py-1.5 text-[12.5px]" : "px-4 py-2.5 text-[13.5px] sm:px-5"
+              compact
+                ? "px-3 py-1.5 text-[12.5px]"
+                : "px-3 py-2 text-[12.5px] sm:px-5 sm:py-2.5 sm:text-[13.5px]"
             } ${active ? "" : "text-white/75 hover:text-white"}`}
             style={active ? { color: CLAY } : undefined}
           >
@@ -159,7 +163,9 @@ function GroupIdentity({ slim = false }: { slim?: boolean }) {
             `truncate`'s overflow box — the line has to be taller than the glyphs. */}
         <p
           className={`truncate font-bold tracking-tight text-white ${MORPH} ${
-            slim ? "text-[15px] leading-[1.55]" : "text-[22px] leading-[1.3] xl:text-[26px]"
+            slim
+              ? "text-[15px] leading-[1.55]"
+              : "text-[18px] leading-[1.35] sm:text-[22px] sm:leading-[1.3] xl:text-[26px]"
           }`}
         >
           {CARE_GROUP.name}
@@ -179,8 +185,12 @@ function GroupIdentity({ slim = false }: { slim?: boolean }) {
         </span>
       </div>
 
+      {/* Members are the first thing to go on a phone: squeezed beside the
+          avatar and the action buttons, the name and the mood chip already wrap
+          to two lines, and a third put the header back where it started. The
+          count is still one tap away in the group's settings. */}
       {!slim && (
-        <div className={`mt-2.5 flex items-center gap-2.5 ${REVEAL}`}>
+        <div className={`mt-2.5 hidden items-center gap-2.5 sm:flex ${REVEAL}`}>
           <div className="flex -space-x-2">
             {CARE_GROUP.members.map((member) => (
               <span
@@ -269,7 +279,11 @@ function HeaderBody({
 }) {
   return (
     <div
-      className={`flex ${slim ? "h-14 items-center gap-3" : "flex-wrap items-center gap-x-6 gap-y-4"}`}
+      className={`flex ${
+        slim
+          ? "h-14 items-center gap-3"
+          : "flex-wrap items-center gap-x-4 gap-y-3 sm:gap-x-6 sm:gap-y-4"
+      }`}
     >
       {!slim && (
         <p
@@ -279,19 +293,29 @@ function HeaderBody({
         </p>
       )}
 
-      <ProfileAvatar
-        className={`${MORPH} ${slim ? "h-9 w-9" : "h-16 w-16 xl:h-[72px] xl:w-[72px]"}`}
-      />
-      <h1 className="sr-only">{CARE_GROUP.name}</h1>
+      {/* Avatar, name and the actions share one line, and that line is the full
+          width — which is what puts the buttons hard right on a desktop and, on
+          a phone, stops them claiming a row of their own. Present in both sizes
+          so the tree never changes shape. */}
+      <div
+        className={`flex min-w-0 items-center ${slim ? "gap-3" : "w-full gap-4 sm:gap-6"}`}
+      >
+        <ProfileAvatar
+          className={`${MORPH} ${
+            slim ? "h-9 w-9" : "h-12 w-12 sm:h-16 sm:w-16 xl:h-[72px] xl:w-[72px]"
+          }`}
+        />
+        <h1 className="sr-only">{CARE_GROUP.name}</h1>
 
-      <GroupIdentity slim={slim} />
+        <GroupIdentity slim={slim} />
 
-      {!slim && (
-        <div className={`ml-auto flex items-center gap-2 ${REVEAL}`}>
-          <GroupActions />
-          {toggle}
-        </div>
-      )}
+        {!slim && (
+          <div className={`ml-auto flex shrink-0 items-center gap-2 ${REVEAL}`}>
+            <GroupActions />
+            {toggle}
+          </div>
+        )}
+      </div>
 
       <div className={slim ? "ml-auto shrink-0" : "w-full"}>
         <TabSwitcher tab={tab} onSelect={onSelect} compact={slim} />
@@ -477,7 +501,7 @@ export default function CareShell({
           <Blobs height={fullH} />
           <div
             ref={contentRef}
-            className={`absolute inset-x-0 top-0 ${PAD} ${slim ? "" : "pb-6 pt-[72px] md:pt-6 xl:pt-7"}`}
+            className={`absolute inset-x-0 top-0 ${PAD} ${slim ? "" : "pb-5 pt-5 sm:pb-6 sm:pt-6 xl:pt-7"}`}
           >
             <HeaderBody
               slim={slim}
@@ -513,7 +537,10 @@ export default function CareShell({
            in step with `pb-10 xl:pb-12` in Care.tsx — so the composer lands on
            the fold. No gap either side of it: nothing here is a card. */
         <div className={`-mb-10 xl:-mb-12 ${BLEED}`}>
-          <TeamChat context={context} height={hostH ? `calc(100dvh - ${hostH}px)` : undefined} />
+          <TeamChat
+            context={context}
+            height={hostH ? `calc(100dvh - ${hostH}px - var(--bottom-nav))` : undefined}
+          />
         </div>
       )}
     </div>

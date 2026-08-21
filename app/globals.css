@@ -107,6 +107,20 @@
   }
 }
 
+/* The phone navigation bar's height, as a length the whole app can subtract.
+   Zero from `md` up, where the rail takes over and nothing is pinned to the
+   bottom of the viewport — so `calc(100dvh - var(--bottom-nav))` is correct on
+   every breakpoint without a media query at each call site. */
+:root {
+  --bottom-nav: 0px;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --bottom-nav: calc(4rem + env(safe-area-inset-bottom));
+  }
+}
+
 body {
   background: var(--color-karsa-canvas);
   color: #262626;

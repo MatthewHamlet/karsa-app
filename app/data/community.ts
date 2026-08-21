@@ -121,6 +121,92 @@ export const DISCUSSIONS: Discussion[] = [
       { label: "Rutinitas", tone: "cream" },
     ],
   },
+  {
+    id: "d3",
+    author: "anindya",
+    title: "Kenapa tensi lansia sering lebih tinggi di pagi hari?",
+    snippet:
+      "Banyak yang bertanya soal ini, jadi saya tulis sekali. Tekanan darah punya irama harian — naik menjelang bangun dan turun saat tidur. Satu angka tinggi di pagi hari belum tentu berarti obatnya kurang.",
+    age: "8 jam yang lalu",
+    replies: 76,
+    upvotes: 214,
+    keywords: ["tensi", "tekanan darah", "obat", "lansia", "edukasi"],
+    tags: [
+      { label: "Edukasi", tone: "blue" },
+      { label: "Obat & Dosis", tone: "lavender" },
+    ],
+  },
+  {
+    id: "d4",
+    author: "rina",
+    title: "Tiga cara mengurangi garam tanpa membuat masakan terasa hambar",
+    snippet:
+      "Rasa asin bisa diganti asam dan rempah, bukan dihilangkan. Perasan jeruk nipis di akhir masak, daun kemangi, dan bawang putih yang ditumis lebih lama — tiga-tiganya menutup hilangnya garam.",
+    age: "1 hari yang lalu",
+    replies: 52,
+    upvotes: 168,
+    keywords: ["nutrisi", "gizi", "resep", "garam", "edukasi"],
+    tags: [
+      { label: "Edukasi", tone: "peach" },
+      { label: "Nutrisi", tone: "green" },
+    ],
+  },
+  {
+    id: "d5",
+    author: "bagas",
+    title: "Memindahkan pasien dari kasur ke kursi roda tanpa melukai punggung Anda",
+    snippet:
+      "Pendamping yang cedera tidak bisa mendampingi. Kunci utamanya bukan tenaga, tapi posisi kaki dan tinggi kasur. Saya jelaskan urutannya langkah demi langkah di sini.",
+    age: "1 hari yang lalu",
+    replies: 38,
+    upvotes: 131,
+    keywords: ["mobilitas", "perawatan harian", "stroke", "edukasi"],
+    tags: [
+      { label: "Edukasi", tone: "lavender" },
+      { label: "Perawatan Harian", tone: "cream" },
+    ],
+  },
+];
+
+/* ── Feed ─────────────────────────────────────────────────────────────────── */
+
+/** The order the feed puts things in.
+ *
+ *  Written out rather than computed, because "which group is worth interrupting
+ *  a run of threads for" is an editorial call, not a sort. A group card lands
+ *  after a couple of posts on the same subject — a nutrition group under a
+ *  nutrition thread reads as a suggestion, the same card at the top reads as an
+ *  advert. The live session sits mid-feed for the same reason. */
+export type FeedEntry =
+  | { kind: "post"; ref: string }
+  | { kind: "group"; ref: string }
+  | { kind: "session" };
+
+export const FEED: FeedEntry[] = [
+  { kind: "post", ref: "d1" },
+  { kind: "post", ref: "d2" },
+  { kind: "group", ref: "g3" },
+  { kind: "post", ref: "d3" },
+  { kind: "session" },
+  { kind: "post", ref: "d4" },
+  { kind: "group", ref: "g1" },
+  { kind: "post", ref: "d5" },
+  { kind: "group", ref: "g2" },
+  { kind: "group", ref: "g4" },
+];
+
+/* ── Urutan ───────────────────────────────────────────────────────────────── */
+
+/** What the Filter button offers. Only posts can be sorted — a group has no
+ *  timestamp and no upvotes — so the feed keeps its editorial order whenever
+ *  the tab is showing anything other than posts. */
+export type SortKey = "relevan" | "terbaru" | "ramai" | "didukung";
+
+export const SORTS: { key: SortKey; label: string }[] = [
+  { key: "relevan", label: "Paling relevan" },
+  { key: "terbaru", label: "Terbaru" },
+  { key: "ramai", label: "Paling banyak dibahas" },
+  { key: "didukung", label: "Paling didukung" },
 ];
 
 /* ── Topik & grup ─────────────────────────────────────────────────────────── */

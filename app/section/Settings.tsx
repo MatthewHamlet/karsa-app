@@ -161,7 +161,7 @@ export default function SettingsPage({
 
   return (
     /* Same rest at the foot of the page as every other route — see Care. */
-    <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
+    <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
       {/* The banner keeps saying "Pengaturan" whatever is open. The section's
           own name belongs on the panel that shows it — swapping the page title
           per selection left the caregiver with two headings competing to say

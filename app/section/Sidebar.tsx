@@ -9,7 +9,7 @@ import {
   PawPrint,
   HeartPulse,
   ChevronsLeft,
-  Menu,
+  ScanText,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -17,6 +17,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import List, { EASE, RAIL_SPRING } from "../components/List";
+import BottomNav from "../components/BottomNav";
 import { ACCOUNT } from "../data/settings";
 
 /** Collapsed width is not arbitrary: rail padding (14) + item padding (14)
@@ -35,6 +36,7 @@ const LOGO_CLOSED = 34;
 const NAV: { link: string; icon: LucideIcon; text: string; badge?: number }[] = [
   { link: "/", icon: Home, text: "Home" },
   { link: "/care", icon: HeartPulse, text: "Perawatan" },
+  { link: "/scan", icon: ScanText, text: "Scan Resep" },
   { link: "/community", icon: UsersRound, text: "Komunitas" },
   { link: "/mascot", icon: PawPrint, text: "Maskot Karsa" },
 ];
@@ -291,18 +293,14 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
   return (
     <>
       <section id="sb">
-        {/* Mobile trigger */}
-        <motion.button
-          onClick={() => setMobileOpen(true)}
-          aria-label="Buka menu"
-          aria-expanded={mobileOpen}
-          whileTap={reduce ? undefined : { scale: 0.9 }}
-          animate={{ opacity: mobileOpen ? 0 : 1, scale: mobileOpen ? 0.85 : 1 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.18, ease: EASE }}
-          className="fixed left-4 top-4 z-30 grid h-11 w-11 place-items-center rounded-2xl bg-karsa-cream text-neutral-700 shadow-[0_2px_10px_-2px_rgba(24,32,24,0.22)] ring-1 ring-karsa-line md:hidden"
-        >
-          <Menu size={20} strokeWidth={2.2} />
-        </motion.button>
+        {/* Phone navigation is a bar at the bottom, not a drawer behind a
+            hamburger. The drawer survives as the "Lainnya" tab, which is where
+            the profile and settings live. */}
+        <BottomNav
+          pathname={pathname}
+          moreOpen={mobileOpen}
+          onMore={() => setMobileOpen((open) => !open)}
+        />
 
         {/* Desktop rail */}
         <motion.aside
@@ -371,7 +369,10 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
           transition={size}
           className="hidden shrink-0 md:block"
         />
-        <main className="min-w-0 flex-1">{children}</main>
+        {/* `--bottom-nav` is the bar's height (0 from `md` up — see globals).
+            Pages that fill the viewport subtract it; everything else just needs
+            its last row to clear the bar. */}
+        <main className="min-w-0 flex-1 pb-[var(--bottom-nav)]">{children}</main>
       </div>
     </>
   );

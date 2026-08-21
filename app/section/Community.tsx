@@ -1,84 +1,99 @@
 "use client";
 
-import { useState } from "react";
-import { PenLine, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import PageHeader from "../components/PageHeader";
-import CommunityDiscussions from "../components/CommunityDiscussions";
-import CommunityGroups from "../components/CommunityGroups";
+import CommunityToolbar, { type FeedTab } from "../components/CommunityToolbar";
+import CommunityFeed, { tabCounts } from "../components/CommunityFeed";
 import CommunityAside from "../components/CommunityAside";
+import type { SortKey } from "../data/community";
 
 export default function CommunityPage() {
   /* One query for the whole page. The search field and the topic chips write to
-     it and both lists read from it, which is what keeps a chip honest: pressing
+     it and the feed reads from it, which is what keeps a chip honest: pressing
      #Demensia puts the word in the box you can see and edit, rather than
      applying a filter with no visible cause. */
   const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<FeedTab>("semua");
+  const [sort, setSort] = useState<SortKey>("relevan");
+
+  const counts = useMemo(() => tabCounts(query), [query]);
+
+  /* The feed scrolls inside itself rather than lengthening the page, and the
+     height it scrolls within is the sidebar's — so the page ends where "Orang
+     untuk Diikuti" ends no matter how many posts load.
+
+     Measured rather than guessed: the topic chips wrap differently at every
+     width, so the sidebar has no height a stylesheet could know. Nothing loops
+     here — the columns are independent `items-start` grid tracks, so capping
+     the feed can never change what the sidebar measures. */
+  const asideRef = useRef<HTMLDivElement>(null);
+  const [asideH, setAsideH] = useState(0);
+
+  useEffect(() => {
+    const node = asideRef.current;
+    if (!node) return;
+
+    const sync = () => setAsideH(node.offsetHeight);
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     /* Same rest at the foot of the page as every other route — see Care. */
-    <div className="w-full px-4 pb-10 pt-20 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
+    <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
       <PageHeader
         tone="forest"
         eyebrow="Karsa"
         title="Komunitas"
         subtitle="Tempat pendamping berbagi cerita, informasi, dan saling mendukung."
-        action={
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[14px] font-bold text-karsa-dark outline-none transition-colors duration-200 hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/70 sm:px-5"
-          >
-            <PenLine size={16} strokeWidth={2.4} />
-            <span className="hidden sm:inline">Buat Diskusi Baru</span>
-            <span className="sm:hidden">Diskusi Baru</span>
-          </button>
-        }
-      >
-        <div className="relative max-w-2xl">
-          <Search
-            size={18}
-            strokeWidth={2.2}
-            aria-hidden
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-white/50"
-          />
-          <label htmlFor="community-search" className="sr-only">
-            Cari di komunitas
-          </label>
-          <input
-            id="community-search"
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Cari diskusi, grup, atau topik (misal: demensia, resep nutrisi)…"
-            /* Glass rather than white: a white field in the middle of the band
-               reads as a hole punched in it. `[&::-webkit-search-cancel-button]`
-               is hidden because the browser draws its clear button in its own
-               dark grey, invisible on this colour — ours sits beside it. */
-            className="w-full rounded-full bg-white/15 py-3 pl-11 pr-11 text-[14.5px] text-white outline-none ring-1 ring-white/25 transition-colors duration-200 placeholder:text-white/55 focus:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              aria-label="Hapus pencarian"
-              className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-white/70 outline-none transition-colors duration-200 hover:bg-white/20 hover:text-white focus-visible:ring-2 focus-visible:ring-white/70"
-            >
-              <X size={16} strokeWidth={2.4} />
-            </button>
-          )}
-        </div>
-      </PageHeader>
+      />
 
       {/* The aside is a companion, not a second page: it keeps its width while
-          the thread column takes whatever the viewport gives. Below `lg` it
-          drops under the groups, where an upcoming session still makes sense
-          to meet after you have read what the room is talking about. */}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_336px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-8 xl:space-y-10">
-          <CommunityDiscussions query={query} />
-          <CommunityGroups query={query} />
+          the feed takes whatever the viewport gives. Below `lg` it drops under
+          the feed, where an upcoming session still makes sense to meet after
+          you have read what the room is talking about. */}
+      {/* The cap is carried as a custom property and only *used* from `lg` up.
+          Below that the sidebar sits under the feed, where borrowing its height
+          would mean scrolling a box inside a page that already scrolls. */}
+      <div
+        style={{ "--aside-h": asideH ? `${asideH}px` : "none" } as CSSProperties}
+        className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_316px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_336px] xl:gap-10 2xl:grid-cols-[minmax(0,1fr)_360px]"
+      >
+        <div className="min-w-0 lg:flex lg:max-h-[var(--aside-h)] lg:flex-col">
+          {/* Stays put: a search box and a tab bar that scroll away are two
+              controls you have to go back up for. */}
+          <div className="lg:shrink-0">
+            <CommunityToolbar
+              query={query}
+              onQuery={setQuery}
+              tab={tab}
+              onTab={setTab}
+              sort={sort}
+              onSort={setSort}
+              counts={counts}
+            />
+          </div>
+
+          {/* `-mx-1 px-1` gives the cards' rings and shadows room to draw
+              instead of being shaved off by the scroll container's edge.
+
+              `contain: paint` is load-bearing, not a hint. Without it the feed's
+              clipped overflow still counted toward the document's scrollable
+              area: the page ended at 1.389px but scrolled to 2.359px, so every
+              post added blank canvas below the sidebar — the exact growth the
+              cap was meant to stop. Paint containment is what actually keeps
+              the overflow inside the box. Scoped to `lg` alongside the overflow,
+              because below that it would clip the cards' own shadows. */}
+          <div className="lg:-mx-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:px-1 lg:[contain:paint] lg:[scrollbar-gutter:stable]">
+            <CommunityFeed query={query} tab={tab} sort={sort} />
+          </div>
         </div>
 
-        <CommunityAside onTopic={setQuery} active={query} />
+        <div ref={asideRef}>
+          <CommunityAside onTopic={setQuery} active={query} />
+        </div>
       </div>
     </div>
   );

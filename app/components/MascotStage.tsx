@@ -2,8 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import MascotAvatar from "./MascotAvatar";
-import CareActionCards from "./CareActionCards";
-import type { ActionCard, MascotState } from "../data/mascot";
+import type { MascotState } from "../data/mascot";
 
 /** What the character is doing, in words, under the character doing it.
  *  A status line is also the accessible version of an animation. */
@@ -22,24 +21,24 @@ const CAPTION: Record<MascotState, { title: string; body: string }> = {
   },
 };
 
-/** The right-hand stage: the mascot, what it is doing, and whatever it is
- *  currently holding out. The mascot leans toward the cards when it has them,
- *  which is what ties the two halves of the panel together. */
-export default function MascotStage({
-  state,
-  cards,
-}: {
-  state: MascotState;
-  cards: ActionCard[];
-}) {
+/** The right-hand stage, from `lg` up: Karsa and what it is doing, and nothing
+ *  else. The action cards used to live down here; they belong under the answer
+ *  that produced them, so they moved into the thread.
+ *
+ *  No card around the character either. A panel this size framing one mascot
+ *  read as a widget parked beside the chat — it sits in the panel's own light
+ *  now, which is what makes it a presence rather than a component. */
+export default function MascotStage({ state }: { state: MascotState }) {
   const reduce = useReducedMotion();
   const caption = CAPTION[state];
 
   return (
-    <div className="flex min-h-0 flex-col">
-      {/* ── Character ───────────────────────────────────────────────────── */}
-      <div className="shrink-0 px-5 pt-6 xl:px-6">
-        <div className="relative overflow-hidden rounded-3xl border border-white/70 bg-white/55 px-4 pb-5 pt-4 shadow-[0_18px_44px_-28px_rgba(24,32,24,0.5)] backdrop-blur-xl">
+    /* `overflow-hidden` moved here from the card that used to hold it: the two
+       gradient blooms are deliberately larger than their box and reach past its
+       edges, and with the card gone they were pushing the page 24px sideways.
+       The panel clips them now, which is what the card was doing all along. */
+    <div className="flex min-h-0 flex-1 flex-col justify-center overflow-hidden px-5 py-6 xl:px-6">
+      <div className="relative">
           {/* Gradient mesh. Two soft blooms, shifted by state, so the panel's
               light changes with the mood instead of the panel changing colour. */}
           <motion.span
@@ -59,8 +58,8 @@ export default function MascotStage({
           />
 
           <div className="relative">
-            {/* Leans and dips toward the cards while presenting — the pose is
-                the pointing, so nothing has to grow an arm to do it. */}
+            {/* Leans and dips while presenting — the pose is the pointing, so
+                nothing has to grow an arm to do it. */}
             <motion.div
               animate={
                 state === "presenting" && !reduce
@@ -96,26 +95,6 @@ export default function MascotStage({
               </motion.div>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* ── Cards ───────────────────────────────────────────────────────── */}
-      {/* Plain conditional, for the same reason as the caption: the cards are
-          the answer, and gating them behind the placeholder's exit would make
-          the mascot point at an empty shelf. Each card animates itself in. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-4 xl:px-6">
-        {cards.length > 0 ? (
-          <>
-            <h3 className="mb-2.5 px-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.16em] text-neutral-400">
-              Tindakan
-            </h3>
-            <CareActionCards cards={cards} />
-          </>
-        ) : (
-          <p className="rounded-2xl border border-dashed border-karsa-line px-4 py-6 text-center text-[12.5px] leading-5 text-neutral-500">
-            Kartu tindakan akan muncul di sini begitu ada yang bisa dicatat.
-          </p>
-        )}
       </div>
     </div>
   );
