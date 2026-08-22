@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, useReducedMotion } from "framer-motion";
 import { ArrowRight, CalendarDays, Check, Clock, HeartPulse, Plus, Sparkles } from "lucide-react";
 
 import Mascot from "../components/Mascot";
@@ -16,8 +16,10 @@ import ActivityItem from "../components/ActivityItem";
 import Calendar, { type Selection } from "../components/Calendar";
 import ScheduleItem from "../components/ScheduleItem";
 import PatientSwitcher from "../components/PatientSwitcher";
+import type { CarePatient } from "../lib/care/types";
 import SlideOver from "../components/SlideOver";
-import { EASE } from "../components/List";
+import Confetti from "../components/Confetti";
+import TasksDone from "../components/TasksDone";
 import {
   ACTIVITIES,
   MONTHS,
@@ -40,7 +42,7 @@ const VISIBLE_TASKS = 3;
 /** Long enough for the strike-through to finish drawing before the row goes. */
 const STRIKE_MS = 520;
 
-export default function Homepage() {
+export default function Homepage({ patients }: { patients?: CarePatient[] }) {
   const [completed, setCompleted] = useState<string[]>(() =>
     TASKS.filter((task) => task.done).map((task) => task.id),
   );
@@ -49,6 +51,8 @@ export default function Homepage() {
   const [selected, setSelected] = useState<Selection>({ ...TODAY });
   /** Phone only — from `lg` the same column is pinned beside the page. */
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  /** Bumped on every finish; the confetti keys off it. */
+  const [burst, setBurst] = useState(0);
   const reduce = useReducedMotion();
 
   /** Completed tasks are hidden — the card is a list of what's left to do. */
@@ -68,6 +72,7 @@ export default function Homepage() {
       () => {
         setCompleted((prev) => [...prev, id]);
         setStriking((prev) => prev.filter((taskId) => taskId !== id));
+        setBurst((n) => n + 1);
       },
       reduce ? 0 : STRIKE_MS,
     );
@@ -204,8 +209,15 @@ export default function Homepage() {
                   card's headline statistic on the right. */}
               <div className="flex flex-1 items-center gap-4 sm:gap-5 @3xl:gap-7">
                 {/* Fixed to three rows so the card never resizes as tasks are
-                    ticked off, and the ring keeps its size and its place. */}
-                <ul className="h-[236px] min-w-0 flex-1 divide-y divide-edge-sand border-y border-edge-sand sm:h-[147px]">
+                    ticked off, and the ring keeps its size and its place.
+
+                    On a phone that height was 236px for 146px of rows — 90px of
+                    nothing, which is what left the rows sitting at the top-left
+                    while the ring sat centred to their right, and gave the card
+                    an empty tail. Sized to the rows now, and `justify-center`
+                    keeps a shorter list in the middle of the box instead of
+                    hanging from the top of it. */}
+                <ul className="flex h-[152px] min-w-0 flex-1 flex-col justify-center divide-y divide-edge-sand border-y border-edge-sand sm:h-[147px]">
                   <AnimatePresence initial={false}>
                     {pending.slice(0, VISIBLE_TASKS).map((task) => (
                       <TaskItem
@@ -217,6 +229,14 @@ export default function Homepage() {
                       />
                     ))}
                   </AnimatePresence>
+
+                  {/* The list keeps its fixed height, so this lands in the space
+                      the rows left behind rather than resizing the card. */}
+                  {pending.length === 0 && (
+                    <li className="grid h-full place-items-center">
+                      <TasksDone size="sm" />
+                    </li>
+                  )}
                 </ul>
 
                 <ProgressRing
@@ -314,6 +334,7 @@ export default function Homepage() {
             slide-over instead — see the trigger at the foot of this file. */}
         <aside className="sched-col hidden min-w-0 flex-col gap-5 md:gap-6 lg:sticky lg:top-8 lg:flex lg:h-[calc(100vh-4rem)] lg:min-h-[730px] xl:top-10 xl:h-[calc(100vh-5rem)] xl:min-h-[790px] xl:gap-7">
           <ScheduleColumn
+            patients={patients}
             selected={selected}
             onSelect={setSelected}
             events={events}
@@ -341,6 +362,7 @@ export default function Homepage() {
       >
         <div className="flex flex-col gap-5">
           <ScheduleColumn
+            patients={patients}
             selected={selected}
             onSelect={setSelected}
             events={events}
@@ -348,6 +370,8 @@ export default function Homepage() {
           />
         </div>
       </SlideOver>
+
+      <Confetti fire={burst} />
     </div>
   );
 }
@@ -361,17 +385,22 @@ function ScheduleColumn({
   onSelect,
   events,
   isSelectedToday,
+  patients,
 }: {
   selected: Selection;
   onSelect: (next: Selection) => void;
   events: (typeof SCHEDULE)[string];
   isSelectedToday: boolean;
+  /** Threaded down from the page. `undefined` means signed out, which is what
+   *  keeps the design placeholder alive; an empty array is a real caregiver
+   *  with nobody yet. */
+  patients?: CarePatient[];
 }) {
   return (
     <>
       {/* Who this column is about, and the bell. The caregiver's own name
           used to sit here; it lives at the foot of the rail now. */}
-      <PatientSwitcher />
+      <PatientSwitcher patients={patients} />
 
       {/* Scheduling */}
       <Panel

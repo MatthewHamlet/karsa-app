@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Manrope } from "next/font/google";
 import "./globals.css";
 import Sidebar from "./section/Sidebar";
+import { getSessionProfile } from "./lib/profile";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,7 +24,11 @@ export const metadata: Metadata = {
   description: "Mum I'm Jamaican, Jamaican me dinner mum",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  /* Read once here and passed down, rather than each component asking. The rail
+     is a client component and cannot reach the database itself. */
+  const profile = await getSessionProfile();
+
   return (
     <html
       lang="en"
@@ -47,7 +52,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       {/* The rail is the app shell, so it lives in the layout rather than
           being re-mounted by every route. */}
       <body className="min-h-full flex flex-col">
-        <Sidebar>{children}</Sidebar>
+        <Sidebar profile={profile}>{children}</Sidebar>
       </body>
     </html>
   );

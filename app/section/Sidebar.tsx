@@ -12,6 +12,8 @@ import {
   NotebookPen,
   ScanText,
   X,
+  LogOut,
+  HeartHandshake,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Image from "next/image";
@@ -20,6 +22,8 @@ import { usePathname } from "next/navigation";
 import List, { EASE, RAIL_SPRING } from "../components/List";
 import BottomNav from "../components/BottomNav";
 import { ACCOUNT } from "../data/settings";
+import { ROLE_LABEL, type SessionProfile } from "../lib/roles";
+import { signOut } from "../login/actions";
 import { PATIENT } from "../data/patient";
 
 /** Collapsed width is not arbitrary: rail padding (14) + item padding (14)
@@ -47,14 +51,20 @@ const NAV: NavItem[] = [
 
 /** The same rail, pointed somewhere else.
  *
- *  `/pasien` is a different product for a different person, and the caregiver's
- *  destinations are meaningless there — a patient has no "Scan Resep" and no
- *  compliance page about themselves. What stays identical is the rail itself:
- *  the logo, the collapse handle, the pill, the row heights. Only the list of
- *  places changes, so someone who has seen one app can use the other. */
+ *  `/pasien` is a different product for a different person, and most of the
+ *  caregiver's destinations are meaningless there — a patient has no compliance
+ *  page about themselves. What stays identical is the rail itself: the logo, the
+ *  collapse handle, the pill, the row heights. Only the list of places changes,
+ *  so someone who has seen one app can use the other.
+ *
+ *  Scan is on both lists. It is the one caregiver tool that reads the same from
+ *  either side — the person holding the paper at the pharmacy counter is often
+ *  the patient. */
 const PATIENT_NAV: NavItem[] = [
   { link: "/pasien", icon: Home, text: "Beranda" },
   { link: "/pasien/jurnal", icon: NotebookPen, text: "Jurnal" },
+  { link: "/pasien/scan", icon: ScanText, text: "Scan Resep" },
+  { link: "/pasien/pendamping", icon: HeartHandshake, text: "Pendamping" },
   { link: "/pasien/komunitas", icon: UsersRound, text: "Komunitas" },
   { link: "/pasien/maskot", icon: PawPrint, text: "Maskot Karsa" },
 ];
@@ -69,15 +79,26 @@ type RailProps = {
   /** Whether we are inside the patient app. Swaps the destinations and whose
    *  name is at the foot — not the rail's design. */
   patientApp?: boolean;
+  /** `null` when signed out, or when Supabase is not configured yet. */
+  profile?: SessionProfile | null;
 };
 
-function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp }: RailProps) {
+function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp, profile }: RailProps) {
   const reduce = useReducedMotion();
   const items = patientApp ? PATIENT_NAV : NAV;
   const settingsLink = patientApp ? "/pasien/pengaturan" : "/settings";
-  const me = patientApp
-    ? { name: PATIENT.greeting, role: "Pasien", initial: PATIENT.initial, href: "/pasien/profil" }
-    : { name: ACCOUNT.name, role: ACCOUNT.role, initial: ACCOUNT.initial, href: "/settings?bagian=profile" };
+  /* The real account when there is one; the placeholder only survives as a
+     fallback so the design pages still render for someone working without
+     credentials. */
+  const fallback = patientApp
+    ? { name: PATIENT.greeting, role: "Pasien", initial: PATIENT.initial }
+    : { name: ACCOUNT.name, role: ACCOUNT.role, initial: ACCOUNT.initial };
+  const me = {
+    name: profile?.fullName ?? fallback.name,
+    role: profile ? ROLE_LABEL[profile.role] : fallback.role,
+    initial: profile?.initial ?? fallback.initial,
+    href: patientApp ? "/pasien/profil" : "/settings?bagian=profile",
+  };
   const size = reduce ? { duration: 0 } : RAIL_SPRING;
   const fade = reduce ? { duration: 0 } : { duration: 0.2, ease: EASE };
 
@@ -160,7 +181,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp 
         <RailProfile isOpen={isOpen} onSelect={onSelect} {...me} />
       </div>
 
-      <ul className="space-y-1.5 px-3.5 pb-3.5 pt-1.5">
+      <ul className="space-y-1.5 px-3.5 pt-1.5">
         <List
           link={settingsLink}
           icon={Settings}
@@ -171,6 +192,35 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp 
           onSelect={onSelect}
         />
       </ul>
+
+      {/* Only when there is a session to end. A "Keluar" row shown to somebody
+          who was never signed in is a button that does nothing.
+
+          A form posting to a Server Action, not an onClick: signing out is a
+          mutation, the cookies are `httpOnly` and can only be cleared server
+          side, and this keeps working with JavaScript disabled. */}
+      {profile && (
+        <form action={signOut} className="px-3.5 pb-3.5 pt-1.5">
+          <button
+            type="submit"
+            title={isOpen ? undefined : "Keluar"}
+            className="group/out relative flex h-12 w-full items-center rounded-xl px-3.5 text-left outline-none transition-colors duration-200 hover:bg-rose-500/[0.07] focus-visible:ring-2 focus-visible:ring-rose-400/50"
+          >
+            <span className="relative z-10 grid w-7 shrink-0 place-items-center text-neutral-500 transition-colors group-hover/out:text-rose-600">
+              <LogOut size={20} strokeWidth={2.1} aria-hidden />
+            </span>
+            <motion.span
+              animate={{ width: isOpen ? "auto" : 0, opacity: isOpen ? 1 : 0, x: isOpen ? 0 : -8 }}
+              transition={fade}
+              className="relative z-10 overflow-hidden whitespace-nowrap"
+            >
+              <span className="ml-3.5 block text-[15px] font-semibold text-neutral-600 transition-colors group-hover/out:text-rose-600">
+                Keluar
+              </span>
+            </motion.span>
+          </button>
+        </form>
+      )}
 
       {/* Collapse handle, straddling the rail's edge. */}
       {onToggle && (
@@ -281,7 +331,13 @@ function RailProfile({
   );
 }
 
-export default function Sidebar({ children }: { children?: React.ReactNode }) {
+export default function Sidebar({
+  children,
+  profile,
+}: {
+  children?: React.ReactNode;
+  profile?: SessionProfile | null;
+}) {
   const [isOpen, setIsOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
@@ -289,6 +345,21 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
   const [seenPath, setSeenPath] = useState(pathname);
   const reduce = useReducedMotion();
   const patientApp = pathname.startsWith("/pasien");
+  /** Only the patient's home is a fixed-height dashboard. Its inner sections do
+   *  their own scrolling, so `main` is pinned to the viewport there — but that
+   *  pinning cannot apply to the rest of the patient app: a flowing page inside
+   *  a height-capped `main` simply has its bottom cut off, with no scrollbar to
+   *  reach it. */
+  const patientHome = pathname === "/pasien";
+  /** Routes that are outside the app rather than inside it — no rail, no bottom
+   *  bar, nothing to navigate to yet. The shell is mounted by the root layout,
+   *  so the only place to say so is here.
+   *
+   *  The whole `/login` subtree, not just `/login` itself. Matching only the
+   *  exact path meant `/login/daftar` rendered inside the caregiver navigation:
+   *  a signed-out visitor who pressed "Daftar sekarang" landed on a 404 wearing
+   *  the app's sidebar and bottom bar. */
+  const bareShell = pathname === "/login" || pathname.startsWith("/login/");
 
   /* The rail lives in the layout and survives navigation, so the highlight has
      to follow the route. Keyed on pathname only: in-page hash links leave it
@@ -334,6 +405,10 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
     setMobileOpen(false);
   };
 
+  /* After the hooks, never before them — an early return above `useEffect`
+     would change the hook count between routes. */
+  if (bareShell) return <>{children}</>;
+
   return (
     <>
       <section id="sb">
@@ -356,6 +431,7 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
           className="fixed inset-y-0 left-0 z-50 hidden border-r border-karsa-line md:block"
         >
           <Rail
+            profile={profile}
             isOpen={isOpen}
             railId="desktop"
             active={active}
@@ -391,6 +467,7 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
                 className="fixed inset-y-0 left-0 z-50 w-[296px] border-r border-karsa-line shadow-2xl md:hidden"
               >
                 <Rail
+                  profile={profile}
                   isOpen
                   railId="mobile"
                   active={active}
@@ -407,17 +484,22 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
       {/* Content area. The rail itself is fixed, so this spacer — and not a
           margin — is what keeps the page clear of it, and it animates with
           the same spring. On mobile the rail overlays, so there's no spacer. */}
-      {/* The patient app is locked to the viewport from `lg` up: one screen, no
-          page scrollbar, and only the task list scrolls inside itself. It is
-          done here rather than inside the page because `h-full` needs a
-          definite height to inherit, and `min-h-screen` is not one — a page
-          asking for "the height of the window" would otherwise get "auto".
+      {/* The patient's *home* is locked to the viewport from `lg` up: one
+          screen, no page scrollbar, and only the task list scrolls inside
+          itself. It is done here rather than inside the page because `h-full`
+          needs a definite height to inherit, and `min-h-screen` is not one — a
+          page asking for "the height of the window" would otherwise get "auto".
           Below `lg` it stays a normal scrolling column: seven tasks and a room
           do not fit on a phone, and forcing them to would mean shrinking the
-          text for the one audience that cannot spare it. */}
+          text for the one audience that cannot spare it.
+
+          Scoped to the home route, not the whole patient app. `overflow-hidden`
+          on a fixed-height wrapper clips any page taller than the window with
+          no scrollbar to recover it — which is exactly what happened to the
+          shared Komunitas page the moment it was mounted under `/pasien`. */}
       <div
-        className={`flex bg-karsa-canvas ${
-          patientApp ? "min-h-screen lg:h-screen lg:overflow-hidden" : "min-h-screen"
+        className={`flex min-h-screen bg-karsa-canvas ${
+          patientHome ? "lg:h-screen lg:overflow-hidden" : ""
         }`}
       >
         <motion.div
@@ -432,7 +514,9 @@ export default function Sidebar({ children }: { children?: React.ReactNode }) {
             its last row to clear the bar. */}
         <main
           className={`min-w-0 flex-1 pb-[var(--bottom-nav)] ${
-            patientApp ? "lg:h-full lg:min-h-0 lg:pb-0" : ""
+            patientApp ? "patient-shell" : ""
+          } ${
+            patientHome ? "lg:h-full lg:min-h-0 lg:pb-0" : ""
           }`}
         >
           {children}

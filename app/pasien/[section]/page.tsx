@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   title: "Karsa · Pasien",
 };
 
+/* Jurnal, Komunitas, Maskot and Scan have their own routes now — static
+   segments win over this one, so listing them here would only be a title
+   nobody can reach. Profil and Pengaturan are what is left unbuilt. */
 const TITLES: Record<string, string> = {
-  jurnal: "Jurnal",
-  komunitas: "Komunitas",
-  maskot: "Maskot",
   profil: "Profil",
   pengaturan: "Pengaturan",
 };

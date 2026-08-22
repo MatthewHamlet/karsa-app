@@ -119,6 +119,15 @@
   :root {
     --bottom-nav: calc(4.5rem + env(safe-area-inset-bottom));
   }
+
+  /* The patient app's bar floats instead of sitting on the edge, so it needs
+     more room than the caregiver's: its own 70px, the 12px it is lifted by, and
+     12px of air above it. Redeclaring the variable on the shell means every
+     page that already subtracts `--bottom-nav` — including the ones shared
+     between the two apps — lands correctly without knowing which app it is in. */
+  .patient-shell {
+    --bottom-nav: calc(5.875rem + env(safe-area-inset-bottom));
+  }
 }
 
 body {
@@ -147,6 +156,28 @@ body {
   h5,
   h6 {
     font-family: var(--font-nohemi);
+  }
+
+  /* Edge — and Chrome, more recently — draw their own "reveal password" eye
+     inside every `input[type=password]`. Next to ours that made two eyes in one
+     field, one of which we do not control: it has no accessible name, it does
+     not follow the `aria-pressed` state our button reports, and it disappears
+     the moment the input's type flips to `text`, so the pair even changed
+     arrangement as you used it.
+
+     Ours stays because it is the one that is labelled and keyboard reachable. */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none;
+  }
+
+  /* Safari's key-shaped autofill button lands in the same corner, behind the
+     toggle, where it is unclickable anyway. */
+  input::-webkit-credentials-auto-fill-button {
+    visibility: hidden;
+    pointer-events: none;
+    position: absolute;
+    right: 0;
   }
 }
 

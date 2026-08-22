@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { History, MessageCircle, ShieldAlert } from "lucide-react";
 import AssistantChat, { type ChatTurn } from "../components/AssistantChat";
 import HealthPattern from "../components/HealthPattern";
@@ -43,7 +42,6 @@ export default function MascotAssistant() {
   const [draft, setDraft] = useState("");
   const [state, setState] = useState<MascotState>("idle");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const reduce = useReducedMotion();
 
   /* One turn is two timers deep, and either can outlive the component if the
      caregiver navigates away mid-answer. */
@@ -130,18 +128,15 @@ export default function MascotAssistant() {
         </div>
 
         {/* Karsa keeps a presence beside the thread from `lg` — where there is
-            width going spare — and nowhere else. */}
-        <motion.aside
+            width going spare — and nowhere else. The state-driven tint used to
+            live on this element's background; the room fills the panel now, so
+            it moved inside as a wash over the scene. */}
+        <aside
           aria-label="Karsa"
-          initial={false}
-          animate={{
-            backgroundColor: state === "thinking" ? "#f0f4ee" : "#f7f5ee",
-          }}
-          transition={reduce ? { duration: 0 } : { duration: 0.5 }}
           className="hidden min-h-0 flex-col border-karsa-line lg:flex lg:border-l"
         >
           <MascotStage state={state} />
-        </motion.aside>
+        </aside>
       </div>
 
       <HistoryModal

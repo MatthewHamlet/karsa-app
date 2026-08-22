@@ -39,6 +39,7 @@ const ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
 const PATIENT_ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/pasien", icon: Home, label: "Beranda" },
   { link: "/pasien/jurnal", icon: NotebookPen, label: "Jurnal" },
+  { link: "/pasien/scan", icon: ScanText, label: "Scan" },
   { link: "/pasien/komunitas", icon: MessagesSquare, label: "Komunitas" },
   { link: "/pasien/maskot", icon: Sparkles, label: "Maskot" },
   { link: "/pasien/profil", icon: UserRound, label: "Profil" },
@@ -69,7 +70,7 @@ export default function BottomNav({
         aria-label="Navigasi utama"
         className="fixed inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-40 rounded-[26px] bg-karsa-cream/95 shadow-[0_16px_40px_-12px_rgba(24,32,24,0.4)] ring-1 ring-karsa-line backdrop-blur-xl md:hidden"
       >
-        <ul className="grid grid-cols-5">
+        <ul className="grid grid-cols-6">
           {PATIENT_ITEMS.map((item) => {
             const Icon = item.icon;
             const active =

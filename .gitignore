@@ -42,3 +42,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# The env template is a placeholder file with no secrets in it, and it has to
+# be committed for anyone cloning the repo to know what to fill in.
+!.env.example
