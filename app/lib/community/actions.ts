@@ -4,6 +4,13 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
 import { NOT_CONFIGURED_MESSAGE, SUPABASE_URL, isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
+import {
+  getCommunityPosts,
+  getGroupMembers,
+  getGroupMessages,
+  getPostComments,
+} from "./queries";
+import { POSTS_PER_PAGE } from "./constants";
 
 /** Writes for Komunitas.
  *
@@ -162,7 +169,10 @@ export async function toggleGroup(
   return { error: null, ok: true };
 }
 
-export async function toggleSession(
+const ART_KINDS = ["nutrition", "elderly", "mind", "recovery"];
+const TONE_KINDS = ["green", "lavender", "peach", "blue", "cream"];
+
+export async function createGroup(
   _prev: CommunityResult,
   formData: FormData,
 ): Promise<CommunityResult> {
@@ -170,26 +180,150 @@ export async function toggleSession(
   const me = await getSessionProfile();
   if (!me) return { error: NOT_SIGNED_IN };
 
-  const sessionId = String(formData.get("session_id") ?? "").trim();
-  if (!sessionId) return { error: "Sesinya tidak ditemukan." };
+  const name = String(formData.get("name") ?? "").trim();
+  const blurb = String(formData.get("blurb") ?? "").trim();
+  const art = String(formData.get("art") ?? "elderly").trim();
+  const tone = String(formData.get("tone") ?? "green").trim();
+  const keywords = terms(String(formData.get("keywords") ?? ""));
+
+  if (!name) return { error: "Nama grupnya harus diisi." };
+  if (name.length > 80) return { error: "Nama grupnya terlalu panjang." };
+  if (blurb.length > 300) return { error: "Deskripsinya terlalu panjang." };
 
   const supabase = await createClient();
-  const { data: existing } = await supabase
-    .from("community_session_signups")
-    .select("session_id")
-    .eq("session_id", sessionId)
-    .eq("profile_id", me.id)
-    .maybeSingle();
+  const { error } = await supabase.from("community_groups").insert({
+    name,
+    blurb,
+    art: ART_KINDS.includes(art) ? art : "elderly",
+    tone: TONE_KINDS.includes(tone) ? tone : "green",
+    keywords,
+    created_by: me.id,
+  });
 
-  const { error } = existing
-    ? await supabase
-        .from("community_session_signups")
-        .delete()
-        .eq("session_id", sessionId)
-        .eq("profile_id", me.id)
-    : await supabase
-        .from("community_session_signups")
-        .insert({ session_id: sessionId, profile_id: me.id });
+  if (error) {
+    if (error.message.toLowerCase().includes("community_groups_one_per_creator")) {
+      return { error: "Kamu sudah punya satu grup. Satu akun hanya bisa membuat satu grup." };
+    }
+    return { error: readable(error.message) };
+  }
+
+  revalidatePath("/community");
+  revalidatePath("/pasien/komunitas");
+  return { error: null, ok: true };
+}
+
+export async function kickMember(
+  _prev: CommunityResult,
+  formData: FormData,
+): Promise<CommunityResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const groupId = String(formData.get("group_id") ?? "").trim();
+  const profileId = String(formData.get("profile_id") ?? "").trim();
+  if (!groupId || !profileId) return { error: "Anggotanya tidak ditemukan." };
+  if (profileId === me.id) return { error: "Kamu admin grup ini, tidak bisa keluar sendiri." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("community_group_members")
+    .delete()
+    .eq("group_id", groupId)
+    .eq("profile_id", profileId)
+    .select("group_id");
+
+  if (error) return { error: readable(error.message) };
+  if (!data?.length) return { error: "Kamu bukan admin grup ini." };
+
+  revalidatePath("/community");
+  revalidatePath("/pasien/komunitas");
+  return { error: null, ok: true };
+}
+
+export async function loadMorePosts(offset: number) {
+  return getCommunityPosts(POSTS_PER_PAGE, Math.max(0, offset));
+}
+
+export async function loadPostComments(postId: string) {
+  return getPostComments(postId);
+}
+
+export async function addComment(
+  _prev: CommunityResult,
+  formData: FormData,
+): Promise<CommunityResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const postId = String(formData.get("post_id") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!postId) return { error: "Postingannya tidak ditemukan." };
+  if (!body) return { error: "Komentarnya masih kosong." };
+  if (body.length > 2000) return { error: "Komentarnya terlalu panjang." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("community_comments")
+    .insert({ post_id: postId, author_id: me.id, body });
+
+  if (error) return { error: readable(error.message) };
+
+  revalidatePath("/community");
+  revalidatePath("/pasien/komunitas");
+  return { error: null, ok: true };
+}
+
+export async function deleteComment(
+  _prev: CommunityResult,
+  formData: FormData,
+): Promise<CommunityResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const id = String(formData.get("comment_id") ?? "").trim();
+  if (!id) return { error: "Komentarnya tidak ditemukan." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("community_comments").delete().eq("id", id);
+
+  if (error) return { error: readable(error.message) };
+
+  revalidatePath("/community");
+  revalidatePath("/pasien/komunitas");
+  return { error: null, ok: true };
+}
+
+export async function loadGroupMembers(groupId: string) {
+  return getGroupMembers(groupId);
+}
+
+export async function loadGroupMessages(groupId: string) {
+  return getGroupMessages(groupId);
+}
+
+export async function sendGroupMessage(
+  _prev: CommunityResult,
+  formData: FormData,
+): Promise<CommunityResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const groupId = String(formData.get("group_id") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!groupId) return { error: "Grupnya tidak ditemukan." };
+  if (!body) return { error: "Pesannya masih kosong." };
+  if (body.length > 2000) return { error: "Pesannya terlalu panjang." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("community_group_messages")
+    .insert({ group_id: groupId, author_id: me.id, body });
 
   if (error) return { error: readable(error.message) };
 

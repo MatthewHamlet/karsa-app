@@ -6,18 +6,14 @@ import { CalendarDays, ChevronLeft, ChevronRight, Play, X } from "lucide-react";
 import MoodFace from "./MoodFace";
 import StatArt from "./StatArt";
 import {
-  HISTORY,
-  MONTH_DAYS,
-  MONTH_LABEL,
-  MONTH_START_OFFSET,
   MONITOR_TONE,
   MOOD_BY_KEY,
-  TODAY_DATE,
   WEEKDAYS,
   dayMetrics,
   mmss,
-  type JournalDay,
 } from "../data/journal";
+import { loadJournalMonth } from "../lib/care/actions";
+import type { JournalDayData, JournalMonth } from "../lib/care/queries";
 
 /** Past days, at two very different sizes.
  *
@@ -44,15 +40,30 @@ export default function JournalHistoryModal({
   onClose,
   selected,
   onSelect,
+  month,
+  patientId,
 }: {
   open: boolean;
   onClose: () => void;
   selected: number;
   onSelect: (date: number) => void;
+  /** The month to open on, already built from the database by the page. */
+  month: JournalMonth;
+  /** Absent when signed out: the arrows then have nothing to fetch, so they
+   *  stay disabled and the one month that was handed down is all there is. */
+  patientId?: string;
 }) {
   return (
     <AnimatePresence>
-      {open && <Shell onClose={onClose} selected={selected} onSelect={onSelect} />}
+      {open && (
+        <Shell
+          onClose={onClose}
+          selected={selected}
+          onSelect={onSelect}
+          month={month}
+          patientId={patientId}
+        />
+      )}
     </AnimatePresence>
   );
 }
@@ -61,13 +72,48 @@ function Shell({
   onClose,
   selected,
   onSelect,
+  month: initialMonth,
+  patientId,
 }: {
   onClose: () => void;
   selected: number;
   onSelect: (date: number) => void;
+  month: JournalMonth;
+  patientId?: string;
 }) {
   const reduce = useReducedMotion();
   const [pick, setPick] = useState(selected);
+  /* The month lives here rather than in the page, so paging the calendar does
+     not close the sheet or reset which day is open. */
+  const [month, setMonth] = useState(initialMonth);
+  const [loading, setLoading] = useState(false);
+
+  /* A save behind the modal revalidates the page, which hands down a fresh
+     `initialMonth`. Without this the calendar would keep showing the month it
+     was opened with and today's new entry would be missing from it. Guarded on
+     the month actually being the same one, so a reload never yanks somebody
+     back from the month they paged to. */
+  useEffect(() => {
+    setMonth((current) =>
+      current.year === initialMonth.year && current.month === initialMonth.month
+        ? initialMonth
+        : current,
+    );
+  }, [initialMonth]);
+
+  const shift = async (step: number) => {
+    if (!patientId || loading) return;
+    setLoading(true);
+    try {
+      const next = await loadJournalMonth(patientId, month.year, month.month + step);
+      setMonth(next);
+      /* Land on a day that exists: paging from the 31st into a 30-day month
+         would otherwise select a square that is not drawn. */
+      setPick((d) => Math.min(d, next.days));
+    } finally {
+      setLoading(false);
+    }
+  };
   /** Phone only. The desktop shows both panels at once and ignores this. */
   const [view, setView] = useState<"calendar" | "report">("calendar");
   const rootRef = useRef<HTMLDivElement>(null);
@@ -95,7 +141,7 @@ function Shell({
     setView("report");
   };
 
-  const day = HISTORY[pick];
+  const day = month.entries[pick];
   const slide = reduce ? { duration: 0 } : SLIDE;
 
   return (
@@ -129,7 +175,7 @@ function Shell({
               Riwayat Kalender
             </h2>
             <p className="mt-0.5 text-[14.5px] text-neutral-500">
-              Laporan {pick} {MONTH_LABEL}
+              Laporan {pick} {month.label}
             </p>
           </div>
           <CloseButton onClick={onClose} label="TUTUP" />
@@ -137,10 +183,10 @@ function Shell({
 
         <div className="grid min-h-0 flex-1 grid-cols-2 divide-x-2 divide-karsa-line">
           <div className="min-h-0 overflow-y-auto p-5 [contain:paint]">
-            <CalendarPanel pick={pick} onPick={choose} />
+            <CalendarPanel pick={pick} onPick={choose} month={month} onShift={shift} busy={loading} />
           </div>
           <div className="min-h-0 overflow-y-auto p-5 [contain:paint]">
-            <ReportPanel day={day} date={pick} />
+            <ReportPanel day={day} date={pick} label={month.label} />
           </div>
         </div>
       </motion.div>
@@ -180,7 +226,7 @@ function Shell({
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-4 [contain:paint]">
-            <CalendarPanel pick={pick} onPick={choose} />
+            <CalendarPanel pick={pick} onPick={choose} month={month} onShift={shift} busy={loading} />
           </div>
         </motion.div>
 
@@ -188,7 +234,7 @@ function Shell({
           role="dialog"
           aria-modal={view === "report" ? true : undefined}
           aria-hidden={view !== "report"}
-          aria-label={`Laporan ${pick} ${MONTH_LABEL}`}
+          aria-label={`Laporan ${pick} ${month.label}`}
           initial={{ y: "100%" }}
           animate={reduce ? { opacity: view === "report" ? 1 : 0 } : { y: view === "report" ? 0 : "100%" }}
           exit={reduce ? { opacity: 0 } : { y: "100%" }}
@@ -205,14 +251,14 @@ function Shell({
                 Laporan
               </p>
               <h2 className="truncate text-[19px] font-extrabold tracking-tight text-neutral-900">
-                {pick} {MONTH_LABEL}
+                {pick} {month.label}
               </h2>
             </div>
             <CloseButton onClick={() => setView("calendar")} label="TUTUP" />
           </header>
 
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 [contain:paint]">
-            <ReportPanel day={day} date={pick} />
+            <ReportPanel day={day} date={pick} label={month.label} />
           </div>
         </motion.div>
       </div>
@@ -243,10 +289,22 @@ function CloseButton({ onClick, label }: { onClick: () => void; label: string })
 
 /** The month. Buttons move it, never a swipe — invisible, undiscoverable and
  *  easy to fire by accident with an unsteady hand. */
-function CalendarPanel({ pick, onPick }: { pick: number; onPick: (date: number) => void }) {
+function CalendarPanel({
+  pick,
+  onPick,
+  month,
+  onShift,
+  busy,
+}: {
+  pick: number;
+  onPick: (date: number) => void;
+  month: JournalMonth;
+  onShift: (step: number) => void;
+  busy: boolean;
+}) {
   const cells = [
-    ...Array.from({ length: MONTH_START_OFFSET }, () => null),
-    ...Array.from({ length: MONTH_DAYS }, (_, i) => i + 1),
+    ...Array.from({ length: month.startOffset }, () => null),
+    ...Array.from({ length: month.days }, (_, i) => i + 1),
   ];
 
   const arrow =
@@ -255,11 +313,26 @@ function CalendarPanel({ pick, onPick }: { pick: number; onPick: (date: number) 
   return (
     <>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <button type="button" disabled aria-label="Bulan sebelumnya" className={arrow}>
+        <button
+          type="button"
+          onClick={() => onShift(-1)}
+          disabled={busy}
+          aria-label="Bulan sebelumnya"
+          className={arrow}
+        >
           <ChevronLeft size={28} strokeWidth={3} />
         </button>
-        <p className="text-[19px] font-extrabold tracking-tight text-neutral-900">{MONTH_LABEL}</p>
-        <button type="button" disabled aria-label="Bulan berikutnya" className={arrow}>
+        <p className="text-[19px] font-extrabold tracking-tight text-neutral-900">{month.label}</p>
+        {/* Forward is barred once the month on screen contains today. There is
+            nothing recorded in the future, so the only thing paging into it can
+            show is a grid of empty squares. */}
+        <button
+          type="button"
+          onClick={() => onShift(1)}
+          disabled={busy || month.today !== null}
+          aria-label="Bulan berikutnya"
+          className={arrow}
+        >
           <ChevronRight size={28} strokeWidth={3} />
         </button>
       </div>
@@ -279,9 +352,14 @@ function CalendarPanel({ pick, onPick }: { pick: number; onPick: (date: number) 
         {cells.map((date, i) => {
           if (date === null) return <span key={`b-${i}`} className="h-[56px] w-full" aria-hidden />;
 
-          const entry = HISTORY[date];
-          const future = date > TODAY_DATE;
-          const complete = entry ? entry.done === entry.total : false;
+          const entry = month.entries[date];
+          /* Only the current month has a future half; every earlier one is
+             entirely in the past. */
+          const future = month.today !== null && date > month.today;
+          /* `total` of 0 means no daily tasks are set up at all — treating that
+             as "complete" would paint the whole month green for somebody who
+             has never had a plan. */
+          const complete = entry ? entry.total > 0 && entry.done === entry.total : false;
           const on = date === pick;
 
           return (
@@ -292,8 +370,8 @@ function CalendarPanel({ pick, onPick }: { pick: number; onPick: (date: number) 
               aria-pressed={on}
               aria-label={
                 entry
-                  ? `${date} ${MONTH_LABEL}, ${complete ? "semua obat selesai" : `${entry.done} dari ${entry.total} obat`}`
-                  : `${date} ${MONTH_LABEL}, belum ada catatan`
+                  ? `${date} ${month.label}, ${complete ? "semua obat selesai" : `${entry.done} dari ${entry.total} obat`}`
+                  : `${date} ${month.label}, belum ada catatan`
               }
               className={`flex h-[56px] w-full flex-col items-center justify-center rounded-2xl outline-none transition-colors duration-150 focus-visible:ring-4 focus-visible:ring-karsa ${
                 on
@@ -322,18 +400,29 @@ function CalendarPanel({ pick, onPick }: { pick: number; onPick: (date: number) 
 }
 
 /** One day, read out: the face, what they said, and what was measured. */
-function ReportPanel({ day, date }: { day: JournalDay | undefined; date: number }) {
+function ReportPanel({
+  day,
+  date,
+  label,
+}: {
+  day: JournalDayData | undefined;
+  date: number;
+  label: string;
+}) {
   if (!day) {
     return (
       <div className="grid h-full place-items-center rounded-3xl border-2 border-dashed border-karsa-line px-6 py-12 text-center">
         <p className="text-[16px] leading-6 text-neutral-500">
-          Belum ada catatan untuk {date} {MONTH_LABEL}.
+          Belum ada catatan untuk {date} {label}.
         </p>
       </div>
     );
   }
 
-  const mood = MOOD_BY_KEY[day.mood];
+  /* A day can hold readings and ticked tasks without a mood — somebody who
+     logged their blood pressure but never opened the wizard. The face is then
+     simply absent rather than guessed at. */
+  const mood = day.mood ? MOOD_BY_KEY[day.mood] : null;
   const metrics = dayMetrics(day);
 
   return (
@@ -343,17 +432,19 @@ function ReportPanel({ day, date }: { day: JournalDay | undefined; date: number 
         {/* The same face the form offered and the caregiver's dashboard draws.
             Tinted with the mood's own wash rather than the neutral canvas, so a
             bad day is legible from across the room before a word is read. */}
-        <span
-          aria-hidden
-          className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full ring-2"
-          style={{ backgroundColor: mood.soft, borderColor: mood.color }}
-        >
-          <MoodFace mood={day.mood} className="h-[62px] w-[62px]" />
-        </span>
+        {mood && day.mood && (
+          <span
+            aria-hidden
+            className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full ring-2"
+            style={{ backgroundColor: mood.soft, borderColor: mood.color }}
+          >
+            <MoodFace mood={day.mood} className="h-[62px] w-[62px]" />
+          </span>
+        )}
 
         <div className="min-w-0 flex-1 pt-1">
           <p className="text-[13px] font-bold uppercase tracking-wide text-neutral-400">
-            {mood.label}
+            {mood ? mood.label : "Tidak ada catatan perasaan"}
           </p>
           {day.story ? (
             <div className="relative mt-1.5 rounded-2xl rounded-tl-md bg-karsa-soft px-4 py-3 ring-2 ring-karsa/15">
@@ -370,19 +461,17 @@ function ReportPanel({ day, date }: { day: JournalDay | undefined; date: number 
       {/* The player sits under both columns rather than inside the right one:
           it belongs to the whole entry, and a play control the width of its own
           label is a small target for the reason it is a small button. */}
-      {day.voice && (
-        <button
-          type="button"
-          className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-white p-2.5 text-left outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
-        >
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-karsa text-white">
-            <Play size={20} strokeWidth={2.8} className="ml-0.5" aria-hidden />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-bold text-neutral-800">Putar suara</span>
-            <span className="block text-[13px] text-neutral-500">{mmss(day.voice)}</span>
-          </span>
-        </button>
+      {day.voiceUrl && (
+        <div className="mt-3 rounded-2xl bg-white p-3 ring-2 ring-karsa-line">
+          <p className="mb-2 flex items-center gap-2 text-[13px] font-bold text-neutral-600">
+            <Play size={14} strokeWidth={2.8} aria-hidden />
+            Rekaman suara
+            {day.voice ? (
+              <span className="font-medium text-neutral-400">· {mmss(day.voice)}</span>
+            ) : null}
+          </p>
+          <audio src={day.voiceUrl} controls preload="none" className="h-11 w-full" />
+        </div>
       )}
 
       {/* On a phone the readings follow the player directly. `mt-auto` used to

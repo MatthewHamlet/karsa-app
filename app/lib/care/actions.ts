@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "../supabase/config";
 import { NOT_CONFIGURED_MESSAGE } from "../supabase/config";
 import { getSessionProfile } from "../profile";
 import { jakartaDateString } from "./time";
+import { getJournalMonth } from "./queries";
 
 /** Mutations for the caregiver–patient relationship system.
  *
@@ -321,6 +322,24 @@ export async function activatePatientProfile(
   return { error: null, ok: true };
 }
 
+/** One month of the journal, for the calendar's arrows.
+ *
+ *  A plain server action rather than a form one — it takes arguments and
+ *  returns data instead of a `{ error }`. Paging the calendar is a read, and
+ *  routing it through the URL would close the modal on every press.
+ *
+ *  RLS is what scopes it: `mood_entries`, `health_readings` and
+ *  `task_completions` all answer `is_my_patient or can_care_for`, so a
+ *  `patientId` belonging to a stranger comes back as an empty month rather
+ *  than somebody else's. */
+export async function loadJournalMonth(patientId: string, year: number, month: number) {
+  /* Normalised here so the caller can hand over month `-1` or `12` and get
+     December or January without doing calendar arithmetic in the browser. */
+  const y = year + Math.floor(month / 12);
+  const m = ((month % 12) + 12) % 12;
+  return getJournalMonth(patientId, y, m);
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Logging the day
    ═══════════════════════════════════════════════════════════════════════════
@@ -360,10 +379,15 @@ export async function logMood(_prev: CareResult, formData: FormData): Promise<Ca
   const patientId = String(formData.get("patient_id") ?? "").trim();
   const mood = String(formData.get("mood") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
+  const voicePath = String(formData.get("voice_path") ?? "").trim();
+  const voiceSeconds = Number(formData.get("voice_seconds"));
 
   if (!patientId) return { error: "Pasien tidak ditemukan." };
   if (!oneOf(MOODS, mood)) return { error: "Pilih dulu perasaannya." };
   if (note.length > 1000) return { error: "Catatannya terlalu panjang." };
+  if (voicePath && !voicePath.startsWith(`${patientId}/`)) {
+    return { error: "Rekamannya tidak dikenali." };
+  }
 
   const supabase = await createClient();
   const { error } = await supabase.from("mood_entries").insert({
@@ -371,6 +395,8 @@ export async function logMood(_prev: CareResult, formData: FormData): Promise<Ca
     mood,
     note: note || null,
     recorded_by: me.id,
+    voice_path: voicePath || null,
+    voice_seconds: voicePath && Number.isFinite(voiceSeconds) ? Math.round(voiceSeconds) : null,
   });
 
   if (error) return { error: readable(error.message) };

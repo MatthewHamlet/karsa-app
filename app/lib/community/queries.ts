@@ -2,6 +2,7 @@ import { cache } from "react";
 import { createClient } from "../supabase/server";
 import { isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
+import { POSTS_PER_PAGE } from "./constants";
 import { clockOf, MONTHS_SHORT, calendarDayOf } from "../care/time";
 
 /** Reads for Komunitas.
@@ -79,6 +80,7 @@ export type CommunityPost = {
   author: CommunityPerson;
   title: string;
   snippet: string;
+  body: string;
   age: string;
   replies: number;
   upvotes: number;
@@ -100,6 +102,8 @@ export type CommunityGroup = {
   art: string;
   tone: string;
   joined: boolean;
+  createdBy: string | null;
+  isAdmin: boolean;
 };
 
 export type CommunitySession = {
@@ -133,7 +137,10 @@ async function peopleFor(ids: (string | null)[]): Promise<Map<string, CommunityP
  *
  *  Reads `community_feed`, the view that carries the reply and vote counts —
  *  otherwise every card on the page would be two more queries. */
-export const getCommunityPosts = cache(async (limit = 30): Promise<CommunityPost[]> => {
+export { POSTS_PER_PAGE };
+
+export const getCommunityPosts = cache(
+  async (limit = POSTS_PER_PAGE, offset = 0): Promise<CommunityPost[]> => {
   if (!isSupabaseConfigured()) return [];
 
   const supabase = await createClient();
@@ -144,7 +151,7 @@ export const getCommunityPosts = cache(async (limit = 30): Promise<CommunityPost
       .from("community_feed")
       .select("id, author_id, group_id, title, body, image_url, keywords, tags, created_at, replies, upvotes")
       .order("created_at", { ascending: false })
-      .limit(limit),
+      .range(offset, offset + limit - 1),
     me
       ? supabase.from("community_votes").select("post_id").eq("profile_id", me.id)
       : Promise.resolve({ data: [] as { post_id: string }[] }),
@@ -166,6 +173,7 @@ export const getCommunityPosts = cache(async (limit = 30): Promise<CommunityPost
       /* Clamped here as well as in CSS: the card shows two lines, and shipping
          a 4KB post body to render two lines of it is a lot of wire for nothing. */
       snippet: body.length > 240 ? `${body.slice(0, 240).trimEnd()}…` : body,
+      body,
       age: ageLabel(row.created_at as string),
       replies: Number(row.replies ?? 0),
       upvotes: Number(row.upvotes ?? 0),
@@ -176,7 +184,8 @@ export const getCommunityPosts = cache(async (limit = 30): Promise<CommunityPost
       imageUrl: (row.image_url as string | null) ?? null,
     };
   });
-});
+  },
+);
 
 export const getCommunityGroups = cache(async (): Promise<CommunityGroup[]> => {
   if (!isSupabaseConfigured()) return [];
@@ -187,7 +196,7 @@ export const getCommunityGroups = cache(async (): Promise<CommunityGroup[]> => {
   const [{ data, error }, { data: members }, { data: mine }] = await Promise.all([
     supabase
       .from("community_groups")
-      .select("id, name, blurb, art, tone, keywords")
+      .select("id, name, blurb, art, tone, keywords, created_by")
       .order("created_at", { ascending: true }),
     /* Counted in JS from one flat read rather than a count per group: the
        member table is small and this is one round trip instead of N. */
@@ -215,6 +224,8 @@ export const getCommunityGroups = cache(async (): Promise<CommunityGroup[]> => {
     art: (row.art as string) ?? "heart",
     tone: (row.tone as string) ?? "karsa",
     joined: joined.has(row.id as string),
+    createdBy: (row.created_by as string | null) ?? null,
+    isAdmin: Boolean(me && row.created_by === me.id),
   }));
 });
 
@@ -333,16 +344,216 @@ export const getSuggestedPeople = cache(async (limit = 4): Promise<CommunityPers
     .map(personOf);
 });
 
+export type GroupMessage = {
+  id: string;
+  authorId: string;
+  author: string;
+  initial: string;
+  color: string;
+  body: string;
+  when: string;
+};
+
+export const getMyGroups = cache(async (): Promise<CommunityGroup[]> => {
+  const all = await getCommunityGroups();
+  return all.filter((g) => g.joined);
+});
+
+export const getGroupMessages = cache(
+  async (groupId: string, limit = 100): Promise<GroupMessage[]> => {
+    if (!isSupabaseConfigured() || !groupId) return [];
+
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("community_group_messages")
+      .select("id, author_id, body, created_at")
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error || !data) return [];
+
+    const people = await peopleFor(data.map((r) => r.author_id as string));
+
+    return data
+      .map((row) => {
+        const person = people.get(row.author_id as string);
+        const name = person?.name ?? "Pengguna Karsa";
+        return {
+          id: row.id as string,
+          authorId: row.author_id as string,
+          author: name,
+          initial: person?.initial ?? initialOf(name),
+          color: person?.color ?? colourFor(row.author_id as string),
+          body: row.body as string,
+          when: ageLabel(row.created_at as string),
+        };
+      })
+      .reverse();
+  },
+);
+
+export type PostComment = {
+  id: string;
+  authorId: string;
+  author: string;
+  initial: string;
+  color: string;
+  role: string;
+  verified: boolean;
+  body: string;
+  when: string;
+};
+
+export const getPostComments = cache(async (postId: string): Promise<PostComment[]> => {
+  if (!isSupabaseConfigured() || !postId) return [];
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("community_comments")
+    .select("id, author_id, body, created_at")
+    .eq("post_id", postId)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) return [];
+
+  const people = await peopleFor(data.map((r) => r.author_id as string));
+
+  return data.map((row) => {
+    const id = row.author_id as string;
+    const person = people.get(id);
+    const name = person?.name ?? "Pengguna Karsa";
+    return {
+      id: row.id as string,
+      authorId: id,
+      author: name,
+      initial: person?.initial ?? initialOf(name),
+      color: person?.color ?? colourFor(id),
+      role: person?.role ?? "Pendamping",
+      verified: person?.verified ?? false,
+      body: row.body as string,
+      when: ageLabel(row.created_at as string),
+    };
+  });
+});
+
+export type GroupMember = {
+  id: string;
+  name: string;
+  initial: string;
+  color: string;
+  role: string;
+  isAdmin: boolean;
+};
+
+export const getGroupMembers = cache(async (groupId: string): Promise<GroupMember[]> => {
+  if (!isSupabaseConfigured() || !groupId) return [];
+
+  const supabase = await createClient();
+  const [{ data: rows }, { data: group }] = await Promise.all([
+    supabase
+      .from("community_group_members")
+      .select("profile_id, joined_at")
+      .eq("group_id", groupId)
+      .order("joined_at", { ascending: true }),
+    supabase.from("community_groups").select("created_by").eq("id", groupId).maybeSingle(),
+  ]);
+
+  const owner = (group?.created_by as string | null) ?? null;
+  const people = await peopleFor((rows ?? []).map((r) => r.profile_id as string));
+
+  return (rows ?? []).map((row) => {
+    const id = row.profile_id as string;
+    const person = people.get(id);
+    const name = person?.name ?? "Pengguna Karsa";
+    return {
+      id,
+      name,
+      initial: person?.initial ?? initialOf(name),
+      color: person?.color ?? colourFor(id),
+      role: person?.role ?? "Pendamping",
+      isAdmin: id === owner,
+    };
+  });
+});
+
+export type AccountStats = { followers: number; following: number; team: number };
+
+export const getAccountStats = cache(async (): Promise<AccountStats> => {
+  const blank = { followers: 0, following: 0, team: 0 };
+  if (!isSupabaseConfigured()) return blank;
+
+  const me = await getSessionProfile();
+  if (!me) return blank;
+
+  const supabase = await createClient();
+  const [followers, following, asCaregiver, myPatient] = await Promise.all([
+    supabase
+      .from("community_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("followee_id", me.id),
+    supabase
+      .from("community_follows")
+      .select("followee_id", { count: "exact", head: true })
+      .eq("follower_id", me.id),
+    supabase
+      .from("care_relationships")
+      .select("id", { count: "exact", head: true })
+      .eq("caregiver_id", me.id)
+      .in("status", ["pending", "active"]),
+    supabase.from("patients").select("id").eq("user_id", me.id).maybeSingle(),
+  ]);
+
+  let team = asCaregiver.count ?? 0;
+
+  if (myPatient.data?.id) {
+    const { count } = await supabase
+      .from("care_relationships")
+      .select("id", { count: "exact", head: true })
+      .eq("patient_id", myPatient.data.id)
+      .in("status", ["pending", "active"]);
+    team += count ?? 0;
+  }
+
+  return {
+    followers: followers.count ?? 0,
+    following: following.count ?? 0,
+    team,
+  };
+});
+
+export const getMyGroupCount = cache(async (): Promise<number> => {
+  if (!isSupabaseConfigured()) return 0;
+  const me = await getSessionProfile();
+  if (!me) return 0;
+
+  const supabase = await createClient();
+  const { count } = await supabase
+    .from("community_groups")
+    .select("id", { count: "exact", head: true })
+    .eq("created_by", me.id);
+
+  return count ?? 0;
+});
+
 /** Everything the page needs, gathered once. */
 export async function getCommunityData() {
-  const [posts, groups, session, topics, people] = await Promise.all([
+  const [posts, groups, topics, people, me] = await Promise.all([
     getCommunityPosts(),
     getCommunityGroups(),
-    getNextSession(),
     getCommunityTopics(),
     getSuggestedPeople(),
+    getSessionProfile(),
   ]);
-  return { posts, groups, session, topics, people };
+  return {
+    posts,
+    groups,
+    topics,
+    people,
+    myGroups: groups.filter((g) => g.joined),
+    meId: me?.id ?? null,
+    ownsGroup: groups.some((g) => g.isAdmin),
+  };
 }
 
 export type CommunityData = Awaited<ReturnType<typeof getCommunityData>>;

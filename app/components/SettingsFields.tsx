@@ -39,6 +39,7 @@ export function TextField({
   type = "text",
   placeholder,
   autoComplete,
+  readOnly,
 }: {
   label: string;
   hint?: string;
@@ -47,6 +48,7 @@ export function TextField({
   type?: "text" | "email" | "tel" | "date";
   placeholder?: string;
   autoComplete?: string;
+  readOnly?: boolean;
 }) {
   const id = useId();
 
@@ -58,8 +60,9 @@ export function TextField({
         value={value}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        readOnly={readOnly}
         onChange={(event) => onChange(event.target.value)}
-        className={CONTROL}
+        className={`${CONTROL} ${readOnly ? "cursor-not-allowed bg-karsa-canvas/60 text-neutral-500" : ""}`}
       />
     </Field>
   );

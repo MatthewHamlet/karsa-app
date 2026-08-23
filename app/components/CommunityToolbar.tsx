@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Check, ListFilter, PenLine, Search, X } from "lucide-react";
+import { Check, ChevronDown, ListFilter, PenLine, Search, UsersRound, X } from "lucide-react";
 import { SORTS, type SortKey } from "../data/community";
 
-export type FeedTab = "semua" | "postingan" | "grup" | "sesi";
+const FOREST = "#3d5a45";
+
+export type FeedTab = "semua" | "postingan" | "grup" | "grupku";
 
 export const TABS: { key: FeedTab; label: string; short: string }[] = [
   { key: "semua", label: "Semua", short: "Semua" },
   { key: "postingan", label: "Postingan", short: "Postingan" },
   { key: "grup", label: "Grup & Komunitas", short: "Grup" },
-  { key: "sesi", label: "Sesi Langsung", short: "Sesi" },
+  { key: "grupku", label: "Grup Saya", short: "Grup Saya" },
 ];
 
 /** Search, filter and compose — one row, in the order the sketch puts them.
@@ -24,6 +26,7 @@ export default function CommunityToolbar({
   onSort,
   counts,
   onCompose,
+  onComposeGroup,
 }: {
   query: string;
   onQuery: (next: string) => void;
@@ -35,9 +38,12 @@ export default function CommunityToolbar({
    *  before spending a click on it. */
   counts: Record<FeedTab, number>;
   onCompose: () => void;
+  onComposeGroup: () => void;
 }) {
   const [filterOpen, setFilterOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const createRef = useRef<HTMLDivElement>(null);
 
   /* A popover that only closes on its own button is a popover you have to
      fight. Escape and an outside click both dismiss it. */
@@ -59,18 +65,43 @@ export default function CommunityToolbar({
     };
   }, [filterOpen]);
 
+  useEffect(() => {
+    if (!createOpen) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setCreateOpen(false);
+    };
+    const onPointer = (event: PointerEvent) => {
+      if (!createRef.current?.contains(event.target as Node)) setCreateOpen(false);
+    };
+
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("pointerdown", onPointer);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("pointerdown", onPointer);
+    };
+  }, [createOpen]);
+
   const activeSort = SORTS.find((s) => s.key === sort) ?? SORTS[0];
 
   return (
-    <div className="mb-6 xl:mb-8">
+    <div className="mb-4 -mt-4">
       {/* ── Search row ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div
+        className="-mx-4 flex flex-row items-center gap-3 px-4 py-3 sm:-mx-6 sm:px-6 md:-mx-8 md:px-8 xl:-mx-12 xl:rounded-b-[24px] xl:px-12"
+        style={{ backgroundColor: FOREST }}
+      >
+        <h1 className="hidden shrink-0 font-satoshi text-[22px] font-bold leading-none tracking-tight text-white sm:block xl:text-[24px]">
+          Komunitas
+        </h1>
+
         <div className="relative min-w-0 flex-1">
           <Search
-            size={18}
+            size={17}
             strokeWidth={2.2}
             aria-hidden
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400"
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400"
           />
           <label htmlFor="community-search" className="sr-only">
             Cari di komunitas
@@ -83,14 +114,14 @@ export default function CommunityToolbar({
             placeholder="Cari diskusi, grup, atau topik…"
             /* The browser draws its own clear button in a grey that disappears
                on this field; ours sits where it can be seen. */
-            className="h-12 w-full rounded-full bg-white pl-11 pr-11 text-[14.5px] text-neutral-800 outline-none ring-1 ring-karsa-line transition-shadow duration-200 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-karsa/40 [&::-webkit-search-cancel-button]:hidden"
+            className="h-11 w-full rounded-full bg-white pl-10 pr-10 text-[14.5px] text-neutral-800 outline-none ring-1 ring-transparent transition-shadow duration-200 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-white/70 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
               type="button"
               onClick={() => onQuery("")}
               aria-label="Hapus pencarian"
-              className="absolute right-2.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-neutral-400 outline-none transition-colors duration-200 hover:bg-karsa-canvas hover:text-neutral-700 focus-visible:ring-2 focus-visible:ring-karsa/40"
+              className="absolute right-2 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full text-neutral-400 outline-none transition-colors duration-200 hover:bg-karsa-canvas hover:text-neutral-700 focus-visible:ring-2 focus-visible:ring-karsa/40"
             >
               <X size={16} strokeWidth={2.4} />
             </button>
@@ -104,8 +135,10 @@ export default function CommunityToolbar({
             onClick={() => setFilterOpen((open) => !open)}
             aria-expanded={filterOpen}
             aria-haspopup="menu"
-            className={`inline-flex h-12 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-semibold text-neutral-700 outline-none ring-1 transition-colors duration-200 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40 sm:px-5 ${
-              sort === "relevan" ? "ring-karsa-line" : "ring-karsa text-karsa-dark"
+            className={`inline-flex h-11 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-semibold outline-none ring-1 transition-colors duration-200 hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/70 ${
+              sort === "relevan"
+                ? "text-neutral-700 ring-transparent"
+                : "text-karsa-dark ring-karsa"
             }`}
           >
             <ListFilter size={17} strokeWidth={2.2} aria-hidden />
@@ -150,16 +183,64 @@ export default function CommunityToolbar({
           )}
         </div>
 
-        {/* ── Compose ───────────────────────────────────────────────────── */}
-        <button
-          type="button"
-          onClick={onCompose}
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-full bg-karsa px-4 text-[14px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 sm:px-5"
-        >
-          <PenLine size={17} strokeWidth={2.4} aria-hidden />
-          <span className="hidden lg:inline">Buat Postingan</span>
-          <span className="sr-only lg:hidden">Buat postingan</span>
-        </button>
+        <div ref={createRef} className="relative shrink-0">
+          <button
+            type="button"
+            onClick={() => setCreateOpen((open) => !open)}
+            aria-expanded={createOpen}
+            aria-haspopup="menu"
+            className="inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-[14px] font-bold text-karsa-dark outline-none transition-colors duration-200 hover:bg-white/90 focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            <PenLine size={17} strokeWidth={2.4} aria-hidden />
+            <span className="hidden sm:inline">Buat Diskusi</span>
+            <span className="sr-only sm:hidden">Buat Diskusi</span>
+            <ChevronDown size={15} strokeWidth={2.6} aria-hidden />
+          </button>
+
+          {createOpen && (
+            <div
+              role="menu"
+              aria-label="Buat sesuatu"
+              className="absolute right-0 z-30 mt-2 w-56 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_44px_-24px_rgba(24,32,24,0.45)] ring-1 ring-karsa-line"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setCreateOpen(false);
+                  onCompose();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors duration-200 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-karsa-soft text-karsa-dark">
+                  <PenLine size={17} strokeWidth={2.3} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[14.5px] font-bold text-neutral-800">Postingan</span>
+                  <span className="block text-[12.5px] text-neutral-500">Tanya atau berbagi</span>
+                </span>
+              </button>
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setCreateOpen(false);
+                  onComposeGroup();
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left outline-none transition-colors duration-200 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+              >
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-karsa-soft text-karsa-dark">
+                  <UsersRound size={17} strokeWidth={2.3} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[14.5px] font-bold text-neutral-800">Grup</span>
+                  <span className="block text-[12.5px] text-neutral-500">Satu per akun</span>
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Tabs ────────────────────────────────────────────────────────────
@@ -168,7 +249,7 @@ export default function CommunityToolbar({
       <div
         role="tablist"
         aria-label="Jenis konten"
-        className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 mt-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
       >
         {TABS.map((item) => {
           const active = tab === item.key;
@@ -181,7 +262,7 @@ export default function CommunityToolbar({
               type="button"
               aria-selected={active}
               onClick={() => onTab(item.key)}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-[13.5px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
                 active
                   ? "bg-karsa text-white ring-karsa"
                   : "bg-white text-neutral-600 ring-karsa-line hover:bg-karsa-canvas"

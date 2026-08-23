@@ -70,9 +70,23 @@ export type DayMetric = {
   unit: string;
 };
 
+/** Just the measured half of a day.
+ *
+ *  `dayMetrics` used to take a whole `JournalDay`, which tied it to the mock
+ *  shape — the real one from the database has a nullable mood and would not
+ *  fit. It only ever reads these five fields, so these five are what it asks
+ *  for. */
+export type DayReadings = {
+  glucose?: number;
+  bp?: [number, number];
+  weight?: number;
+  temp?: number;
+  hr?: number;
+};
+
 /** Flattens a day's readings into the tiles the carousel shows, in a fixed
  *  order so the row never reshuffles between dates. */
-export function dayMetrics(day: JournalDay): DayMetric[] {
+export function dayMetrics(day: DayReadings): DayMetric[] {
   const out: DayMetric[] = [];
   if (day.glucose !== undefined)
     out.push({ monitor: "bloodSugar", label: "Gula Darah", value: String(day.glucose), unit: "mg/dL" });

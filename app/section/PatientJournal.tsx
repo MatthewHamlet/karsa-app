@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   Check,
   ChevronDown,
   Mic,
+  MicOff,
   PenLine,
   Plus,
   Save,
@@ -17,15 +18,29 @@ import JournalHistoryModal from "../components/JournalHistoryModal";
 import Confetti from "../components/Confetti";
 import MoodFace from "../components/MoodFace";
 import StatArt from "../components/StatArt";
+import { useSpeechToText } from "../components/useSpeechToText";
+import { createClient as createSupabaseClient } from "../lib/supabase/client";
 import { logHealthReading, logMood } from "../lib/care/actions";
+import type { JournalMonth } from "../lib/care/queries";
+
+/** What the wizard renders against with no session — the design-preview case.
+ *  A month shaped correctly and entirely empty, so the calendar draws real
+ *  squares rather than crashing on a missing prop. */
+const EMPTY_MONTH: JournalMonth = {
+  year: new Date().getFullYear(),
+  month: new Date().getMonth(),
+  label: "",
+  days: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(),
+  startOffset: (new Date(new Date().getFullYear(), new Date().getMonth(), 1).getDay() + 6) % 7,
+  today: new Date().getDate(),
+  entries: {},
+};
 import {
   ADDABLE_METRICS,
   DEFAULT_METRICS,
   METRICS,
   MONITOR_TONE,
-  MONTH_LABEL,
   MOODS,
-  TODAY_DATE,
   mmss,
   type MetricKind,
   type MetricSpec,
@@ -69,6 +84,7 @@ export default function PatientJournalPage({
   patientName,
   initial,
   filledToday = false,
+  month,
 }: {
   /** Absent when signed out, which is the design-preview case: the wizard still
    *  runs, it simply has nowhere to write to. */
@@ -78,19 +94,20 @@ export default function PatientJournalPage({
   /** Whether today's entry already exists. Opens the "done" screen instead of
    *  the wizard — see the note where it is rendered. */
   filledToday?: boolean;
-} = {}) {
+  /** The current month, already built from the database. */
+  month: JournalMonth;
+} = { month: EMPTY_MONTH }) {
   const reduce = useReducedMotion();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [mood, setMood] = useState<MoodKey | null>(null);
-  const [recording, setRecording] = useState(false);
-  const [recorded, setRecorded] = useState<number | null>(null);
   /** Step 2 offers both ways of telling it. */
   const [noteMode, setNoteMode] = useState<NoteMode>("voice");
   const [note, setNote] = useState("");
+  const [clip, setClip] = useState<{ path: string; seconds: number; url: string } | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [date, setDate] = useState(TODAY_DATE);
+  const [date, setDate] = useState(month.today ?? 1);
   const [saved, setSaved] = useState(filledToday);
   const [burst, setBurst] = useState(0);
 
@@ -157,6 +174,10 @@ export default function PatientJournalPage({
       fd.set("patient_id", patientId);
       fd.set("mood", mood);
       if (note.trim()) fd.set("note", note.trim());
+      if (clip) {
+        fd.set("voice_path", clip.path);
+        fd.set("voice_seconds", String(clip.seconds));
+      }
       jobs.push(logMood({ error: null }, fd));
     }
 
@@ -241,10 +262,11 @@ export default function PatientJournalPage({
           <CalendarDays size={20} strokeWidth={2.6} className="text-karsa-dark" aria-hidden />
           BUKA KALENDER SEHAT
         </span>
-        <span className="flex shrink-0 items-center gap-2 text-[13px] font-bold text-neutral-500">
-          {date} {MONTH_LABEL.split(" ")[0]}
-          <ChevronDown size={20} strokeWidth={3} aria-hidden />
-        </span>
+        {/* No date printed here any more. It showed whichever square was last
+            selected inside the modal, which read as "the journal is about that
+            day" while the wizard underneath was always writing today's. Two
+            different dates on one screen, and the wrong one was the louder. */}
+        <ChevronDown size={20} strokeWidth={3} className="shrink-0 text-neutral-500" aria-hidden />
       </button>
 
       {saved ? (
@@ -288,7 +310,7 @@ export default function PatientJournalPage({
                 setStep(1);
                 setMood(null);
                 setNote("");
-                setRecorded(null);
+                setClip(null);
                 setSaveError(null);
               }}
               className="h-14 w-full rounded-2xl bg-white text-[15.5px] font-extrabold text-neutral-700 outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
@@ -349,16 +371,8 @@ export default function PatientJournalPage({
 
             {step === 2 && (
               <VoiceStep
-                recording={recording}
-                recorded={recorded}
-                onToggle={() => {
-                  if (recording) {
-                    setRecording(false);
-                    setRecorded(23);
-                  } else {
-                    setRecording(true);
-                  }
-                }}
+                patientId={patientId}
+                onClip={setClip}
                 mode={noteMode}
                 onMode={setNoteMode}
                 text={note}
@@ -451,6 +465,8 @@ export default function PatientJournalPage({
         onClose={() => setCalendarOpen(false)}
         selected={date}
         onSelect={setDate}
+        month={month}
+        patientId={patientId}
       />
 
       {/* Rendered here, at the page root, and not inside the step that opens it.
@@ -537,23 +553,57 @@ function MoodStep({
 /* ── Step 2 ───────────────────────────────────────────────────────────────── */
 
 function VoiceStep({
-  recording,
-  recorded,
-  onToggle,
   mode,
   onMode,
   text,
   onText,
+  patientId,
+  onClip,
 }: {
-  recording: boolean;
-  recorded: number | null;
-  onToggle: () => void;
   mode: NoteMode;
   onMode: (next: NoteMode) => void;
   text: string;
   onText: (next: string) => void;
+  patientId?: string;
+  onClip: (clip: { path: string; seconds: number; url: string } | null) => void;
 }) {
   const reduce = useReducedMotion();
+  const [uploading, setUploading] = useState(false);
+  const [clipUrl, setClipUrl] = useState<string | null>(null);
+
+  const speech = useSpeechToText(
+    (chunk) => {
+      const clean = chunk.trim();
+      if (!clean) return;
+      onText(text ? `${text} ${clean}`.replace(/\s+/g, " ") : clean);
+    },
+    patientId
+      ? async ({ blob, seconds }) => {
+          setUploading(true);
+          const local = URL.createObjectURL(blob);
+          setClipUrl(local);
+
+          const supabase = createSupabaseClient();
+          const ext = blob.type.includes("ogg") ? "ogg" : blob.type.includes("mp4") ? "m4a" : "webm";
+          const path = `${patientId}/${crypto.randomUUID()}.${ext}`;
+
+          const { error } = await supabase.storage
+            .from("voices")
+            .upload(path, blob, { contentType: blob.type || "audio/webm", upsert: false });
+
+          setUploading(false);
+          if (error) {
+            onClip(null);
+            return;
+          }
+          onClip({ path, seconds, url: local });
+        }
+      : undefined,
+  );
+
+  useEffect(() => {
+    if (mode !== "voice" && speech.listening) speech.stop();
+  }, [mode, speech]);
 
   const tab = (on: boolean) =>
     `flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 text-[15.5px] font-extrabold outline-none transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-karsa/40 ${
@@ -569,8 +619,6 @@ function VoiceStep({
         Boleh dilewati kalau sedang tidak ingin bercerita.
       </p>
 
-      {/* Speaking is not always the easy option — a sore throat, a quiet room, a
-          person who simply prefers writing. Two ways in, both the same size. */}
       <div className="mt-3 flex shrink-0 gap-2.5">
         <button type="button" onClick={() => onMode("voice")} aria-pressed={mode === "voice"} className={tab(mode === "voice")}>
           <Mic size={19} strokeWidth={2.6} aria-hidden />
@@ -583,36 +631,101 @@ function VoiceStep({
       </div>
 
       {mode === "voice" ? (
-        <div className="mt-3 flex flex-1 flex-col items-center justify-center rounded-3xl bg-white p-6 ring-2 ring-karsa-line">
-          <button
-            type="button"
-            onClick={onToggle}
-            aria-pressed={recording}
-            aria-label={recording ? "Berhenti merekam" : "Tekan dan bicara"}
-            className={`relative grid h-[136px] w-[136px] place-items-center rounded-full outline-none transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-4 ${
-              recording ? "bg-rose-600" : "bg-karsa hover:bg-karsa-dark"
-            }`}
-          >
-            {recording && !reduce && (
-              <motion.span
-                aria-hidden
-                animate={{ scale: [1, 1.35], opacity: [0.55, 0] }}
-                transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
-                className="absolute inset-0 rounded-full bg-rose-500"
-              />
-            )}
-            <Mic size={60} strokeWidth={2.2} className="relative text-white" aria-hidden />
-          </button>
+        <div className="mt-3 flex flex-1 flex-col items-center rounded-3xl bg-white p-6 ring-2 ring-karsa-line">
+          {!speech.supported ? (
+            <div className="flex flex-1 flex-col items-center justify-center text-center">
+              <span aria-hidden className="grid h-20 w-20 place-items-center rounded-full bg-karsa-canvas text-neutral-400">
+                <MicOff size={40} strokeWidth={2.2} />
+              </span>
+              <p className="mt-4 max-w-[30ch] text-[16px] leading-6 text-neutral-600">
+                Browser ini belum bisa mengubah suara jadi teks.
+              </p>
+              <button
+                type="button"
+                onClick={() => onMode("text")}
+                className="mt-5 h-13 rounded-2xl bg-karsa px-6 py-3.5 text-[15.5px] font-extrabold text-white outline-none transition-colors hover:bg-karsa-dark focus-visible:ring-4 focus-visible:ring-karsa/40"
+              >
+                Tulis saja
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => (speech.listening ? speech.stop() : speech.start())}
+                aria-pressed={speech.listening}
+                aria-label={speech.listening ? "Berhenti bicara" : "Tekan dan bicara"}
+                className={`relative grid h-[120px] w-[120px] shrink-0 place-items-center rounded-full outline-none transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-4 ${
+                  speech.listening ? "bg-rose-600" : "bg-karsa hover:bg-karsa-dark"
+                }`}
+              >
+                {speech.listening && !reduce && (
+                  <motion.span
+                    aria-hidden
+                    animate={{ scale: [1, 1.35], opacity: [0.55, 0] }}
+                    transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
+                    className="absolute inset-0 rounded-full bg-rose-500"
+                  />
+                )}
+                <Mic size={54} strokeWidth={2.2} className="relative text-white" aria-hidden />
+              </button>
 
-          <p className="mt-5 text-center text-[19px] font-extrabold text-neutral-900">
-            {recording ? "🔴 SEDANG MEREKAM…" : "🎙️ TEKAN & BICARA"}
-          </p>
+              <p className="mt-4 shrink-0 text-center text-[18px] font-extrabold text-neutral-900">
+                {speech.listening ? `SEDANG MENDENGARKAN · ${mmss(speech.seconds)}` : "TEKAN & BICARA"}
+              </p>
 
-          {recorded !== null && !recording && (
-            <p className="mt-2 inline-flex items-center gap-2 rounded-full bg-act-50 px-4 py-2 text-[14px] font-bold text-act-600 ring-1 ring-act-edge">
-              <Check size={15} strokeWidth={3} aria-hidden />
-              Tersimpan · {mmss(recorded)}
-            </p>
+              {speech.error && (
+                <p role="alert" className="mt-2 shrink-0 rounded-2xl bg-rose-50 px-4 py-2.5 text-center text-[13.5px] font-bold leading-5 text-rose-800 ring-1 ring-rose-200">
+                  {speech.error}
+                </p>
+              )}
+
+              <div className="mt-4 min-h-0 w-full flex-1 overflow-y-auto rounded-2xl bg-karsa-canvas p-4">
+                {text || speech.interim ? (
+                  <p className="text-[17px] leading-7 text-neutral-900">
+                    {text}
+                    {speech.interim && (
+                      <span className="text-neutral-400">{text ? " " : ""}{speech.interim}</span>
+                    )}
+                  </p>
+                ) : (
+                  <p className="text-[15px] leading-6 text-neutral-400">
+                    Ceritanya akan muncul di sini sambil kamu bicara.
+                  </p>
+                )}
+              </div>
+
+              {clipUrl && !speech.listening && (
+                <div className="mt-3 w-full shrink-0">
+                  <audio src={clipUrl} controls className="h-11 w-full" />
+                  {uploading && (
+                    <p className="mt-1.5 text-[12.5px] text-neutral-500">Menyimpan rekaman…</p>
+                  )}
+                </div>
+              )}
+
+              {(text.trim() || clipUrl) && !speech.listening && (
+                <div className="mt-3 flex w-full shrink-0 items-center gap-2.5">
+                  {text.trim() && (
+                    <p className="inline-flex items-center gap-2 rounded-full bg-act-50 px-4 py-2 text-[14px] font-bold text-act-600 ring-1 ring-act-edge">
+                      <Check size={15} strokeWidth={3} aria-hidden />
+                      {text.trim().length} huruf
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onText("");
+                      setClipUrl(null);
+                      onClip(null);
+                    }}
+                    className="ml-auto rounded-xl px-3 py-2 text-[14px] font-bold text-neutral-500 outline-none transition-colors hover:bg-karsa-canvas hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-karsa/40"
+                  >
+                    Hapus
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       ) : (

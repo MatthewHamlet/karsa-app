@@ -36,11 +36,26 @@ import Toggle from "../components/Toggle";
 import { AvatarField, FormActions, SelectField, TextField } from "../components/SettingsFields";
 import { EASE } from "../components/List";
 import { TONES, type Tone } from "../components/tones";
+import type {
+  Contributions,
+  MySettings,
+  PatientAccess,
+} from "../lib/settings/queries";
+import type { AccountStats } from "../lib/community/queries";
+import { count } from "../data/community";
+import { ROLE_LABEL } from "../lib/roles";
+import { UserMinus } from "lucide-react";
+import { useActionState } from "react";
+import { revokeRelationship, type CareResult } from "../lib/care/actions";
+import {
+  updateAppearance,
+  updatePersonalInfo,
+  updateProfile,
+} from "../lib/settings/actions";
 import { CARE_GROUP } from "../data/careStats";
 import {
   ACCOUNT,
   ACCOUNT_STATS,
-  BADGES,
   CONTRIBUTIONS,
   OVERVIEW,
   PROFILE_FIELDS,
@@ -108,8 +123,16 @@ const first = (value: string | string[] | undefined) =>
 
 export default function SettingsPage({
   params,
+  me,
+  access,
+  stats,
+  contributions,
 }: {
   params?: Record<string, string | string[] | undefined>;
+  me?: MySettings | null;
+  access?: PatientAccess;
+  stats?: AccountStats;
+  contributions?: Contributions;
 }) {
   /* `?bagian=profile` opens straight onto a section. The rail's profile row
      uses it, so that row lands somewhere different from the Pengaturan row
@@ -180,7 +203,12 @@ export default function SettingsPage({
           on the left against 529px on the right at 2560. The cap turns that
           into a column that is full or centred, never lopsided. */}
       <div className="mx-auto grid w-full max-w-[1680px] gap-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[360px_minmax(0,1fr)] xl:gap-10">
-        <ProfileRail selectedId={selectedId} onSelect={setSelectedId} />
+        <ProfileRail
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          me={me}
+          stats={stats}
+        />
 
         {/* Capped rather than uncapped: past about 1280px a settings row puts
             its control so far from its label that they stop reading as one
@@ -204,9 +232,12 @@ export default function SettingsPage({
                 item={selected}
                 switches={switches}
                 onSwitch={(key, next) => setSwitches((prev) => ({ ...prev, [key]: next }))}
+                me={me}
+                access={access}
               />
             ) : (
               <Overview
+                contributions={contributions}
                 onSelect={setSelectedId}
                 switches={switches}
                 onSwitch={(key, next) => setSwitches((prev) => ({ ...prev, [key]: next }))}
@@ -224,9 +255,13 @@ export default function SettingsPage({
 function ProfileRail({
   selectedId,
   onSelect,
+  me,
+  stats,
 }: {
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  me?: MySettings | null;
+  stats?: AccountStats;
 }) {
   /** Arrow keys walk the rail and take the selection with them, which is the
    *  expected behaviour for a tablist whose panels are cheap to render. Home
@@ -266,7 +301,7 @@ function ProfileRail({
       <div className="flex flex-col items-start">
         <span className="relative inline-block">
           <span className="grid h-20 w-20 place-items-center rounded-full bg-karsa text-[28px] font-bold text-white xl:h-24 xl:w-24 xl:text-[32px]">
-            {ACCOUNT.initial}
+            {me ? me.fullName.trim().charAt(0).toUpperCase() || "?" : ACCOUNT.initial}
           </span>
           <button
             type="button"
@@ -280,7 +315,7 @@ function ProfileRail({
 
         <div className="mt-4 flex w-full items-center gap-2">
           <h2 className="min-w-0 flex-1 truncate text-[22px] font-bold leading-8 tracking-tight text-neutral-900 xl:text-[25px]">
-            {ACCOUNT.name}
+            {me?.fullName ?? ACCOUNT.name}
           </h2>
           <button
             type="button"
@@ -294,12 +329,19 @@ function ProfileRail({
 
         <p className="mt-0.5 flex items-center gap-2 text-[13.5px] text-neutral-500">
           <span className="h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
-          {ACCOUNT.role}
+          {me ? ROLE_LABEL[me.role] : ACCOUNT.role}
         </p>
       </div>
 
       <dl className="mt-5 flex gap-6">
-        {ACCOUNT_STATS.map((stat) => (
+        {(stats
+          ? [
+              { label: "Follower", value: count(stats.followers) },
+              { label: "Following", value: count(stats.following) },
+              { label: "Tim", value: count(stats.team) },
+            ]
+          : ACCOUNT_STATS
+        ).map((stat) => (
           <div key={stat.label} className="min-w-0">
             <dt className="truncate text-[12.5px] leading-4 text-neutral-500">{stat.label}</dt>
             <dd className="mt-0.5 text-[19px] font-bold leading-7 tabular-nums text-neutral-900">
@@ -367,7 +409,7 @@ function ProfileRail({
           </div>
         ))}
 
-        <div className="mt-6 border-t border-karsa-line pt-4">
+        <div className="mt-6 border-t border-karsa-line pt-4 lg:hidden">
           <LogOutButton />
         </div>
       </div>
@@ -471,14 +513,20 @@ function DetailShell({
 function Detail({
   item,
   switches,
+  me,
+  access,
   onSwitch,
 }: {
   item: ResolvedItem;
   switches: Record<string, boolean>;
+  me?: MySettings | null;
+  access?: PatientAccess;
   onSwitch: (key: string, next: boolean) => void;
 }) {
-  if (item.id === "profile") return <ProfileForm item={item} />;
-  if (item.id === "personal") return <PersonalForm item={item} />;
+  if (item.id === "profile") return <ProfileForm item={item} me={me} />;
+  if (item.id === "personal") return <PersonalForm item={item} me={me} />;
+  if (item.id === "appearance") return <AppearanceForm item={item} me={me} />;
+  if (item.id === "patient-access") return <AccessPanel item={item} access={access} me={me} />;
 
   return (
     <DetailShell item={item} bodyClassName="">
@@ -519,19 +567,40 @@ function Detail({
 /** Two forms, one shape. `saved` is the last committed state and `draft` what
  *  is on screen; Cancel is just a copy of one onto the other, which is why it
  *  needs no confirmation of its own. */
-function useDraft<T extends Record<string, string>>(initial: T) {
+function useDraft<T extends Record<string, string>>(
+  initial: T,
+  persist?: (draft: T) => Promise<{ error: string | null }>,
+) {
   const [saved, setSaved] = useState(initial);
   const [draft, setDraft] = useState(initial);
   const [justSaved, setJustSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const dirty = (Object.keys(saved) as (keyof T)[]).some((key) => saved[key] !== draft[key]);
 
   const set = (key: keyof T) => (next: string) => {
     setDraft((prev) => ({ ...prev, [key]: next }));
     setJustSaved(false);
+    setError(null);
   };
 
-  const save = () => {
+  const save = async () => {
+    if (!persist) {
+      setSaved(draft);
+      setJustSaved(true);
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    const result = await persist(draft);
+    setBusy(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
     setSaved(draft);
     setJustSaved(true);
   };
@@ -539,19 +608,50 @@ function useDraft<T extends Record<string, string>>(initial: T) {
   const cancel = () => {
     setDraft(saved);
     setJustSaved(false);
+    setError(null);
   };
 
-  return { draft, dirty, justSaved, set, save, cancel };
+  return { draft, dirty, justSaved, error, busy, set, save, cancel };
 }
+
+function FormError({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <p
+      role="alert"
+      className="mt-4 whitespace-pre-line rounded-2xl border-2 border-rose-200 bg-rose-50 px-4 py-3 text-[14px] font-semibold leading-5 text-rose-800"
+    >
+      {message}
+    </p>
+  );
+}
+
+const formData = (fields: Record<string, string | boolean>) => {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value === "boolean") {
+      if (value) fd.set(key, "on");
+    } else {
+      fd.set(key, value);
+    }
+  }
+  return fd;
+};
 
 const FORM_DIVIDER = "mt-7 flex flex-col gap-4 border-t border-karsa-line pt-6";
 
-function ProfileForm({ item }: { item: ResolvedItem }) {
-  const form = useDraft({
-    name: PROFILE_FIELDS.name,
-    email: PROFILE_FIELDS.email,
-    role: PROFILE_FIELDS.role,
-  });
+function ProfileForm({ item, me }: { item: ResolvedItem; me?: MySettings | null }) {
+  const form = useDraft(
+    {
+      name: me?.fullName ?? PROFILE_FIELDS.name,
+      email: me?.email ?? PROFILE_FIELDS.email,
+      headline: me?.headline ?? "",
+    },
+    me
+      ? (draft) =>
+          updateProfile({ error: null }, formData({ full_name: draft.name, headline: draft.headline }))
+      : undefined,
+  );
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -578,18 +678,25 @@ function ProfileForm({ item }: { item: ResolvedItem }) {
             value={form.draft.email}
             onChange={form.set("email")}
             autoComplete="email"
-            hint="Dipakai untuk masuk dan pemberitahuan penting."
+            readOnly={Boolean(me)}
+            hint="Dipakai untuk masuk, jadi belum bisa diubah dari sini."
           />
           <div className="sm:col-span-2">
-            <SelectField
-              label="Peran pendamping"
-              value={form.draft.role}
-              options={ROLE_OPTIONS}
-              onChange={form.set("role")}
-              hint="Menentukan seberapa jauh kamu bisa mengubah data perawatan pasien."
+            <TextField
+              label="Deskripsi singkat"
+              value={form.draft.headline}
+              onChange={form.set("headline")}
+              hint="Tampil di bawah namamu di Komunitas."
             />
           </div>
+          {me && (
+            <div className="sm:col-span-2">
+              <RoleRow role={me.role} />
+            </div>
+          )}
         </div>
+
+        <FormError message={form.error} />
 
         <div className={FORM_DIVIDER}>
           <FormActions
@@ -604,13 +711,47 @@ function ProfileForm({ item }: { item: ResolvedItem }) {
   );
 }
 
-function PersonalForm({ item }: { item: ResolvedItem }) {
-  const form = useDraft({
-    phone: PROFILE_FIELDS.phone,
-    birth: PROFILE_FIELDS.birth,
-    address: PROFILE_FIELDS.address,
-    emergency: PROFILE_FIELDS.emergency,
-  });
+function RoleRow({ role }: { role: "caregiver" | "patient" }) {
+  return (
+    <div className="rounded-2xl bg-karsa-canvas/60 p-4">
+      <p className="text-[13px] font-semibold text-neutral-600">Peran</p>
+      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-[15px] font-bold text-neutral-900">{ROLE_LABEL[role]}</p>
+        <Link
+          href="/login/peran?ganti=1"
+          className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-white px-4 text-[13.5px] font-bold text-karsa-dark ring-1 ring-karsa-line outline-none transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
+        >
+          Ubah peran
+        </Link>
+      </div>
+      <p className="mt-2 text-[12.5px] leading-4 text-neutral-500">
+        Mengubah peran tidak menghapus data atau memutus hubungan perawatan.
+      </p>
+    </div>
+  );
+}
+
+function PersonalForm({ item, me }: { item: ResolvedItem; me?: MySettings | null }) {
+  const form = useDraft(
+    {
+      phone: me?.phone ?? (me ? "" : PROFILE_FIELDS.phone),
+      birth: me?.dateOfBirth ?? (me ? "" : PROFILE_FIELDS.birth),
+      address: me?.address ?? (me ? "" : PROFILE_FIELDS.address),
+      emergency: me?.emergencyContact ?? (me ? "" : PROFILE_FIELDS.emergency),
+    },
+    me
+      ? (draft) =>
+          updatePersonalInfo(
+            { error: null },
+            formData({
+              phone: draft.phone,
+              date_of_birth: draft.birth,
+              address: draft.address,
+              emergency_contact: draft.emergency,
+            }),
+          )
+      : undefined,
+  );
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -645,15 +786,16 @@ function PersonalForm({ item }: { item: ResolvedItem }) {
           <div className="sm:col-span-2">
             {/* Drawn from the care team rather than typed: an emergency contact
                 who is not in the group is one the app cannot actually reach. */}
-            <SelectField
+            <TextField
               label="Kontak darurat"
               value={form.draft.emergency}
-              options={CARE_GROUP.members.map((member) => member.name)}
               onChange={form.set("emergency")}
-              hint="Dihubungi lebih dulu bila terjadi keadaan mendesak."
+              hint="Nama dan nomor yang dihubungi lebih dulu bila mendesak."
             />
           </div>
         </div>
+
+        <FormError message={form.error} />
 
         <div className={FORM_DIVIDER}>
           <FormActions
@@ -668,6 +810,204 @@ function PersonalForm({ item }: { item: ResolvedItem }) {
   );
 }
 
+function AppearanceForm({ item, me }: { item: ResolvedItem; me?: MySettings | null }) {
+  const form = useDraft(
+    {
+      theme: me?.theme ?? "system",
+      text_scale: me?.textScale ?? "medium",
+      language: me?.language ?? "id",
+      reduce_motion: me?.reduceMotion ? "on" : "",
+    },
+    me
+      ? (draft) =>
+          updateAppearance(
+            { error: null },
+            formData({
+              theme: draft.theme,
+              text_scale: draft.text_scale,
+              language: draft.language,
+              reduce_motion: draft.reduce_motion === "on",
+            }),
+          )
+      : undefined,
+  );
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    void form.save();
+  };
+
+  return (
+    <DetailShell item={item}>
+      <form onSubmit={submit} noValidate>
+        <div className="grid gap-5 sm:grid-cols-2">
+          <SelectField
+            label="Tema"
+            value={THEME_LABEL[form.draft.theme] ?? "Sistem"}
+            options={Object.values(THEME_LABEL)}
+            onChange={(next) => form.set("theme")(THEME_VALUE[next] ?? "system")}
+          />
+          <SelectField
+            label="Ukuran teks"
+            value={SCALE_LABEL[form.draft.text_scale] ?? "Sedang"}
+            options={Object.values(SCALE_LABEL)}
+            onChange={(next) => form.set("text_scale")(SCALE_VALUE[next] ?? "medium")}
+          />
+          <SelectField
+            label="Bahasa aplikasi"
+            value={form.draft.language === "en" ? "English" : "Indonesia"}
+            options={["Indonesia", "English"]}
+            onChange={(next) => form.set("language")(next === "English" ? "en" : "id")}
+          />
+          <div className="sm:col-span-2">
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-karsa-canvas/60 p-4">
+              <input
+                type="checkbox"
+                checked={form.draft.reduce_motion === "on"}
+                onChange={(event) =>
+                  form.set("reduce_motion")(event.target.checked ? "on" : "")
+                }
+                className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer rounded border-2 border-karsa-line bg-white accent-karsa"
+              />
+              <span className="min-w-0">
+                <span className="block text-[14.5px] font-bold text-neutral-800">
+                  Kurangi animasi
+                </span>
+                <span className="block text-[13px] leading-5 text-neutral-500">
+                  Matikan gerakan yang tidak perlu di seluruh aplikasi.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <FormError message={form.error} />
+
+        <div className={FORM_DIVIDER}>
+          <FormActions
+            dirty={form.dirty}
+            saved={form.justSaved}
+            onSave={form.save}
+            onCancel={form.cancel}
+          />
+        </div>
+      </form>
+    </DetailShell>
+  );
+}
+
+function AccessPanel({
+  item,
+  access,
+  me,
+}: {
+  item: ResolvedItem;
+  access?: PatientAccess;
+  me?: MySettings | null;
+}) {
+  const isPatient = me?.role === "patient";
+  const rows = isPatient ? (access?.caregivers ?? []) : (access?.patients ?? []);
+
+  return (
+    <DetailShell item={item}>
+      <p className="text-[14px] leading-6 text-neutral-500">
+        {isPatient
+          ? "Mereka bisa melihat catatan perawatanmu. Cabut akses kapan saja."
+          : "Orang yang kamu dampingi. Mencabut akses menutup semua datanya darimu."}
+      </p>
+
+      {rows.length === 0 ? (
+        <p className="mt-5 rounded-2xl bg-karsa-canvas px-4 py-5 text-[15px] leading-6 text-neutral-500">
+          {isPatient ? "Belum ada yang mendampingimu." : "Belum ada pasien."}
+        </p>
+      ) : (
+        <ul className="mt-5 space-y-3">
+          {rows.map((row) => {
+            const name = "fullName" in row ? row.fullName : row.displayName;
+            const sub = "fullName" in row ? row.relation : row.relation;
+            return (
+              <li
+                key={row.relationshipId}
+                className="flex items-center gap-3 rounded-2xl bg-karsa-canvas/60 p-4"
+              >
+                <span
+                  aria-hidden
+                  className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-karsa text-[15px] font-bold text-white"
+                >
+                  {row.initial}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[15px] font-bold text-neutral-900">{name}</p>
+                  <p className="truncate text-[13px] text-neutral-500">
+                    {sub ?? (isPatient ? "Pendamping" : "Pasien")} ·{" "}
+                    {row.status === "active" ? "Aktif" : "Menunggu persetujuan"}
+                  </p>
+                </div>
+                <RevokeButton relationshipId={row.relationshipId} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {access?.shareCode && (
+        <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-karsa-line">
+          <p className="text-[15px] font-bold text-neutral-900">Kode undanganmu</p>
+          <p className="mt-1 text-[13.5px] leading-5 text-neutral-500">
+            Bacakan ke orang yang kamu percaya. Kamu tetap harus menyetujui
+            permintaannya.
+          </p>
+          <p className="mt-4 select-all rounded-2xl bg-karsa-canvas px-4 py-4 text-center text-[24px] font-extrabold uppercase tracking-[0.2em] text-karsa-dark">
+            {access.shareCode}
+          </p>
+        </div>
+      )}
+    </DetailShell>
+  );
+}
+
+function RevokeButton({ relationshipId }: { relationshipId: string }) {
+  const [state, action, busy] = useActionState<CareResult, FormData>(revokeRelationship, {
+    error: null,
+  });
+
+  return (
+    <form action={action} className="shrink-0">
+      <input type="hidden" name="relationship_id" value={relationshipId} />
+      <button
+        type="submit"
+        disabled={busy}
+        title={state.error ?? "Cabut akses"}
+        aria-label="Cabut akses"
+        className="grid h-10 w-10 place-items-center rounded-full text-neutral-400 outline-none transition-colors hover:bg-rose-50 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-rose-300 disabled:opacity-50"
+      >
+        <UserMinus size={17} strokeWidth={2.2} />
+      </button>
+    </form>
+  );
+}
+
+const THEME_LABEL: Record<string, string> = {
+  system: "Sistem",
+  light: "Terang",
+  dark: "Gelap",
+};
+const THEME_VALUE: Record<string, string> = {
+  Sistem: "system",
+  Terang: "light",
+  Gelap: "dark",
+};
+const SCALE_LABEL: Record<string, string> = {
+  small: "Kecil",
+  medium: "Sedang",
+  large: "Besar",
+};
+const SCALE_VALUE: Record<string, string> = {
+  Kecil: "small",
+  Sedang: "medium",
+  Besar: "large",
+};
+
 /* ── Overview ─────────────────────────────────────────────────────────────── */
 
 function QuickSettings({
@@ -675,6 +1015,7 @@ function QuickSettings({
   switches,
   onSwitch,
 }: {
+  contributions?: Contributions;
   onSelect: (id: string) => void;
   switches: Record<string, boolean>;
   onSwitch: (key: string, next: boolean) => void;
@@ -729,7 +1070,7 @@ function QuickSettings({
   );
 }
 
-function Contributions() {
+function Contributions({ data }: { data?: Contributions }) {
   return (
     <section className={`${CARD} p-6 sm:p-7 xl:p-8`}>
       <header className="mb-6">
@@ -742,7 +1083,15 @@ function Contributions() {
       </header>
 
       <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {CONTRIBUTIONS.map((entry) => {
+        {(data
+          ? [
+              { id: "notes", label: "Catatan harian", value: count(data.notes), note: data.since ?? "Belum ada catatan", tone: "green" as Tone },
+              { id: "doses", label: "Dosis dicatat", value: count(data.doses), note: "Dari yang kamu catat", tone: "lavender" as Tone },
+              { id: "replies", label: "Balasan di komunitas", value: count(data.replies), note: "Komentar yang kamu tulis", tone: "peach" as Tone },
+              { id: "streak", label: "Hari beruntun", value: count(data.streakDays), note: data.streakDays > 0 ? "Berturut-turut sampai hari ini" : "Centang tugas untuk memulai", tone: "blue" as Tone },
+            ]
+          : CONTRIBUTIONS
+        ).map((entry) => {
           const t = TONES[entry.tone];
 
           return (
@@ -768,93 +1117,21 @@ function Contributions() {
   );
 }
 
-function Badges() {
-  return (
-    <section className={`${CARD} p-6 sm:p-7 xl:p-8`}>
-      <header className="mb-5">
-        <h2 className="text-[19px] font-bold leading-7 tracking-tight text-neutral-900 xl:text-[21px]">
-          Lencana
-        </h2>
-        <p className="mt-1 text-[13.5px] leading-5 text-neutral-500">
-          Ditandai sendiri dari catatanmu — tidak ada yang perlu diklaim.
-        </p>
-      </header>
-
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {BADGES.map((badge) => {
-          const t = TONES[badge.tone];
-          const Icon = BADGE_ICON[badge.id];
-          const locked = Boolean(badge.progress);
-          const pct = badge.progress
-            ? Math.round((badge.progress.current / badge.progress.target) * 100)
-            : 100;
-
-          return (
-            <li
-              key={badge.id}
-              className={`flex items-start gap-3.5 rounded-2xl p-4 ring-1 ${
-                locked ? "bg-white ring-karsa-line" : `${t.card} ${t.ring}`
-              }`}
-            >
-              <span
-                className={`relative grid h-11 w-11 shrink-0 place-items-center rounded-full ${
-                  locked ? "bg-karsa-canvas text-neutral-400" : t.tile
-                }`}
-              >
-                <Icon size={19} strokeWidth={2} />
-                {locked && (
-                  <span className="absolute -bottom-0.5 -right-0.5 grid h-5 w-5 place-items-center rounded-full bg-white text-neutral-400 ring-1 ring-karsa-line">
-                    <Lock size={10} strokeWidth={2.8} />
-                  </span>
-                )}
-              </span>
-
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`truncate text-[14.5px] font-bold leading-5 ${
-                    locked ? "text-neutral-500" : "text-neutral-800"
-                  }`}
-                >
-                  {badge.label}
-                </p>
-                <p className="text-[12.5px] leading-4 text-neutral-500">{badge.note}</p>
-
-                {badge.progress && (
-                  <>
-                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-karsa-canvas">
-                      <div
-                        className="h-full rounded-full bg-karsa/45"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <p className="mt-1 text-[11.5px] tabular-nums text-neutral-400">
-                      {badge.progress.current} dari {badge.progress.target}
-                    </p>
-                  </>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
-
 function Overview({
+  contributions,
   onSelect,
   switches,
   onSwitch,
 }: {
+  contributions?: Contributions;
   onSelect: (id: string) => void;
   switches: Record<string, boolean>;
   onSwitch: (key: string, next: boolean) => void;
 }) {
   return (
     <div className="space-y-5 xl:space-y-6">
-      <Contributions />
+      <Contributions data={contributions} />
       <QuickSettings onSelect={onSelect} switches={switches} onSwitch={onSwitch} />
-      <Badges />
 
       {/* Side by side once there is room — three full-width cards in a column
           was most of the empty space this page used to end on. */}

@@ -4,7 +4,9 @@ import { isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
 import type { CarePatient, CareTeamMember, PatientStatus, RelationshipStatus } from "./types";
 import {
+  MONTHS,
   MONTHS_SHORT,
+  TZ,
   calendarDayOf,
   clockOf,
   dayKey,
@@ -108,7 +110,7 @@ export const getMyCareTeam = cache(async (): Promise<CareTeamMember[]> => {
   const { data, error } = await supabase
     .from("care_relationships")
     .select(
-      "id, status, relation, invited_at, caregiver:profiles!care_relationships_caregiver_id_fkey(id, full_name)",
+      "id, status, relation, invited_at, caregiver_id, caregiver:profiles!care_relationships_caregiver_id_fkey(id, full_name)",
     )
     .eq("patient_id", record.id)
     .in("status", ["pending", "active"])
@@ -116,23 +118,31 @@ export const getMyCareTeam = cache(async (): Promise<CareTeamMember[]> => {
 
   if (error || !data) return [];
 
-  return data.flatMap((row) => {
+  /* `map`, not `flatMap`-with-a-drop. This used to bin any row whose embedded
+     profile came back empty, which turned a *permissions* problem into an
+     invisible one: `profiles` had no policy letting a patient read their own
+     caregiver's row (fixed in migration 0014), so the join returned null, every
+     relationship was silently discarded, and the screen said "belum ada
+     pendamping" about relationships that existed and were active.
+
+     The relationship row is the fact here; the profile is decoration on it. So
+     a missing profile now costs a name, not the row — the patient still sees
+     that somebody has access and can still revoke it. Losing the ability to
+     revoke access you cannot see is the worst failure this page has. */
+  return data.map((row) => {
     const c = (Array.isArray(row.caregiver) ? row.caregiver[0] : row.caregiver) as
       | CaregiverRow
       | undefined;
-    if (!c) return [];
-    const name = c.full_name?.trim() || "Pendamping";
-    return [
-      {
-        relationshipId: row.id as string,
-        caregiverId: c.id,
-        fullName: name,
-        initial: initialOf(name),
-        relation: (row.relation as string | null) ?? null,
-        status: row.status as RelationshipStatus,
-        invitedAt: row.invited_at as string,
-      },
-    ];
+    const name = c?.full_name?.trim() || "Pendamping";
+    return {
+      relationshipId: row.id as string,
+      caregiverId: c?.id ?? (row.caregiver_id as string) ?? "",
+      fullName: name,
+      initial: initialOf(name),
+      relation: (row.relation as string | null) ?? null,
+      status: row.status as RelationshipStatus,
+      invitedAt: row.invited_at as string,
+    };
   });
 });
 
@@ -584,7 +594,7 @@ export const getCareGroup = cache(
     const { data, error } = await supabase
       .from("care_relationships")
       .select(
-        "status, created_at, caregiver:profiles!care_relationships_caregiver_id_fkey(id, full_name)",
+        "status, created_at, caregiver_id, caregiver:profiles!care_relationships_caregiver_id_fkey(id, full_name)",
       )
       .eq("patient_id", patientId)
       .in("status", ["pending", "active"])
@@ -592,13 +602,20 @@ export const getCareGroup = cache(
 
     if (error || !data) return { members: [], since: null };
 
-    const members = data.flatMap((row) => {
+    /* Same reasoning as `getMyCareTeam`: a member whose profile does not come
+       back is still a member, and dropping them under-counts the team on the
+       card that exists to say how big it is. */
+    const members = data.map((row) => {
       const c = (Array.isArray(row.caregiver) ? row.caregiver[0] : row.caregiver) as
         | CaregiverRow
         | undefined;
-      if (!c) return [];
-      const name = c.full_name?.trim() || "Pendamping";
-      return [{ id: c.id, name, initial: initialOf(name), active: row.status === "active" }];
+      const name = c?.full_name?.trim() || "Pendamping";
+      return {
+        id: c?.id ?? (row.caregiver_id as string) ?? "",
+        name,
+        initial: initialOf(name),
+        active: row.status === "active",
+      };
     });
 
     const first = data[0]?.created_at as string | undefined;
@@ -868,6 +885,183 @@ export const hasJournaledToday = cache(async (patientId: string): Promise<boolea
 
   return (count ?? 0) > 0;
 });
+
+/* ── The journal's calendar ──────────────────────────────────────────────── */
+
+/** One day in the heatmap, as the modal reads it.
+ *
+ *  `mood` is nullable and the rest is optional, because a day is built from
+ *  whatever happened to be recorded — somebody who ticked their tasks but never
+ *  opened the journal has a `done`/`total` and nothing else. */
+export type JournalDayData = {
+  mood: MoodKey | null;
+  /** The medicine ratio the square is coloured by. */
+  done: number;
+  total: number;
+  /** What they wrote, if anything. */
+  story: string | null;
+  /** Length of the voice note in seconds.
+   *
+   *  Always `undefined` today: the wizard records but nothing stores the audio
+   *  yet. It is in the shape so the player in the report panel is wired and
+   *  waiting — once a recording is saved against the day, filling this in is
+   *  the only change the calendar needs. */
+  voice?: number;
+  voiceUrl?: string;
+  glucose?: number;
+  bp?: [number, number];
+  weight?: number;
+  temp?: number;
+  hr?: number;
+};
+
+export type JournalMonth = {
+  year: number;
+  /** 0-based, matching `Date` and the grid. */
+  month: number;
+  label: string;
+  days: number;
+  /** Monday-first blanks before the 1st. */
+  startOffset: number;
+  /** Day-of-month of today, or null when this month is not the current one —
+   *  which is what stops every month drawing a "today" square. */
+  today: number | null;
+  entries: Record<number, JournalDayData>;
+};
+
+/** Which reading maps onto which field of a day. */
+const JOURNAL_READING: Record<string, keyof JournalDayData> = {
+  blood_sugar: "glucose",
+  weight: "weight",
+  temperature: "temp",
+  heart_rate: "hr",
+};
+
+/** A month of the patient's journal, built from what was actually recorded.
+ *
+ *  Three tables, one month-shaped window, joined in JavaScript. That is the
+ *  right trade here: it is at most a few hundred rows, and the alternative —
+ *  a SQL function returning a month of json — would put the calendar's layout
+ *  rules inside a migration, where changing "Monday first" means a deploy.
+ *
+ *  Readings are taken newest-first and the first of each kind wins, so a day
+ *  with three blood-pressure entries shows the latest rather than an average
+ *  nobody measured. */
+export const getJournalMonth = cache(
+  async (patientId: string, year: number, month: number): Promise<JournalMonth> => {
+    const days = new Date(year, month + 1, 0).getDate();
+    const startOffset = (new Date(year, month, 1).getDay() + 6) % 7;
+    const now = jakartaToday();
+    const shell: JournalMonth = {
+      year,
+      month,
+      label: `${MONTHS[month]} ${year}`,
+      days,
+      startOffset,
+      today: now.y === year && now.m === month ? now.d : null,
+      entries: {},
+    };
+
+    if (!isSupabaseConfigured() || !patientId) return shell;
+
+    const from = jakartaMidnight({ y: year, m: month, d: 1 });
+    const to = jakartaMidnight({ y: year, m: month + 1, d: 1 });
+    const supabase = await createClient();
+
+    const [{ data: moods }, { data: readings }, { data: completions }, { data: tasks }] =
+      await Promise.all([
+        supabase
+          .from("mood_entries")
+          .select("mood, note, recorded_at, voice_path, voice_seconds")
+          .eq("patient_id", patientId)
+          .gte("recorded_at", from.toISOString())
+          .lt("recorded_at", to.toISOString())
+          .order("recorded_at", { ascending: false }),
+        supabase
+          .from("health_readings")
+          .select("kind, value, value_secondary, recorded_at")
+          .eq("patient_id", patientId)
+          .gte("recorded_at", from.toISOString())
+          .lt("recorded_at", to.toISOString())
+          .order("recorded_at", { ascending: false }),
+        supabase
+          .from("task_completions")
+          .select("done_on")
+          .eq("patient_id", patientId)
+          .gte("done_on", from.toLocaleDateString("en-CA", { timeZone: TZ }))
+          .lt("done_on", to.toLocaleDateString("en-CA", { timeZone: TZ })),
+        supabase
+          .from("daily_tasks")
+          .select("id")
+          .eq("patient_id", patientId)
+          .eq("active", true),
+      ]);
+
+    /* Today's plan, applied to every day of the month. A per-day historical
+       total would need the task list to be versioned, which it is not — so
+       this is an approximation, and an honest one: the ratio is there to
+       colour a square, not to be audited. */
+    const total = (tasks ?? []).length;
+    const entries: Record<number, JournalDayData> = {};
+    const voicePaths: { day: number; path: string }[] = [];
+
+    const dayOf = (n: number): JournalDayData =>
+      (entries[n] ??= { mood: null, done: 0, total, story: null });
+
+    /* Newest-first, so the first mood seen for a day is the latest one. */
+    for (const row of moods ?? []) {
+      const d = calendarDayOf(row.recorded_at as string).d;
+      const entry = dayOf(d);
+      if (entry.mood === null) {
+        entry.mood = row.mood as MoodKey;
+        entry.story = (row.note as string | null)?.trim() || null;
+        const path = row.voice_path as string | null;
+        if (path) {
+          entry.voice = (row.voice_seconds as number | null) ?? undefined;
+          voicePaths.push({ day: d, path });
+        }
+      }
+    }
+
+    for (const row of readings ?? []) {
+      const d = calendarDayOf(row.recorded_at as string).d;
+      const entry = dayOf(d);
+      const kind = row.kind as string;
+
+      if (kind === "blood_pressure") {
+        if (entry.bp === undefined && row.value_secondary !== null) {
+          entry.bp = [Number(row.value), Number(row.value_secondary)];
+        }
+        continue;
+      }
+
+      const field = JOURNAL_READING[kind];
+      if (field && entry[field] === undefined) {
+        /* The four simple readings are all plain numbers on the day. */
+        (entry as Record<string, unknown>)[field] = Number(row.value);
+      }
+    }
+
+    for (const row of completions ?? []) {
+      /* `done_on` is already a Jakarta date string, so the day is the last two
+         characters rather than something to re-derive from an instant. */
+      const d = Number((row.done_on as string).slice(-2));
+      if (Number.isFinite(d)) dayOf(d).done += 1;
+    }
+
+    if (voicePaths.length > 0) {
+      const { data: signed } = await supabase.storage
+        .from("voices")
+        .createSignedUrls(voicePaths.map((v) => v.path), 3600);
+
+      (signed ?? []).forEach((item, i) => {
+        if (item.signedUrl) entries[voicePaths[i].day].voiceUrl = item.signedUrl;
+      });
+    }
+
+    return { ...shell, entries };
+  },
+);
 
 /* ── Meals ───────────────────────────────────────────────────────────────── */
 

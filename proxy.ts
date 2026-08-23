@@ -149,25 +149,24 @@ export async function proxy(request: NextRequest) {
   /* ── The onboarding gate ────────────────────────────────────────────────
      A caregiver who is not yet looking after anybody gets exactly one screen.
 
-     Only for caregivers, and only for pages they are not already allowed. The
-     role comes off the token's metadata, which is already in hand from the
-     `getUser` above — reading `profiles` instead would be a second database
-     round trip on every navigation in the app, to answer a question that
-     changes roughly never.
+     ── Why this reads `profiles` and the check above reads metadata ────────
+     They are not asking the same question, and it took a bug to see it.
 
-     Metadata can be stale or, for a Google account, absent. That is survivable
-     in both directions: a patient mislabelled as a caregiver is asked to add
-     somebody and can walk to `/pasien`, and a caregiver mislabelled as a
-     patient is not gated here — `app/page.tsx` still sends them to `/mulai`.
-     This layer is the net, not the only check. */
-  // ── The onboarding gate ────────────────────────────────────────────────
+     Above: *has this person ever answered* "pendamping or pasien". Only
+     metadata can say — `profiles.role` always holds something, because the
+     signup trigger defaults it, so it cannot tell a choice from a default.
+
+     Here: *which app does this person belong in*. That has to be `profiles`,
+     because metadata goes stale in a way that matters. `redeem_pairing_code`
+     writes `care_relationships` and a `patients` row and never touches
+     `auth.users` at all — so a patient linked by a pairing code carries no
+     role in their token, gets read as a caregiver with nobody to care for, and
+     is thrown to `/mulai` from every page in their own app. Trusting metadata
+     here is exactly that bug.
+
+     It costs one indexed lookup per navigation, which is the right price for
+     not locking people out of the product. */
   if (user && !isPublic(pathname) && !allowedWhileOnboarding(pathname)) {
-    /* Sumber kebenaran soal peran adalah profiles.role, bukan
-       user_metadata.role — metadata bisa basi (akun Google yang belum
-       pernah menyentuh /login/peran, atau pasien yang di-link lewat kode
-       pairing, yang mana redeem_pairing_code tidak pernah menulis ke
-       auth.users sama sekali). Memercayai metadata di sini adalah yang
-       bikin pasien salah dianggap caregiver dan dilempar ke /mulai. */
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")

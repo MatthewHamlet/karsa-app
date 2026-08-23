@@ -98,6 +98,21 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    /* `next` defaults to "/", which is the caregiver app's home. Wrong for a
+       patient — user_metadata.role can be stale for Google/pairing accounts,
+       so profiles.role (same source proxy.ts trusts) decides instead. An
+       explicit deep link in `next` still wins over this. */
+    if (next === "/") {
+      const { data: profileRow } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user!.id)
+        .maybeSingle();
+
+      const home = profileRow?.role === "patient" ? "/pasien" : "/";
+      return NextResponse.redirect(`${origin}${home}`);
+    }
+
     return NextResponse.redirect(`${origin}${next}`);
   }
 

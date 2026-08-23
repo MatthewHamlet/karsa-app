@@ -97,7 +97,6 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
     name: profile?.fullName ?? fallback.name,
     role: profile ? ROLE_LABEL[profile.role] : fallback.role,
     initial: profile?.initial ?? fallback.initial,
-    href: patientApp ? "/pasien/profil" : "/settings?bagian=profile",
   };
   const size = reduce ? { duration: 0 } : RAIL_SPRING;
   const fade = reduce ? { duration: 0 } : { duration: 0.2, ease: EASE };
@@ -178,7 +177,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
           works for me" are the same errand. It used to sit in the top-right of
           the dashboard, over a column of somebody else's numbers. */}
       <div className="px-3.5 pb-1 pt-3.5">
-        <RailProfile isOpen={isOpen} onSelect={onSelect} {...me} />
+        <RailProfile isOpen={isOpen} {...me} />
       </div>
 
       <ul className="space-y-1.5 px-3.5 pt-1.5">
@@ -259,23 +258,18 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
   );
 }
 
-/** The caregiver's own row. Built here rather than reusing `List` because that
- *  takes a line icon, and a person is a face — but the collapse behaviour is
- *  copied from it exactly, so the two rows shrink as one block. */
+/** Who is signed in. Decorative: it is a label, not a destination — the row
+ *  under it is where account settings live. */
 function RailProfile({
   isOpen,
-  onSelect,
   name,
   role,
   initial,
-  href,
 }: {
   isOpen: boolean;
-  onSelect?: (link: string) => void;
   name: string;
   role: string;
   initial: string;
-  href: string;
 }) {
   const reduce = useReducedMotion();
 
@@ -288,13 +282,7 @@ function RailProfile({
       };
 
   return (
-    <Link
-      href={href}
-      onClick={() => onSelect?.(href)}
-      className="group/me relative flex h-12 items-center rounded-xl px-3.5 outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40"
-    >
-      <span className="absolute inset-0 rounded-xl bg-neutral-900/0 transition-colors duration-200 group-hover/me:bg-neutral-900/[0.045]" />
-
+    <div className="group/me relative flex h-12 items-center rounded-xl px-3.5">
       <span className="relative z-10 grid w-7 shrink-0 place-items-center">
         <span className="relative">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-karsa text-[13px] font-bold text-white">
@@ -327,7 +315,7 @@ function RailProfile({
           {name}
         </span>
       )}
-    </Link>
+    </div>
   );
 }
 

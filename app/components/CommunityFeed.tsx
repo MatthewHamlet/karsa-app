@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowBigUp, Bell, BellRing, CalendarDays, Check, Clock, MessageCircle, UsersRound } from "lucide-react";
 import Image from "next/image";
 import GroupArt from "./GroupArt";
@@ -10,24 +10,19 @@ import type { FeedTab } from "./CommunityToolbar";
 import { count, matches, type SortKey } from "../data/community";
 import type { GroupArtKind } from "./GroupArt";
 import type { Tone } from "./tones";
+import { POSTS_PER_PAGE } from "../lib/community/constants";
 import type {
   CommunityData,
   CommunityGroup,
   CommunityPost,
-  CommunitySession,
 } from "../lib/community/queries";
-import {
-  toggleFollow,
-  toggleGroup,
-  toggleSession,
-  toggleVote,
-} from "../lib/community/actions";
+import { loadMorePosts, toggleGroup, toggleVote } from "../lib/community/actions";
 
 /** The database keeps `art` and `tone` as free text so a value added later
  *  cannot fail a constraint on deploy day — which means the component has to be
  *  the one that copes with an unknown one. Both fall back rather than throwing;
  *  a card with the default drawing is a card, a crash is not. */
-const ART: GroupArtKind[] = ["nutrition", "elderly", "mind", "recovery"];
+export const ART: GroupArtKind[] = ["nutrition", "elderly", "mind", "recovery"];
 /** A stable tone per tag word. Hashed rather than random, so "lansia" is the
  *  same colour on every card and on every reload — a chip that changes colour
  *  between renders reads as a different chip. */
@@ -38,10 +33,10 @@ export function toneForTag(word: string): Tone {
   return TAG_TONES[hash % TAG_TONES.length];
 }
 
-const artOf = (value: string): GroupArtKind =>
+export const artOf = (value: string): GroupArtKind =>
   (ART as string[]).includes(value) ? (value as GroupArtKind) : "elderly";
 
-const toneOf = (value: string): Tone =>
+export const toneOf = (value: string): Tone =>
   value in TONES ? (value as Tone) : "green";
 
 /** What a post is searchable by. Built here rather than stored: the same words
@@ -68,13 +63,9 @@ const PLUM = "#6f5a7d";
 export function tabCounts(query: string, data: CommunityData): Record<FeedTab, number> {
   const posts = data.posts.filter((d) => matches(query, postText(d))).length;
   const groups = data.groups.filter((g) => matches(query, groupTextOf(g))).length;
-  const session =
-    data.session &&
-    matches(query, [data.session.title, data.session.blurb, data.session.host, "sesi langsung"])
-      ? 1
-      : 0;
+  const mine = data.myGroups.filter((g) => matches(query, groupTextOf(g))).length;
 
-  return { semua: posts + groups + session, postingan: posts, grup: groups, sesi: session };
+  return { semua: posts + groups, postingan: posts, grup: groups, grupku: mine };
 }
 
 /* ── Post ─────────────────────────────────────────────────────────────────── */
@@ -82,7 +73,13 @@ export function tabCounts(query: string, data: CommunityData): Record<FeedTab, n
 /** A thread, full width. Header, question, then a footer that carries the tags
  *  on the left and the counts on the right — the sketch's layout, and the one
  *  that lets a caregiver scan either column on its own. */
-function PostCard({ post }: { post: CommunityPost }) {
+function PostCard({
+  post,
+  onOpen,
+}: {
+  post: CommunityPost;
+  onOpen: (post: CommunityPost) => void;
+}) {
   const author = post.author;
   /* Optimistic, and local to the card. The write is a round trip and the arrow
      has to answer the press immediately; the next server render is what
@@ -99,7 +96,7 @@ function PostCard({ post }: { post: CommunityPost }) {
   };
 
   return (
-    <article className="rounded-[20px] bg-white p-5 shadow-[0_1px_2px_rgba(24,32,24,0.03),0_14px_30px_-26px_rgba(24,32,24,0.28)] ring-1 ring-karsa-line transition-shadow duration-200 hover:shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_36px_-24px_rgba(24,32,24,0.38)] xl:p-6">
+    <article className="relative rounded-[20px] bg-white p-5 shadow-[0_1px_2px_rgba(24,32,24,0.03),0_14px_30px_-26px_rgba(24,32,24,0.28)] ring-1 ring-karsa-line transition-shadow duration-200 hover:shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_36px_-24px_rgba(24,32,24,0.38)] xl:p-6">
       <div className="flex items-center gap-2.5">
         <Avatar person={author} />
         <p className="min-w-0 truncate text-[13.5px] font-semibold text-neutral-700">
@@ -114,12 +111,13 @@ function PostCard({ post }: { post: CommunityPost }) {
       </div>
 
       <h3 className="mt-3 font-satoshi text-[16px] font-bold leading-6 tracking-tight text-neutral-900 xl:text-[17px]">
-        <a
-          href="#"
-          className="outline-none after:absolute focus-visible:underline focus-visible:decoration-karsa focus-visible:decoration-2 focus-visible:underline-offset-4"
+        <button
+          type="button"
+          onClick={() => onOpen(post)}
+          className="text-left outline-none after:absolute after:inset-0 after:rounded-[20px] focus-visible:underline focus-visible:decoration-karsa focus-visible:decoration-2 focus-visible:underline-offset-4"
         >
           {post.title}
-        </a>
+        </button>
       </h3>
 
       <p className="mt-2 line-clamp-2 text-[13.5px] leading-6 text-neutral-500">
@@ -142,7 +140,7 @@ function PostCard({ post }: { post: CommunityPost }) {
         </div>
       )}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5">
           {/* The tone is derived from the word rather than stored beside it:
               a colour is a fact about the design, and asking somebody writing
@@ -153,11 +151,15 @@ function PostCard({ post }: { post: CommunityPost }) {
         </div>
 
         <div className="flex shrink-0 items-center gap-4 text-[13px] font-semibold text-neutral-500">
-          <span className="inline-flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onOpen(post)}
+            className="inline-flex items-center gap-1.5 rounded-full px-1.5 py-0.5 outline-none transition-colors duration-200 hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
+          >
             <MessageCircle size={15} strokeWidth={2.2} aria-hidden />
             {count(post.replies)}
-            <span className="sr-only">tanggapan</span>
-          </span>
+            <span className="sr-only">tanggapan — buka untuk berkomentar</span>
+          </button>
           <button
             type="button"
             onClick={vote}
@@ -186,7 +188,13 @@ function PostCard({ post }: { post: CommunityPost }) {
 /** A group recommendation, deliberately not shaped like a post: it sits on its
  *  own hue instead of white, carries artwork instead of an avatar, and ends in
  *  a full-width button. Nothing about it invites a read — it asks a yes/no. */
-function GroupCard({ group }: { group: CommunityGroup }) {
+function GroupCard({
+  group,
+  onOpenChat,
+}: {
+  group: CommunityGroup;
+  onOpenChat: (group: CommunityGroup) => void;
+}) {
   const [joined, setJoined] = useState(group.joined);
   const [members, setMembers] = useState(group.members);
   const tone = TONES[toneOf(group.tone)];
@@ -239,96 +247,17 @@ function GroupCard({ group }: { group: CommunityGroup }) {
         {joined && <Check size={15} strokeWidth={2.6} aria-hidden />}
         {joined ? "Tergabung" : "Gabung"}
       </button>
-    </article>
-  );
-}
 
-/* ── Session ──────────────────────────────────────────────────────────────── */
-
-/** The same session the sidebar carries, inlined where the feed reaches it —
- *  and the only thing the "Sesi Langsung" tab has to show on a phone, where the
- *  sidebar has dropped to the bottom of the page. */
-function SessionCard({ session }: { session: CommunitySession }) {
-  const [joined, setJoined] = useState(session.joined);
-  const [reminded, setReminded] = useState(false);
-
-  const attend = () => {
-    setJoined((v) => !v);
-    const fd = new FormData();
-    fd.set("session_id", session.id);
-    void toggleSession({ error: null }, fd);
-  };
-
-  return (
-    <article
-      className="relative overflow-hidden rounded-[20px] p-5 text-white shadow-[0_1px_2px_rgba(24,32,24,0.03),0_18px_36px_-28px_rgba(24,32,24,0.55)] xl:p-6"
-      style={{ backgroundColor: PLUM }}
-    >
-      <svg
-        aria-hidden
-        viewBox="0 0 480 220"
-        preserveAspectRatio="xMaxYMid slice"
-        className="pointer-events-none absolute inset-0 h-full w-full opacity-[0.13]"
-      >
-        <circle cx="430" cy="10" r="92" fill="white" />
-        <circle cx="476" cy="182" r="64" fill="white" />
-        <circle cx="340" cy="196" r="44" fill="white" />
-      </svg>
-
-      <div className="relative">
-        <p className="text-[11px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/60">
-          Sesi langsung
-        </p>
-        <h3 className="mt-2 font-satoshi text-[17px] font-bold leading-6 tracking-tight xl:text-[19px]">
-          {session.title}
-        </h3>
-        <p className="mt-2 text-[13.5px] leading-6 text-white/75">{session.blurb}</p>
-
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] font-semibold ring-1 ring-white/20">
-            <CalendarDays size={14} strokeWidth={2.2} aria-hidden />
-            {session.date}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] font-semibold tabular-nums ring-1 ring-white/20">
-            <Clock size={14} strokeWidth={2.2} aria-hidden />
-            {session.time}
-          </span>
-          <span className="inline-flex items-center rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] text-white/80 ring-1 ring-white/20">
-            Bersama {session.host}
-          </span>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-          <button
-            type="button"
-            onClick={attend}
-            aria-pressed={joined}
-            className={`flex-1 rounded-full py-2.5 text-[14px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
-              joined ? "bg-white/25 text-white ring-1 ring-white/40" : "bg-white hover:bg-white/90"
-            }`}
-            style={joined ? undefined : { color: PLUM }}
-          >
-            {joined ? "Sudah terdaftar" : "Ikuti Sesi"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setReminded((v) => !v)}
-            aria-pressed={reminded}
-            className={`inline-flex flex-1 items-center justify-center gap-2 rounded-full py-2.5 text-[13.5px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
-              reminded
-                ? "bg-white/25 text-white ring-white/40"
-                : "bg-white/10 text-white/85 ring-white/25 hover:bg-white/20"
-            }`}
-          >
-            {reminded ? (
-              <BellRing size={15} strokeWidth={2.3} aria-hidden />
-            ) : (
-              <Bell size={15} strokeWidth={2.3} aria-hidden />
-            )}
-            {reminded ? "Pengingat aktif" : "Ingatkan Saya"}
-          </button>
-        </div>
-      </div>
+      {joined && (
+        <button
+          type="button"
+          onClick={() => onOpenChat(group)}
+          className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-[14px] font-bold text-karsa-dark outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
+        >
+          <MessageCircle size={15} strokeWidth={2.4} aria-hidden />
+          Buka obrolan
+        </button>
+      )}
     </article>
   );
 }
@@ -352,27 +281,77 @@ const SORTERS: Record<SortKey, ((a: CommunityPost, b: CommunityPost) => number) 
  *  what the fourth card is. Woven at a fixed interval instead, so the rhythm of
  *  the original stays without anybody having to maintain a list. */
 const GROUP_EVERY = 3;
-/** Which slot the session lands in, when there is one on. */
-const SESSION_AFTER = 2;
 
 export default function CommunityFeed({
   query,
   tab,
   sort,
   data,
+  onOpenGroup,
+  onOpenPost,
+  scrollRoot,
 }: {
   query: string;
   tab: FeedTab;
   sort: SortKey;
   data: CommunityData;
+  onOpenGroup: (group: CommunityGroup) => void;
+  onOpenPost: (post: CommunityPost) => void;
+  scrollRoot?: React.RefObject<HTMLDivElement | null>;
 }) {
-  const posts = data.posts.filter((p) => matches(query, postText(p)));
+  const [extra, setExtra] = useState<CommunityPost[]>([]);
+  const [exhausted, setExhausted] = useState(data.posts.length < POSTS_PER_PAGE);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const busyRef = useRef(false);
+
+  useEffect(() => {
+    setExtra([]);
+    setExhausted(data.posts.length < POSTS_PER_PAGE);
+  }, [data.posts]);
+
+  const loaded = useMemo(() => {
+    const seen = new Set<string>();
+    return [...data.posts, ...extra].filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
+  }, [data.posts, extra]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || exhausted) return;
+
+    const container = scrollRoot?.current ?? null;
+    const root = container && container.scrollHeight > container.clientHeight ? container : null;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting || busyRef.current) return;
+        busyRef.current = true;
+        setLoadingMore(true);
+
+        loadMorePosts(loaded.length)
+          .then((rows) => {
+            if (rows.length < POSTS_PER_PAGE) setExhausted(true);
+            if (rows.length > 0) setExtra((prev) => [...prev, ...rows]);
+          })
+          .finally(() => {
+            busyRef.current = false;
+            setLoadingMore(false);
+          });
+      },
+      { root, rootMargin: "400px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [exhausted, loaded.length, scrollRoot]);
+
+  const posts = loaded.filter((p) => matches(query, postText(p)));
   const groups = data.groups.filter((g) => matches(query, groupTextOf(g)));
-  const session =
-    data.session &&
-    matches(query, [data.session.title, data.session.blurb, data.session.host, "sesi langsung"])
-      ? data.session
-      : null;
+  const mine = data.myGroups.filter((g) => matches(query, groupTextOf(g)));
 
   const sorter = SORTERS[sort];
   const sortedPosts = sorter ? [...posts].sort(sorter) : posts;
@@ -380,40 +359,45 @@ export default function CommunityFeed({
   const rendered: React.ReactNode[] = [];
 
   if (tab === "postingan") {
-    rendered.push(...sortedPosts.map((post) => <PostCard key={post.id} post={post} />));
+    rendered.push(
+      ...sortedPosts.map((post) => (
+        <PostCard key={post.id} post={post} onOpen={onOpenPost} />
+      )),
+    );
   } else if (tab === "grup") {
-    rendered.push(...groups.map((group) => <GroupCard key={group.id} group={group} />));
-  } else if (tab === "sesi") {
-    if (session) rendered.push(<SessionCard key={session.id} session={session} />);
+    rendered.push(
+      ...groups.map((group) => (
+        <GroupCard key={group.id} group={group} onOpenChat={onOpenGroup} />
+      )),
+    );
+  } else if (tab === "grupku") {
+    rendered.push(
+      ...mine.map((group) => (
+        <GroupCard key={group.id} group={group} onOpenChat={onOpenGroup} />
+      )),
+    );
   } else {
     /* "Semua": posts carry the thread, with a group dealt in every few and the
        session once near the top. Any groups left over are appended, so nothing
        is silently unreachable just because there were too few posts to weave
        them into. */
     let groupCursor = 0;
-    let sessionPlaced = false;
 
     sortedPosts.forEach((post, i) => {
-      rendered.push(<PostCard key={post.id} post={post} />);
-
-      if (!sessionPlaced && session && i === SESSION_AFTER) {
-        rendered.push(<SessionCard key={session.id} session={session} />);
-        sessionPlaced = true;
-      }
+      rendered.push(<PostCard key={post.id} post={post} onOpen={onOpenPost} />);
 
       if ((i + 1) % GROUP_EVERY === 0 && groupCursor < groups.length) {
         const group = groups[groupCursor];
         groupCursor += 1;
-        rendered.push(<GroupCard key={group.id} group={group} />);
+        rendered.push(
+          <GroupCard key={group.id} group={group} onOpenChat={onOpenGroup} />,
+        );
       }
     });
 
-    if (!sessionPlaced && session) {
-      rendered.push(<SessionCard key={session.id} session={session} />);
-    }
     for (; groupCursor < groups.length; groupCursor += 1) {
       const group = groups[groupCursor];
-      rendered.push(<GroupCard key={group.id} group={group} />);
+      rendered.push(<GroupCard key={group.id} group={group} onOpenChat={onOpenGroup} />);
     }
   }
 
@@ -432,5 +416,17 @@ export default function CommunityFeed({
     );
   }
 
-  return <div className="space-y-4 xl:space-y-5">{rendered}</div>;
+  return (
+    <div className="space-y-4 xl:space-y-5">
+      {rendered}
+
+      {tab !== "grup" && tab !== "grupku" && !exhausted && (
+        <div ref={sentinelRef} className="py-4 text-center">
+          {loadingMore && (
+            <p className="text-[13.5px] text-neutral-500">Memuat postingan…</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }

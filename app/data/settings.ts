@@ -100,38 +100,6 @@ export const SETTINGS: SettingGroup[] = [
     tone: "lavender",
     items: [
       {
-        id: "notifications",
-        title: "Notifikasi",
-        description: "Pengingat, tugas, dan pembaruan aktivitas",
-        icon: "bell",
-        rows: [
-          {
-            id: "task",
-            title: "Pengingat tugas",
-            description: "Sebelum tugas harian jatuh tempo",
-            control: { kind: "toggle", enabled: true },
-          },
-          {
-            id: "activity",
-            title: "Pembaruan aktivitas",
-            description: "Saat pendamping lain mencatat sesuatu",
-            control: { kind: "toggle", enabled: true },
-          },
-          {
-            id: "messages",
-            title: "Pesan grup",
-            description: "Percakapan tim perawatan",
-            control: { kind: "toggle", enabled: true },
-          },
-          {
-            id: "digest",
-            title: "Ringkasan harian",
-            description: "Dikirim setiap pagi pukul 07:00",
-            control: { kind: "toggle", enabled: false },
-          },
-        ],
-      },
-      {
         id: "appearance",
         title: "Tampilan",
         description: "Terang, gelap, atau mengikuti sistem",
@@ -147,17 +115,6 @@ export const SETTINGS: SettingGroup[] = [
           },
         ],
       },
-      {
-        id: "language",
-        title: "Bahasa",
-        description: "Bahasa aplikasi dan format waktu",
-        icon: "languages",
-        rows: [
-          { id: "lang", title: "Bahasa aplikasi", control: { kind: "value", value: "Indonesia" } },
-          { id: "time", title: "Format waktu", control: { kind: "value", value: "24 jam" } },
-          { id: "region", title: "Wilayah", control: { kind: "value", value: "Indonesia" } },
-        ],
-      },
     ],
   },
   {
@@ -165,22 +122,6 @@ export const SETTINGS: SettingGroup[] = [
     label: "Perawatan",
     tone: "peach",
     items: [
-      {
-        id: "care-prefs",
-        title: "Preferensi perawatan",
-        description: "Cara Karsa mengingatkan tugas perawatan",
-        icon: "careHands",
-        rows: [
-          { id: "med-reminder", title: "Pengingat obat", control: { kind: "toggle", enabled: true } },
-          {
-            id: "quiet",
-            title: "Jam tenang",
-            description: "Tidak ada notifikasi pada rentang ini",
-            control: { kind: "value", value: "22:00 – 05:00" },
-          },
-          { id: "units", title: "Satuan", control: { kind: "value", value: "Metrik" } },
-        ],
-      },
       {
         id: "patient-access",
         title: "Akses pasien",
@@ -199,74 +140,6 @@ export const SETTINGS: SettingGroup[] = [
       },
     ],
   },
-  {
-    id: "privacy",
-    label: "Privasi & keamanan",
-    tone: "blue",
-    items: [
-      {
-        id: "privacy",
-        title: "Privasi",
-        description: "Kelola data dan izin aplikasi",
-        icon: "privacy",
-        rows: [
-          { id: "data", title: "Data saya", control: { kind: "link" } },
-          { id: "download", title: "Unduh salinan data", control: { kind: "link" } },
-          {
-            id: "analytics",
-            title: "Bantu tingkatkan Karsa",
-            description: "Berbagi data penggunaan anonim",
-            control: { kind: "toggle", enabled: false },
-          },
-        ],
-      },
-      {
-        id: "security",
-        title: "Keamanan",
-        description: "Kata sandi dan keamanan akun",
-        icon: "security",
-        rows: [
-          { id: "password", title: "Kata sandi", control: { kind: "value", value: "Diubah 3 bulan lalu" } },
-          {
-            id: "twofa",
-            title: "Verifikasi dua langkah",
-            description: "Lapisan keamanan tambahan saat masuk",
-            control: { kind: "toggle", enabled: false },
-          },
-          { id: "devices", title: "Perangkat terhubung", control: { kind: "value", value: "2" } },
-        ],
-      },
-    ],
-  },
-  {
-    id: "support",
-    label: "Bantuan",
-    tone: "cream",
-    items: [
-      {
-        id: "help",
-        title: "Bantuan & dukungan",
-        description: "Pusat bantuan dan kontak tim Karsa",
-        icon: "support",
-        rows: [
-          { id: "center", title: "Pusat bantuan", control: { kind: "link" } },
-          { id: "contact", title: "Hubungi kami", control: { kind: "link" } },
-          { id: "report", title: "Laporkan masalah", control: { kind: "link" } },
-        ],
-      },
-      {
-        id: "about",
-        title: "Tentang aplikasi",
-        description: "Versi, syarat, dan kebijakan privasi",
-        icon: "about",
-        rows: [
-          { id: "version", title: "Versi aplikasi", control: { kind: "value", value: "1.0.0" } },
-          { id: "terms", title: "Syarat & ketentuan", control: { kind: "link" } },
-          { id: "policy", title: "Kebijakan privasi", control: { kind: "link" } },
-        ],
-      },
-    ],
-  },
 ];
 
 /** Flat lookup for the selected item. */
@@ -278,13 +151,10 @@ export type ResolvedItem = (typeof SETTING_ITEMS)[number];
 
 /* ── Profile rail ─────────────────────────────────────────────────────────── */
 
-/** The three figures under the name. Deliberately not social counts — nobody
- *  is here to gather followers. These are what the caregiver has actually put
- *  in, which is the number worth showing them. */
 export const ACCOUNT_STATS: { label: string; value: string }[] = [
-  { label: "Hari mendampingi", value: "254" },
-  { label: "Tim perawatan", value: "1" },
-  { label: "Catatan", value: "1.284" },
+  { label: "Follower", value: "0" },
+  { label: "Following", value: "0" },
+  { label: "Tim", value: "0" },
 ];
 
 /** The one warm card in the rail. It nudges the caregiver toward themselves,
@@ -339,31 +209,6 @@ export const CONTRIBUTIONS: Contribution[] = [
     value: "18",
     note: "Rekor terpanjang 46",
     tone: "blue",
-  },
-];
-
-/** Milestones, including one still out of reach. A locked badge with its
- *  distance shown is the only honest way to say "keep going" — a wall of
- *  earned badges tells the caregiver nothing they don't know. */
-export type Badge = {
-  id: string;
-  label: string;
-  note: string;
-  tone: Tone;
-  /** Present only while unearned: how far there is left to go. */
-  progress?: { current: number; target: number };
-};
-
-export const BADGES: Badge[] = [
-  { id: "steady", label: "Pendamping Tekun", note: "250 hari mendampingi", tone: "green" },
-  { id: "keeper", label: "Pencatat Setia", note: "1.000 catatan harian", tone: "peach" },
-  { id: "open", label: "Tangan Terbuka", note: "50 balasan di komunitas", tone: "lavender" },
-  {
-    id: "night",
-    label: "Penjaga Malam",
-    note: "100 catatan lewat tengah malam",
-    tone: "blue",
-    progress: { current: 73, target: 100 },
   },
 ];
 

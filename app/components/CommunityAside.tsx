@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bell, BellRing, CalendarDays, Clock, Plus, Check } from "lucide-react";
+import { MessageCircle, Plus, Check } from "lucide-react";
 import Panel from "./Panel";
 import { Avatar } from "./CommunityKit";
 import { TONES } from "./tones";
@@ -9,10 +9,12 @@ import { count } from "../data/community";
 import { toneForTag } from "./CommunityFeed";
 import type {
   CommunityData,
+  CommunityGroup,
   CommunityPerson,
-  CommunitySession,
 } from "../lib/community/queries";
-import { toggleFollow, toggleSession } from "../lib/community/actions";
+import GroupArt from "./GroupArt";
+import { artOf, toneOf } from "./CommunityFeed";
+import { toggleFollow } from "../lib/community/actions";
 
 /** The one loud colour on the page. Plum rather than another green: it has to
  *  read as a different kind of thing from the forest header above it, and it
@@ -34,19 +36,13 @@ const Shapes = () => (
   </svg>
 );
 
-function LiveSession({ session }: { session: CommunitySession | null }) {
-  const [joined, setJoined] = useState(session?.joined ?? false);
-
-  const attend = () => {
-    if (!session) return;
-    setJoined((v) => !v);
-    const fd = new FormData();
-    fd.set("session_id", session.id);
-    void toggleSession({ error: null }, fd);
-  };
-
-  const [reminded, setReminded] = useState(false);
-
+function MyGroups({
+  groups,
+  onOpen,
+}: {
+  groups: CommunityGroup[];
+  onOpen: (group: CommunityGroup) => void;
+}) {
   return (
     <section
       className="relative overflow-hidden rounded-[20px] p-6 text-white shadow-[0_1px_2px_rgba(24,32,24,0.03),0_18px_36px_-28px_rgba(24,32,24,0.55)]"
@@ -56,96 +52,47 @@ function LiveSession({ session }: { session: CommunitySession | null }) {
 
       <div className="relative">
         <p className="text-[11px] font-semibold uppercase leading-4 tracking-[0.18em] text-white/60">
-          Sesi langsung
+          Grup saya
         </p>
 
-        {/* No session on. The card stays — it is how anybody learns Karsa runs
-            these at all — and says what it is waiting for rather than showing a
-            date that does not exist. */}
-        {!session ? (
+        {groups.length === 0 ? (
           <>
             <h2 className="mt-2 font-satoshi text-[19px] font-bold leading-7 tracking-tight">
-              Belum ada sesi terjadwal
+              Belum gabung grup mana pun
             </h2>
             <p className="mt-2 text-[13.5px] leading-5 text-white/75">
-              Sesi tanya jawab bersama ahli diadakan berkala. Begitu ada yang
-              dijadwalkan, detailnya muncul di sini.
+              Gabung salah satu grup di daftar, lalu obrolannya muncul di sini.
             </p>
-
-            <button
-              type="button"
-              onClick={() => setReminded((v) => !v)}
-              aria-pressed={reminded}
-              className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-[13.5px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
-                reminded
-                  ? "bg-white/25 text-white ring-white/40"
-                  : "bg-white/10 text-white/85 ring-white/25 hover:bg-white/20"
-              }`}
-            >
-              {reminded ? (
-                <BellRing size={15} strokeWidth={2.3} aria-hidden />
-              ) : (
-                <Bell size={15} strokeWidth={2.3} aria-hidden />
-              )}
-              {reminded ? "Akan dikabari" : "Kabari kalau ada"}
-            </button>
           </>
         ) : (
-          <>
-            {/* Same rule as a thread title — this one runs to three lines. */}
-            <h2 className="mt-2 font-satoshi text-[19px] font-bold leading-7 tracking-tight">
-              {session.title}
-            </h2>
-            <p className="mt-2 text-[13.5px] leading-5 text-white/75">{session.blurb}</p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] font-semibold ring-1 ring-white/20">
-                <CalendarDays size={14} strokeWidth={2.2} />
-                {session.date}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[12.5px] font-semibold tabular-nums ring-1 ring-white/20">
-                <Clock size={14} strokeWidth={2.2} />
-                {session.time}
-              </span>
-            </div>
-
-            {session.host && (
-              <p className="mt-4 text-[12.5px] text-white/60">Bersama {session.host}</p>
-            )}
-
-            <button
-              type="button"
-              onClick={attend}
-              aria-pressed={joined}
-              className={`mt-4 w-full rounded-full py-2.5 text-[14px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
-                joined ? "bg-white/25 text-white ring-1 ring-white/40" : "bg-white hover:bg-white/90"
-              }`}
-              style={joined ? undefined : { color: PLUM }}
-            >
-              {joined ? "Sudah terdaftar" : "Ikuti Sesi"}
-            </button>
-
-            {/* Second, quieter action. Joining is a promise to be somewhere on a
-                Saturday evening; a reminder is not, and a caregiver who cannot
-                promise that yet should still have something to press. */}
-            <button
-              type="button"
-              onClick={() => setReminded((v) => !v)}
-              aria-pressed={reminded}
-              className={`mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-[13.5px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-white/70 ${
-                reminded
-                  ? "bg-white/25 text-white ring-white/40"
-                  : "bg-white/10 text-white/85 ring-white/25 hover:bg-white/20"
-              }`}
-            >
-              {reminded ? (
-                <BellRing size={15} strokeWidth={2.3} aria-hidden />
-              ) : (
-                <Bell size={15} strokeWidth={2.3} aria-hidden />
-              )}
-              {reminded ? "Pengingat aktif" : "Ingatkan Saya"}
-            </button>
-          </>
+          <ul className="mt-3 space-y-2">
+            {groups.map((group) => (
+              <li key={group.id}>
+                <button
+                  type="button"
+                  onClick={() => onOpen(group)}
+                  className="flex w-full items-center gap-3 rounded-2xl bg-white/10 px-3 py-3 text-left outline-none ring-1 ring-white/20 transition-colors duration-200 hover:bg-white/20 focus-visible:ring-2 focus-visible:ring-white/70"
+                >
+                  <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white/85">
+                    <GroupArt
+                      kind={artOf(group.art)}
+                      tone={toneOf(group.tone)}
+                      className="h-full w-full"
+                    />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14.5px] font-bold leading-5">
+                      {group.name}
+                    </span>
+                    <span className="block text-[12px] leading-4 text-white/65">
+                      {count(group.members)} anggota
+                    </span>
+                  </span>
+                  <MessageCircle size={17} strokeWidth={2.2} className="shrink-0 text-white/70" />
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </section>
@@ -271,10 +218,12 @@ export default function CommunityAside({
   onTopic,
   active = "",
   data,
+  onOpenGroup,
 }: {
   onTopic: (term: string) => void;
   active?: string;
   data: CommunityData;
+  onOpenGroup: (group: CommunityGroup) => void;
 }) {
   return (
     <aside className="space-y-6 xl:space-y-8">
@@ -285,7 +234,7 @@ export default function CommunityAside({
           hides the fact that the feature exists at all — a caregiver on a quiet
           day would never learn Karsa runs live sessions. Each one says what it
           is waiting for instead. */}
-      <LiveSession session={data.session} />
+      <MyGroups groups={data.myGroups} onOpen={onOpenGroup} />
       <TopicCloud onTopic={onTopic} active={active} topics={data.topics} />
       <PeopleToFollow people={data.people} />
     </aside>
