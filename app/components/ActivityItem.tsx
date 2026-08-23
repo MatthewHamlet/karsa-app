@@ -1,8 +1,6 @@
 "use client";
 
 import { HeartPulse, Utensils, Footprints } from "lucide-react";
-import type { Activity } from "../data/dashboard";
-import { whenOf } from "../data/dashboard";
 
 const TONE = {
   care: { icon: Footprints, ring: "bg-karsa-soft text-karsa-dark" },
@@ -10,8 +8,27 @@ const TONE = {
   meal: { icon: Utensils, ring: "bg-amber-50 text-amber-600" },
 } as const;
 
+export type ActivityTone = keyof typeof TONE;
+
+/** One line of the activity timeline.
+ *
+ *  Takes finished strings, not a timestamp. The label is formatted in
+ *  Asia/Jakarta by the query that produced it — see `lib/care/time` — because a
+ *  `Date` formatted here renders in the server's timezone during SSR and in the
+ *  visitor's on hydration, and React calls that a mismatch. */
+export type ActivityRow = {
+  id: string;
+  /** Who did it. */
+  actor: string;
+  /** What they did, as it follows the name: "menyiapkan sarapan". */
+  action: string;
+  /** Already formatted: a clock today, a date and clock before that. */
+  when: string;
+  tone: ActivityTone;
+};
+
 type ActivityItemProps = {
-  activity: Activity;
+  activity: ActivityRow;
   /** The last row stops the timeline instead of trailing into nothing. */
   isLast?: boolean;
 };
@@ -41,7 +58,7 @@ export default function ActivityItem({ activity, isLast }: ActivityItemProps) {
           {activity.action}
         </p>
         <time className="shrink-0 text-[13px] font-medium tabular-nums text-neutral-400 xl:text-sm">
-          {whenOf(activity.at)}
+          {activity.when}
         </time>
       </div>
     </li>

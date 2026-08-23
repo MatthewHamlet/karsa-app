@@ -1,19 +1,17 @@
 import type { Metadata } from "next";
 import CommunityPage from "../../section/Community";
+import { getCommunityData } from "../../lib/community/queries";
 
 export const metadata: Metadata = {
   title: "Komunitas · Karsa",
-  description:
-    "Tempat berbagi cerita, informasi, dan saling mendukung: diskusi, grup, dan sesi bersama ahli.",
+  description: "Cerita dan dukungan dari sesama, di ruang yang sama.",
 };
 
-/** The same room, entered from the other door.
- *
- *  A static segment beats `[section]`, so this replaces the placeholder without
- *  touching it. The page itself is untouched too — the patient app has its own
- *  shell (its own rail entries and its own floating bar), and the community is
- *  the one part of Karsa where both people are in the same conversation. Two
- *  copies of it would be two rooms. */
-export default function PatientCommunity() {
-  return <CommunityPage />;
+export const dynamic = "force-dynamic";
+
+/** The same community, reached from the patient app. One room, not two — the
+ *  point of it is that caregivers and the people they look after are not kept
+ *  in separate buildings. */
+export default async function PatientCommunity() {
+  return <CommunityPage data={await getCommunityData()} />;
 }

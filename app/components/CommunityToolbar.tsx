@@ -23,6 +23,7 @@ export default function CommunityToolbar({
   sort,
   onSort,
   counts,
+  onCompose,
 }: {
   query: string;
   onQuery: (next: string) => void;
@@ -33,6 +34,7 @@ export default function CommunityToolbar({
   /** How many items each tab would show, so a caregiver can see a tab is empty
    *  before spending a click on it. */
   counts: Record<FeedTab, number>;
+  onCompose: () => void;
 }) {
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
@@ -151,6 +153,7 @@ export default function CommunityToolbar({
         {/* ── Compose ───────────────────────────────────────────────────── */}
         <button
           type="button"
+          onClick={onCompose}
           className="inline-flex h-12 shrink-0 items-center gap-2 rounded-full bg-karsa px-4 text-[14px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 sm:px-5"
         >
           <PenLine size={17} strokeWidth={2.4} aria-hidden />

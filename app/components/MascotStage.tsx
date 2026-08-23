@@ -10,11 +10,11 @@ import type { MascotState } from "../data/mascot";
 const CAPTION: Record<MascotState, { title: string; body: string }> = {
   idle: {
     title: "Karsa siap menemani",
-    body: "Tanya apa saja tentang perawatan Meimei hari ini.",
+    body: "Tanya apa saja tentang perawatan hari ini.",
   },
   thinking: {
     title: "Sedang menyiapkan…",
-    body: "Aku sedang membaca catatan Meimei dulu.",
+    body: "Aku sedang membaca catatannya dulu.",
   },
   presenting: {
     title: "Ini yang bisa dilakukan",

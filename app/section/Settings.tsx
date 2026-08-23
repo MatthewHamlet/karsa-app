@@ -586,7 +586,7 @@ function ProfileForm({ item }: { item: ResolvedItem }) {
               value={form.draft.role}
               options={ROLE_OPTIONS}
               onChange={form.set("role")}
-              hint="Menentukan seberapa jauh kamu bisa mengubah data perawatan Meimei."
+              hint="Menentukan seberapa jauh kamu bisa mengubah data perawatan pasien."
             />
           </div>
         </div>
@@ -737,7 +737,7 @@ function Contributions() {
           Kontribusi kamu
         </h2>
         <p className="mt-1 text-[13.5px] leading-5 text-neutral-500">
-          Yang sudah kamu kerjakan sejak mulai mendampingi Meimei.
+          Yang sudah kamu kerjakan sejak mulai mendampingi.
         </p>
       </header>
 

@@ -5,9 +5,11 @@ import PageHeader from "../components/PageHeader";
 import CommunityToolbar, { type FeedTab } from "../components/CommunityToolbar";
 import CommunityFeed, { tabCounts } from "../components/CommunityFeed";
 import CommunityAside from "../components/CommunityAside";
+import ComposePost from "../components/ComposePost";
 import type { SortKey } from "../data/community";
+import type { CommunityData } from "../lib/community/queries";
 
-export default function CommunityPage() {
+export default function CommunityPage({ data }: { data: CommunityData }) {
   /* One query for the whole page. The search field and the topic chips write to
      it and the feed reads from it, which is what keeps a chip honest: pressing
      #Demensia puts the word in the box you can see and edit, rather than
@@ -15,8 +17,9 @@ export default function CommunityPage() {
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<FeedTab>("semua");
   const [sort, setSort] = useState<SortKey>("relevan");
+  const [composing, setComposing] = useState(false);
 
-  const counts = useMemo(() => tabCounts(query), [query]);
+  const counts = useMemo(() => tabCounts(query, data), [query, data]);
 
   /* The feed scrolls inside itself rather than lengthening the page, and the
      height it scrolls within is the sidebar's — so the page ends where "Orang
@@ -73,6 +76,7 @@ export default function CommunityPage() {
               sort={sort}
               onSort={setSort}
               counts={counts}
+              onCompose={() => setComposing(true)}
             />
           </div>
 
@@ -87,12 +91,18 @@ export default function CommunityPage() {
               the overflow inside the box. Scoped to `lg` alongside the overflow,
               because below that it would clip the cards' own shadows. */}
           <div className="lg:-mx-1 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain lg:px-1 lg:[contain:paint] lg:[scrollbar-gutter:stable]">
-            <CommunityFeed query={query} tab={tab} sort={sort} />
+            <CommunityFeed query={query} tab={tab} sort={sort} data={data} />
           </div>
         </div>
 
+        <ComposePost
+          open={composing}
+          onClose={() => setComposing(false)}
+          groups={data.groups}
+        />
+
         <div ref={asideRef}>
-          <CommunityAside onTopic={setQuery} active={query} />
+          <CommunityAside onTopic={setQuery} active={query} data={data} />
         </div>
       </div>
     </div>

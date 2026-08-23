@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeft,
   ArrowRight,
+  CalendarDays,
   Check,
   ChevronDown,
   Mic,
@@ -14,10 +15,14 @@ import {
 } from "lucide-react";
 import JournalHistoryModal from "../components/JournalHistoryModal";
 import Confetti from "../components/Confetti";
+import MoodFace from "../components/MoodFace";
+import StatArt from "../components/StatArt";
+import { logHealthReading, logMood } from "../lib/care/actions";
 import {
   ADDABLE_METRICS,
   DEFAULT_METRICS,
   METRICS,
+  MONITOR_TONE,
   MONTH_LABEL,
   MOODS,
   TODAY_DATE,
@@ -40,11 +45,43 @@ import { PATIENT } from "../data/patient";
 
 const STEPS = 3;
 
+/** The journal's names for its metrics, and the database's.
+ *
+ *  The two lists differ because they answer to different things: `bp` and
+ *  `glucose` are what fits on a stepper's label, while `blood_pressure` and
+ *  `blood_sugar` are the values `health_readings.kind` is constrained to
+ *  (migration 0005). Mapped explicitly rather than renamed on either side — the
+ *  UI names are load-bearing in `METRICS`, and the column's check constraint is
+ *  load-bearing everywhere else. */
+const READING_KIND: Record<MetricKind, string> = {
+  bp: "blood_pressure",
+  glucose: "blood_sugar",
+  weight: "weight",
+  temp: "temperature",
+  hr: "heart_rate",
+};
+
 /** Spoken or written — the same answer, two ways of giving it. */
 type NoteMode = "voice" | "text";
 
-export default function PatientJournalPage() {
+export default function PatientJournalPage({
+  patientId,
+  patientName,
+  initial,
+  filledToday = false,
+}: {
+  /** Absent when signed out, which is the design-preview case: the wizard still
+   *  runs, it simply has nowhere to write to. */
+  patientId?: string;
+  patientName?: string;
+  initial?: string;
+  /** Whether today's entry already exists. Opens the "done" screen instead of
+   *  the wizard — see the note where it is rendered. */
+  filledToday?: boolean;
+} = {}) {
   const reduce = useReducedMotion();
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [mood, setMood] = useState<MoodKey | null>(null);
   const [recording, setRecording] = useState(false);
@@ -54,7 +91,7 @@ export default function PatientJournalPage() {
   const [note, setNote] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [date, setDate] = useState(TODAY_DATE);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState(filledToday);
   const [burst, setBurst] = useState(0);
 
   /* Step 3. Which metrics are on the card, and what they read. */
@@ -81,7 +118,73 @@ export default function PatientJournalPage() {
       [kind]: Math.max(0, Math.round((prev[kind] + delta) * 10) / 10),
     }));
 
-  const save = () => {
+  /** Writes the day down: the mood, the note, and whatever was measured.
+   *
+   *  Each reading is its own row in `health_readings` rather than one "journal
+   *  entry" record, because that is the table the caregiver's charts and stat
+   *  cards already read — a journal that stored its numbers somewhere else
+   *  would be a second, quieter source of truth for the same blood pressure.
+   *
+   *  Sent together, and a failure anywhere is reported rather than swallowed.
+   *  This is the one screen where a silent failure is worst: the person has
+   *  just told the app how they feel, and being lied to with a tick is worse
+   *  than being asked to try again. */
+  const save = async () => {
+    if (!patientId) {
+      /* Design preview with no session. The confetti still fires so the flow
+         can be walked through, but nothing pretends to have been stored. */
+      setSaved(true);
+      setBurst((n) => n + 1);
+      return;
+    }
+
+    setSaving(true);
+    setSaveError(null);
+
+    const reading = (kind: string, value: number, secondary?: number) => {
+      const fd = new FormData();
+      fd.set("patient_id", patientId);
+      fd.set("kind", kind);
+      fd.set("value", String(value));
+      if (secondary !== undefined) fd.set("value_secondary", String(secondary));
+      return logHealthReading({ error: null }, fd);
+    };
+
+    const jobs: Promise<{ error: string | null }>[] = [];
+
+    if (mood) {
+      const fd = new FormData();
+      fd.set("patient_id", patientId);
+      fd.set("mood", mood);
+      if (note.trim()) fd.set("note", note.trim());
+      jobs.push(logMood({ error: null }, fd));
+    }
+
+    for (const kind of metrics) {
+      if (kind === "bp") {
+        const sys = Number(bp.sys);
+        const dia = Number(bp.dia);
+        /* Both or neither — a systolic on its own is stored as a bare number
+           that the activity feed then prints as a whole blood pressure. */
+        if (Number.isFinite(sys) && Number.isFinite(dia) && sys > 0 && dia > 0) {
+          jobs.push(reading("blood_pressure", sys, dia));
+        }
+        continue;
+      }
+      const value = values[kind];
+      if (!Number.isFinite(value)) continue;
+      jobs.push(reading(READING_KIND[kind], value));
+    }
+
+    const results = await Promise.all(jobs);
+    setSaving(false);
+
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
+      setSaveError(failed.error);
+      return;
+    }
+
     setSaved(true);
     setBurst((n) => n + 1);
   };
@@ -116,13 +219,13 @@ export default function PatientJournalPage() {
 
         <div className="relative flex items-center gap-3">
           <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/20 text-[18px] font-extrabold text-white ring-1 ring-white/30">
-            {PATIENT.initial}
+            {initial ?? PATIENT.initial}
           </span>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-[22px] font-extrabold tracking-tight text-white">
               Jurnal Sehat
             </h1>
-            <p className="truncate text-[14px] text-white/70">{PATIENT.greeting}</p>
+            <p className="truncate text-[14px] text-white/70">{patientName ?? PATIENT.greeting}</p>
           </div>
         </div>
       </header>
@@ -134,144 +237,214 @@ export default function PatientJournalPage() {
         /* No top margin: the header already carries the gap below its curve. */
         className="flex shrink-0 items-center justify-between gap-3 rounded-2xl bg-white px-5 py-4 text-left outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
       >
-        <span className="text-[16px] font-extrabold text-neutral-900">🗓️ BUKA KALENDER SEHAT</span>
+        <span className="inline-flex items-center gap-2.5 text-[16px] font-extrabold text-neutral-900">
+          <CalendarDays size={20} strokeWidth={2.6} className="text-karsa-dark" aria-hidden />
+          BUKA KALENDER SEHAT
+        </span>
         <span className="flex shrink-0 items-center gap-2 text-[13px] font-bold text-neutral-500">
           {date} {MONTH_LABEL.split(" ")[0]}
           <ChevronDown size={20} strokeWidth={3} aria-hidden />
         </span>
       </button>
 
-      {/* ── Progress ─────────────────────────────────────────────────────── */}
-      <div className="mt-4 shrink-0">
-        <p className="mb-2 text-[14px] font-bold text-neutral-600">
-          Langkah {step} dari {STEPS}
-        </p>
-        <div
-          role="progressbar"
-          aria-valuenow={step}
-          aria-valuemin={1}
-          aria-valuemax={STEPS}
-          aria-label={`Langkah ${step} dari ${STEPS}`}
-          className="h-4 overflow-hidden rounded-full bg-karsa/15"
-        >
-          <div
-            style={{ width: `${(step / STEPS) * 100}%` }}
-            className="h-full rounded-full bg-karsa transition-[width] duration-500 ease-out motion-reduce:transition-none"
-          />
-        </div>
-      </div>
+      {saved ? (
+        /* Today is already written. The wizard is not re-opened by default:
+           the question it asks — "hari ini kamu merasa apa?" — has an answer on
+           file, and asking again as if it did not is how an app makes somebody
+           doubt whether the first one saved.
 
-      {/* ── Step ─────────────────────────────────────────────────────────── */}
-      {/* Padding, then the same amount back off as margin: the box keeps its
-          place and gains 4px of clip room on every side. Without it this
-          scroller — and `contain: paint` with it — cuts at exactly the line the
-          cards' `ring-2` paints on, which is why every card lost its border and
-          the heading lost its top. */}
-      {/* `overflow-x-clip`, not `hidden`. The step slides in from `x: 24`, and a
-          transform that ends past the right edge counts toward scrollable
-          overflow — so a horizontal scrollbar flashed for the length of every
-          transition. `clip` refuses to scroll on that axis instead of offering
-          to, and unlike `hidden` it leaves the vertical axis alone rather than
-          turning it into a second scroll container.
-
-          It clips at the padding box, so the 4px below still shelters the
-          cards' `ring-2` — the reason that padding is here at all. */}
-      <div className="-mx-1 -my-1 mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-clip overscroll-contain p-1 [contain:paint]">
-        {/* Keyed remount, not `AnimatePresence mode="wait"`: waiting for the old
-            step to leave puts a delay on every Lanjut for no gain. */}
-        <motion.div
-          key={step}
-          initial={reduce ? false : { opacity: 0, x: 24 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={reduce ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-          className="flex min-h-full flex-col"
-        >
-          {step === 1 && <MoodStep mood={mood} onPick={setMood} />}
-
-          {step === 2 && (
-            <VoiceStep
-              recording={recording}
-              recorded={recorded}
-              onToggle={() => {
-                if (recording) {
-                  setRecording(false);
-                  setRecorded(23);
-                } else {
-                  setRecording(true);
-                }
-              }}
-              mode={noteMode}
-              onMode={setNoteMode}
-              text={note}
-              onText={setNote}
-            />
-          )}
-
-          {step === 3 && (
-            <MetricsStep
-              active={metrics}
-              values={values}
-              bp={bp}
-              onBp={setBp}
-              onStep={stepMetric}
-              remaining={remaining}
-              onOpenAdd={() => setAddOpen(true)}
-            />
-          )}
-        </motion.div>
-      </div>
-
-      {/* ── Navigation ───────────────────────────────────────────────────── */}
-      <div className="mt-3 flex shrink-0 gap-3">
-        {step > 1 && (
-          <button
-            type="button"
-            onClick={() => setStep((s) => s - 1)}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[16px] font-extrabold text-neutral-700 outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
+           It is a screen, not a lock. `Catat lagi` is right there, because a
+           mood is a reading taken at a moment: somebody who felt awful this
+           morning and better tonight has two true things to record, and
+           `mood_entries` is insert-only precisely so both survive. */
+        <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
+          <span
+            aria-hidden
+            className="grid h-24 w-24 place-items-center rounded-full bg-act-50 ring-2 ring-act-edge"
           >
-            <ArrowLeft size={20} strokeWidth={3} aria-hidden />
-            Kembali
-          </button>
-        )}
+            <Check size={52} strokeWidth={3} className="text-act-600" />
+          </span>
 
-        {step < STEPS && (
-          /* Same width as Kembali. Weighting the primary wider made the pair
-             look misaligned rather than emphasised; the colour already says
-             which one is the way forward. */
-          <button
-            type="button"
-            onClick={() => setStep((s) => s + 1)}
-            disabled={step === 1 && mood === null}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-karsa py-4 text-[16px] font-extrabold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-2 disabled:bg-neutral-300"
-          >
-            Lanjut
-            <ArrowRight size={20} strokeWidth={3} aria-hidden />
-          </button>
-        )}
+          <h2 className="mt-5 text-[24px] font-extrabold tracking-tight text-neutral-900">
+            Kamu sudah mengisi untuk hari ini!
+          </h2>
+          <p className="mx-auto mt-2 max-w-[30ch] text-[15.5px] leading-6 text-neutral-500">
+            Catatanmu sudah tersimpan dan bisa dilihat pendampingmu. Sampai
+            besok ya.
+          </p>
 
-        {/* The last step's action is not a sibling of Kembali in the way Lanjut
-            was — it is the end of the whole wizard, and it takes the room its
-            label needs. */}
-        {step === STEPS &&
-          (saved ? (
-            <p
-              role="status"
-              className="flex flex-[2] items-center justify-center gap-2 rounded-2xl bg-act-50 py-4 text-[16px] font-extrabold text-act-600 ring-2 ring-act-edge"
-            >
-              <Check size={22} strokeWidth={3} aria-hidden />
-              Tersimpan!
-            </p>
-          ) : (
+          <div className="mt-7 flex w-full max-w-sm flex-col gap-2.5">
             <button
               type="button"
-              onClick={save}
-              className="inline-flex flex-[2] items-center justify-center gap-2 rounded-2xl bg-karsa px-3 py-4 text-center text-[15.5px] font-extrabold leading-tight text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-2"
+              onClick={() => setCalendarOpen(true)}
+              className="h-14 w-full rounded-2xl bg-karsa text-[16px] font-extrabold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-2"
             >
-              <Save size={22} strokeWidth={2.6} className="shrink-0" aria-hidden />
-              SIMPAN JURNAL SEHAT
+              Lihat kalender sehat
             </button>
-          ))}
-      </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSaved(false);
+                setStep(1);
+                setMood(null);
+                setNote("");
+                setRecorded(null);
+                setSaveError(null);
+              }}
+              className="h-14 w-full rounded-2xl bg-white text-[15.5px] font-extrabold text-neutral-700 outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
+            >
+              Catat lagi
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+
+        {/* ── Progress ─────────────────────────────────────────────────────── */}
+        <div className="mt-4 shrink-0">
+          <p className="mb-2 text-[14px] font-bold text-neutral-600">
+            Langkah {step} dari {STEPS}
+          </p>
+          <div
+            role="progressbar"
+            aria-valuenow={step}
+            aria-valuemin={1}
+            aria-valuemax={STEPS}
+            aria-label={`Langkah ${step} dari ${STEPS}`}
+            className="h-4 overflow-hidden rounded-full bg-karsa/15"
+          >
+            <div
+              style={{ width: `${(step / STEPS) * 100}%` }}
+              className="h-full rounded-full bg-karsa transition-[width] duration-500 ease-out motion-reduce:transition-none"
+            />
+          </div>
+        </div>
+
+        {/* ── Step ─────────────────────────────────────────────────────────── */}
+        {/* Padding, then the same amount back off as margin: the box keeps its
+            place and gains 4px of clip room on every side. Without it this
+            scroller — and `contain: paint` with it — cuts at exactly the line the
+            cards' `ring-2` paints on, which is why every card lost its border and
+            the heading lost its top. */}
+        {/* `overflow-x-clip`, not `hidden`. The step slides in from `x: 24`, and a
+            transform that ends past the right edge counts toward scrollable
+            overflow — so a horizontal scrollbar flashed for the length of every
+            transition. `clip` refuses to scroll on that axis instead of offering
+            to, and unlike `hidden` it leaves the vertical axis alone rather than
+            turning it into a second scroll container.
+
+            It clips at the padding box, so the 4px below still shelters the
+            cards' `ring-2` — the reason that padding is here at all. */}
+        <div className="-mx-1 -my-1 mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-clip overscroll-contain p-1 [contain:paint]">
+          {/* Keyed remount, not `AnimatePresence mode="wait"`: waiting for the old
+              step to leave puts a delay on every Lanjut for no gain. */}
+          <motion.div
+            key={step}
+            initial={reduce ? false : { opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={reduce ? { duration: 0 } : { duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
+            className="flex min-h-full flex-col"
+          >
+            {step === 1 && <MoodStep mood={mood} onPick={setMood} name={patientName} />}
+
+            {step === 2 && (
+              <VoiceStep
+                recording={recording}
+                recorded={recorded}
+                onToggle={() => {
+                  if (recording) {
+                    setRecording(false);
+                    setRecorded(23);
+                  } else {
+                    setRecording(true);
+                  }
+                }}
+                mode={noteMode}
+                onMode={setNoteMode}
+                text={note}
+                onText={setNote}
+              />
+            )}
+
+            {step === 3 && (
+              <MetricsStep
+                active={metrics}
+                values={values}
+                bp={bp}
+                onBp={setBp}
+                onStep={stepMetric}
+                remaining={remaining}
+                onOpenAdd={() => setAddOpen(true)}
+              />
+            )}
+          </motion.div>
+        </div>
+
+        {/* ── Navigation ───────────────────────────────────────────────────── */}
+        <div className="mt-3 flex shrink-0 gap-3">
+          {step > 1 && (
+            <button
+              type="button"
+              onClick={() => setStep((s) => s - 1)}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-white py-4 text-[16px] font-extrabold text-neutral-700 outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
+            >
+              <ArrowLeft size={20} strokeWidth={3} aria-hidden />
+              Kembali
+            </button>
+          )}
+
+          {step < STEPS && (
+            /* Same width as Kembali. Weighting the primary wider made the pair
+               look misaligned rather than emphasised; the colour already says
+               which one is the way forward. */
+            <button
+              type="button"
+              onClick={() => setStep((s) => s + 1)}
+              disabled={step === 1 && mood === null}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-karsa py-4 text-[16px] font-extrabold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-2 disabled:bg-neutral-300"
+            >
+              Lanjut
+              <ArrowRight size={20} strokeWidth={3} aria-hidden />
+            </button>
+          )}
+
+          {/* The last step's action is not a sibling of Kembali in the way Lanjut
+              was — it is the end of the whole wizard, and it takes the room its
+              label needs. */}
+          {step === STEPS &&
+            (saved ? (
+              <p
+                role="status"
+                className="flex flex-[2] items-center justify-center gap-2 rounded-2xl bg-act-50 py-4 text-[16px] font-extrabold text-act-600 ring-2 ring-act-edge"
+              >
+                <Check size={22} strokeWidth={3} aria-hidden />
+                Tersimpan!
+              </p>
+            ) : (
+              <button
+                type="button"
+                onClick={save}
+                disabled={saving}
+                className="inline-flex flex-[2] items-center justify-center gap-2 rounded-2xl bg-karsa px-3 py-4 text-center text-[15.5px] font-extrabold leading-tight text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-4 focus-visible:ring-karsa focus-visible:ring-offset-2 disabled:bg-neutral-300"
+              >
+                <Save size={22} strokeWidth={2.6} className="shrink-0" aria-hidden />
+                {saving ? "MENYIMPAN…" : "SIMPAN JURNAL SEHAT"}
+              </button>
+            ))}
+        </div>
+
+        </>
+      )}
+
+
+      {saveError && (
+        <p
+          role="alert"
+          className="mt-2 shrink-0 rounded-2xl bg-rose-50 px-4 py-3 text-[14px] font-bold leading-5 text-rose-800 ring-2 ring-rose-200"
+        >
+          {saveError}
+        </p>
+      )}
 
       <JournalHistoryModal
         open={calendarOpen}
@@ -303,33 +476,51 @@ export default function PatientJournalPage() {
 
 /* ── Step 1 ───────────────────────────────────────────────────────────────── */
 
-function MoodStep({ mood, onPick }: { mood: MoodKey | null; onPick: (m: MoodKey) => void }) {
+function MoodStep({
+  mood,
+  onPick,
+  name,
+}: {
+  mood: MoodKey | null;
+  onPick: (m: MoodKey) => void;
+  name?: string;
+}) {
   return (
     <>
       <h2 className="shrink-0 text-[22px] font-extrabold tracking-tight text-neutral-900">
-        Hari ini Oma merasa apa?
+        {name ? `Hari ini ${name} merasa apa?` : "Hari ini kamu merasa apa?"}
       </h2>
 
-      {/* Two by two, each cell a whole quarter of the area. Four large targets
-          beat a row of small ones for a hand that does not aim well. */}
+      {/* `MoodFace`, the same drawing the caregiver reads on their side — not
+          emoji. Two reasons, and the second is the one that matters: emoji
+          render as a different typeface at a different weight on every
+          platform (several of these arrived flat and grey on Windows), and
+          more importantly the caregiver's dashboard draws these five faces, so
+          a patient tapping a yellow emoji here would have their answer shown
+          to their family as a different picture with a different name.
+
+          Two columns, and the fifth spans the pair so the grid has no hole in
+          it. Large targets throughout — this is a hand that does not aim well. */}
       <div className="mt-3 grid flex-1 grid-cols-2 gap-3">
-        {MOODS.map((m) => {
+        {MOODS.map((m, i) => {
           const on = mood === m.key;
+          const last = i === MOODS.length - 1;
+          const odd = MOODS.length % 2 === 1;
           return (
             <button
               key={m.key}
               type="button"
               onClick={() => onPick(m.key)}
               aria-pressed={on}
-              className={`flex min-h-[120px] flex-col items-center justify-center gap-2 rounded-3xl outline-none ring-2 transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-karsa ${
+              className={`flex min-h-[104px] flex-col items-center justify-center gap-2 rounded-3xl outline-none ring-2 transition-colors duration-200 focus-visible:ring-4 focus-visible:ring-karsa ${
+                last && odd ? "col-span-2" : ""
+              } ${
                 on
                   ? "bg-karsa-soft ring-karsa"
                   : "bg-white ring-karsa-line hover:bg-karsa-soft/50"
               }`}
             >
-              <span aria-hidden className="text-[52px] leading-none">
-                {m.emoji}
-              </span>
+              <MoodFace mood={m.key} className="h-14 w-14" />
               <span
                 className={`text-[17px] font-extrabold ${on ? "text-karsa-dark" : "text-neutral-700"}`}
               >
@@ -473,7 +664,7 @@ function MetricsStep({
         Catat Metrik Kesehatan Hari Ini
       </h2>
       <p className="mt-1 shrink-0 text-[14.5px] leading-5 text-neutral-500">
-        Isi jika Oma/Opa melakukan pengecekan hari ini (Opsional)
+        Isi jika ada pengecekan hari ini (Opsional)
       </p>
 
       {/* `auto-rows-fr` is what makes the add button the same size as the cards
@@ -529,9 +720,11 @@ function BloodPressureCard({
   return (
     <section className="rounded-3xl bg-white p-5 ring-2 ring-karsa-line">
       <div className="flex items-center gap-2">
-        <span aria-hidden className="text-[24px] leading-none">
-          {METRICS.bp.emoji}
-        </span>
+        <StatArt
+          kind={METRICS.bp.monitor}
+          tone={MONITOR_TONE[METRICS.bp.monitor]}
+          className="h-7 w-7"
+        />
         <h3 className="flex-1 text-[17px] font-extrabold text-neutral-900">
           {METRICS.bp.label}
         </h3>
@@ -591,9 +784,7 @@ function StepperCard({
   return (
     <section className="rounded-3xl bg-white p-5 ring-2 ring-karsa-line">
       <div className="flex items-center gap-2">
-        <span aria-hidden className="text-[24px] leading-none">
-          {spec.emoji}
-        </span>
+        <StatArt kind={spec.monitor} tone={MONITOR_TONE[spec.monitor]} className="h-7 w-7" />
         <h3 className="flex-1 text-[17px] font-extrabold text-neutral-900">{spec.label}</h3>
         <span className="text-[14px] font-bold text-neutral-500">{spec.unit}</span>
       </div>
@@ -680,9 +871,11 @@ function AddMetricSheet({
                     onClick={() => onPick(kind)}
                     className="flex w-full items-center gap-4 rounded-2xl bg-karsa-canvas p-4 text-left outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-4 focus-visible:ring-karsa/40"
                   >
-                    <span aria-hidden className="text-[30px] leading-none">
-                      {spec.emoji}
-                    </span>
+                    <StatArt
+                      kind={spec.monitor}
+                      tone={MONITOR_TONE[spec.monitor]}
+                      className="h-9 w-9"
+                    />
                     <span className="min-w-0 flex-1">
                       <span className="block text-[17px] font-extrabold text-neutral-900">
                         {spec.label}

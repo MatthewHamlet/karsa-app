@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BedDouble,
@@ -19,6 +19,9 @@ import HealthPattern from "./HealthPattern";
 import { EASE } from "./List";
 import { CHAT_DAY, ME, MESSAGES, SENDERS, type ChatMessage } from "../data/chat";
 import { CONTEXT_LABEL, type CareContextType } from "../data/care";
+import { sendCareMessage, type CareResult } from "../lib/care/actions";
+import type { CareData } from "../lib/care/view";
+import { colourFor } from "./avatarColour";
 
 /** Uncoloured on purpose — the log line is meant to recede, so the glyph is
  *  only there to say which kind of entry it is at a glance. */
@@ -88,12 +91,24 @@ function LogEntry({ message }: { message: Extract<ChatMessage, { kind: "system" 
 function Bubble({
   message,
   head,
+  senders,
+  me,
 }: {
   message: Exclude<ChatMessage, { kind: "system" }>;
   head: boolean;
+  senders: typeof SENDERS;
+  /** Whose messages sit on the right. */
+  me: string;
 }) {
-  const sender = SENDERS[message.from];
-  const mine = message.from === ME;
+  /* A sender who has left the care group is no longer in the roster, but their
+     messages are still in the thread — so the lookup has to survive a miss. */
+  const sender = senders[message.from] ?? {
+    id: message.from,
+    name: "Seseorang",
+    initial: "?",
+    color: "#8b8b8b",
+  };
+  const mine = message.from === me;
 
   return (
     <li className={`flex gap-2 ${mine ? "flex-row-reverse" : ""} ${head ? "mt-2.5" : "mt-[3px]"}`}>
@@ -178,25 +193,71 @@ const PAD = "px-3 sm:px-4 md:px-6";
 export default function TeamChat({
   context,
   height,
+  data,
 }: {
   /** Carried in from a "Diskusikan" link, pre-attached to the composer. */
   context?: { type: CareContextType; label: string; detail?: string } | null;
   /** Set by the shell to whatever is left of the viewport under the header. */
   height?: string;
+  data?: CareData;
 }) {
   const [draft, setDraft] = useState("");
   const [attached, setAttached] = useState(context ?? null);
   const streamRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 
+  const [state, send, sending] = useActionState<CareResult, FormData>(sendCareMessage, {
+    error: null,
+  });
+
   useEffect(() => setAttached(context ?? null), [context]);
+
+  /* Cleared on success rather than on submit. Clearing optimistically loses
+     what somebody typed if the send fails, and a chat that eats a message is
+     worse than one that is slow. */
+  useEffect(() => {
+    if (state.ok) {
+      setDraft("");
+      setAttached(null);
+    }
+  }, [state.ok]);
+
+  /** The thread. Real messages carry no voice notes and no interleaved log
+   *  entries yet, so they all arrive as text bubbles; the two other kinds stay
+   *  in the type because the placeholder thread still shows them and because
+   *  both are what this pane is for. */
+  const messages: ChatMessage[] = useMemo(() => {
+    if (!data) return MESSAGES;
+    return data.messages.map((m) => ({
+      kind: "text" as const,
+      id: m.id,
+      from: m.authorId,
+      time: m.when,
+      text: m.context ? `[${m.context.label}] ${m.body}` : m.body,
+    }));
+  }, [data]);
+
+  /** Who wrote what, for the avatars. Built from the care group rather than the
+   *  messages, so somebody who has not said anything yet still gets their
+   *  colour the moment they do. */
+  const senders = useMemo(() => {
+    if (!data) return SENDERS;
+    return Object.fromEntries(
+      data.group.members.map((m) => [
+        m.id,
+        { id: m.id, name: m.name, initial: m.initial, color: colourFor(m.id) },
+      ]),
+    ) as typeof SENDERS;
+  }, [data]);
+
+  const me = data?.me.id ?? ME;
 
   /* A log card between two of Sinta's messages breaks the run — she has to
      re-introduce herself on the other side of it, same as in any chat. */
   const rows = useMemo(
     () =>
-      MESSAGES.map((message, i) => {
-        const previous = MESSAGES[i - 1];
+      messages.map((message, i) => {
+        const previous = messages[i - 1];
         const head =
           message.kind === "system" ||
           !previous ||
@@ -204,7 +265,7 @@ export default function TeamChat({
           previous.from !== message.from;
         return { message, head };
       }),
-    [],
+    [messages],
   );
 
   /** Open at the newest message, the way a chat should. Re-run when the shell
@@ -213,7 +274,7 @@ export default function TeamChat({
   useEffect(() => {
     const stream = streamRef.current;
     if (stream) stream.scrollTop = stream.scrollHeight;
-  }, [height]);
+  }, [height, messages.length]);
 
   return (
     <section
@@ -239,10 +300,22 @@ export default function TeamChat({
             message.kind === "system" ? (
               <LogEntry key={message.id} message={message} />
             ) : (
-              <Bubble key={message.id} message={message} head={head} />
+              <Bubble
+                key={message.id}
+                message={message}
+                head={head}
+                senders={senders}
+                me={me}
+              />
             ),
           )}
         </ul>
+
+        {data && messages.length === 0 && (
+          <p className="mx-auto mt-8 max-w-[34ch] text-balance text-center text-[14px] leading-6 text-neutral-500">
+            Belum ada percakapan. Tulis pesan pertama untuk tim perawatan.
+          </p>
+        )}
       </div>
 
       {/* ── Composer ──────────────────────────────────────────────────── */}
@@ -281,13 +354,20 @@ export default function TeamChat({
           </motion.div>
         )}
 
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setDraft("");
-          }}
-          className="flex items-end gap-2"
-        >
+        {state.error && (
+          <p role="alert" className="mb-2 text-[13px] font-medium text-rose-700">
+            {state.error}
+          </p>
+        )}
+
+        <form action={send} className="flex items-end gap-2">
+          <input type="hidden" name="patient_id" value={data?.activePatientId ?? ""} />
+          {/* The attachment travels with the message rather than being resolved
+              later: the label has to keep saying what it said when it was sent,
+              even after the care item behind it is edited. */}
+          <input type="hidden" name="context_type" value={attached?.type ?? ""} />
+          <input type="hidden" name="context_label" value={attached?.label ?? ""} />
+          <input type="hidden" name="context_detail" value={attached?.detail ?? ""} />
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
@@ -310,11 +390,13 @@ export default function TeamChat({
           </label>
           <textarea
             id="chat-draft"
+            name="body"
             rows={1}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
-            placeholder="Tulis pesan untuk tim…"
-            className="min-h-[44px] flex-1 resize-none rounded-2xl bg-white px-4 py-3 text-[14.5px] leading-5 text-neutral-800 outline-none ring-1 ring-karsa-line placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-karsa/40"
+            disabled={sending}
+            placeholder={data ? "Tulis pesan untuk tim…" : "Masuk untuk mengobrol"}
+            className="min-h-[44px] flex-1 resize-none rounded-2xl bg-white px-4 py-3 text-[14.5px] leading-5 text-neutral-800 outline-none ring-1 ring-karsa-line placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-karsa/40 disabled:opacity-70"
           />
 
           {/* Mic when there's nothing to send, send button once there is. */}
@@ -322,7 +404,8 @@ export default function TeamChat({
             <button
               type="submit"
               aria-label="Kirim pesan"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-karsa text-white outline-none transition-colors hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2"
+              disabled={sending || !data}
+              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-karsa text-white outline-none transition-colors hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 disabled:opacity-50"
             >
               <Send size={18} strokeWidth={2.2} className="-ml-0.5" />
             </button>

@@ -16,6 +16,7 @@ import {
 import Modal from "./Modal";
 import { EASE } from "./List";
 import { MONTHS, WEEKDAYS } from "../data/dashboard";
+import type { CareData } from "../lib/care/view";
 import { chatHref } from "../data/care";
 import {
   ACTIVITIES_BY_DATE,
@@ -25,6 +26,17 @@ import {
   type ActivityIcon,
   type PatientActivity,
 } from "../data/careStats";
+
+/** How the feed's five kinds land on this page's five icons. The card on Home
+ *  has three tones for the same rows; here there is room to tell a glass of
+ *  water from a night's sleep. */
+const ICON_FOR: Record<string, ActivityIcon> = {
+  medication: "medication",
+  meal: "meal",
+  task: "vital",
+  mood: "vital",
+  reading: "vital",
+};
 
 const ICON: Record<ActivityIcon, { icon: typeof Pill; bg: string; ink: string }> = {
   medication: { icon: Pill, bg: "#e6e0f7", ink: "#6a58ae" },
@@ -77,16 +89,30 @@ function ActivityRow({ activity }: { activity: PatientActivity }) {
   );
 }
 
-export default function PatientActivities() {
+export default function PatientActivities({ data }: { data?: CareData }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState(ACTIVITY_MONTH);
-  const [picked, setPicked] = useState(ACTIVITY_TODAY);
+  const [view, setView] = useState(data?.today ?? ACTIVITY_MONTH);
+  const [picked, setPicked] = useState(data?.today ?? ACTIVITY_TODAY);
   const [monthOpen, setMonthOpen] = useState(false);
   const reduce = useReducedMotion();
 
+  /* The month in the modal is fetched for whatever month the page loaded on —
+     see `getActivitiesByDate`. Paging past it shows empty days rather than
+     wrong ones, which is the honest failure: the grid says "no activity
+     recorded", and that is true of every day it has not been given. */
+  const byDate = data?.activitiesByDate ?? ACTIVITIES_BY_DATE;
+  const recent = data
+    ? data.feed.map((item) => ({
+        id: item.id,
+        icon: ICON_FOR[item.kind],
+        text: `${item.actor} ${item.action}`,
+        time: item.when,
+      }))
+    : RECENT_ACTIVITIES;
+
   const total = daysIn(view.y, view.m);
   const blanks = lead(view.y, view.m);
-  const dayList = ACTIVITIES_BY_DATE[key(picked.y, picked.m, picked.d)] ?? [];
+  const dayList = byDate[key(picked.y, picked.m, picked.d)] ?? [];
 
   const shift = (step: number) =>
     setView(({ y, m }) => {
@@ -104,7 +130,7 @@ export default function PatientActivities() {
             Aktivitas pasien
           </p>
           <h2 className="mt-1.5 text-[21px] font-bold leading-7 tracking-tight text-neutral-900 xl:text-[23px]">
-            Yang Meimei lakukan
+            Yang {data?.patientName ?? "pasien"} lakukan
           </h2>
         </div>
 
@@ -123,7 +149,7 @@ export default function PatientActivities() {
       </header>
 
       <ul className="-mx-3">
-        {RECENT_ACTIVITIES.map((activity) => (
+        {recent.map((activity) => (
           <ActivityRow key={activity.id} activity={activity} />
         ))}
       </ul>
@@ -218,7 +244,7 @@ export default function PatientActivities() {
             {Array.from({ length: total }, (_, i) => i + 1).map((day) => {
               const isPicked =
                 picked.y === view.y && picked.m === view.m && picked.d === day;
-              const has = Boolean(ACTIVITIES_BY_DATE[key(view.y, view.m, day)]);
+              const has = Boolean(byDate[key(view.y, view.m, day)]);
 
               return (
                 <button

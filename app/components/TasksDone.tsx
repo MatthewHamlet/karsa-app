@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
+import MoodFace from "./MoodFace";
 
 /** What the list says once there is nothing left in it.
  *
@@ -33,9 +34,14 @@ export default function TasksDone({ size = "md" }: { size?: "sm" | "md" }) {
             : { rotate: [-12, 8, -4, 0], scale: [0.7, 1.15, 0.98, 1] }
         }
         transition={reduce ? { duration: 0 } : { duration: 0.7, delay: 0.2, ease: "easeOut" }}
-        className={big ? "text-[52px] leading-none" : "text-[34px] leading-none"}
+        className={big ? "block h-14 w-14" : "block h-9 w-9"}
       >
-        😎
+        {/* The app's own drawing, not an emoji. Emoji render as a different
+            typeface at a different weight on every platform — this one arrived
+            flat and grey on Windows — and this face has to match the five the
+            mood picker and the caregiver's dashboard already use, or the app
+            has two visual languages for "how is it going". */}
+        <MoodFace mood="great" className="h-full w-full" />
       </motion.span>
 
       <p

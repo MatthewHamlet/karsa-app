@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/server";
 import { isSupabaseConfigured } from "../../lib/supabase/config";
+import { hasChosenRole } from "../../lib/roles";
 
 /** Where every link Supabase sends comes back to: Google, the signup
  *  confirmation email, and the password reset email.
@@ -77,8 +78,26 @@ export async function GET(request: NextRequest) {
 
   const code = searchParams.get("code");
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) return fail(readableCallbackError(null, error.message));
+
+    /* Google is the reason this branch exists, and Google tells us nothing
+       about which half of the app this person belongs in. An account that has
+       never answered goes and answers before it goes anywhere else — otherwise
+       `handle_new_user`'s caregiver default stands in for a choice nobody made,
+       and a patient spends their first visit in a compliance dashboard.
+
+       Answered accounts fall straight through, so signing in with Google on
+       every subsequent visit is still one hop. */
+    if (!hasChosenRole(data.user?.user_metadata)) {
+      const back = `${origin}/login/peran`;
+      /* Deep links survive the detour: `chooseRole` lands them on their role's
+         home, and anything more specific is carried here so it can win. */
+      return NextResponse.redirect(
+        next === "/" ? back : `${back}?next=${encodeURIComponent(next)}`,
+      );
+    }
+
     return NextResponse.redirect(`${origin}${next}`);
   }
 

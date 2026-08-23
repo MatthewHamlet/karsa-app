@@ -6,6 +6,7 @@ import { headers } from "next/headers";
 import { createClient } from "../lib/supabase/server";
 import { NOT_CONFIGURED_MESSAGE, isSupabaseConfigured } from "../lib/supabase/config";
 import { OTP_MAX, OTP_MIN } from "../lib/otp";
+import { HOME_FOR, normaliseRole } from "../lib/roles";
 
 /** What the form gets back. `null` never reaches the UI — a success either
  *  redirects or revalidates, so the only thing worth returning is a problem. */
@@ -71,7 +72,10 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   }
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email: identifier, password });
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: identifier,
+    password,
+  });
 
   if (error) return { error: readableError(error.message) };
 
@@ -81,7 +85,34 @@ export async function signIn(_prev: AuthState, formData: FormData): Promise<Auth
   /* Only ever redirect to a path on this site. `next` arrives from the query
      string, and an open redirect is exactly how a sign-in page gets turned into
      a credible phishing hop to another domain. */
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "/";
+
+  /* One form, two apps. Nobody is asked to pick "I am a patient" or "I am a
+     caregiver" at the door — the answer is already in their profile, and asking
+     invites the wrong answer from somebody who has both roles in their life.
+     A `next` from a deep link still wins: it means they were already headed
+     somewhere specific and were only interrupted by the login. */
+  redirect(safe !== "/" ? safe : await homeForUser(data.user?.id));
+}
+
+/** The route this account belongs in.
+ *
+ *  Read from `profiles`, not from auth metadata: metadata is whatever the
+ *  signup form happened to write and is absent entirely for Google accounts,
+ *  while the profile row is what the rest of the app reads. Falls back to the
+ *  caregiver app, which is the one that copes with having nothing in it — a
+ *  patient dropped there sees the onboarding screen rather than a broken page. */
+async function homeForUser(userId: string | undefined): Promise<string> {
+  if (!userId) return HOME_FOR.caregiver;
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return HOME_FOR[normaliseRole(data?.role)];
 }
 
 /** Hands off to Google, which sends the user back to `/auth/callback`.
@@ -411,6 +442,64 @@ export async function verifyRecoveryCode(_prev: OtpState, formData: FormData): P
 
   revalidatePath("/", "layout");
   redirect("/login/kata-sandi-baru");
+}
+
+/* ── Picking a role ────────────────────────────────────────────────────────
+   The email form asks up front and passes the answer as user metadata. Google
+   sends nothing of ours, so those accounts arrive with no role at all and
+   `handle_new_user` falls back to caregiver — a default, not a choice. This is
+   where the choice actually gets made. */
+
+/** Records the answer, and sends them into the right half of the app. */
+export async function chooseRole(_prev: AuthState, formData: FormData): Promise<AuthState> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+
+  const picked = String(formData.get("role") ?? "");
+  if (picked !== "caregiver" && picked !== "patient") {
+    return { error: "Pilih dulu kamu mendampingi atau pasien." };
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sesimu sudah habis. Masuk lagi ya." };
+
+  /* Written to both places, and both are load-bearing. `profiles.role` is what
+     the application reads; the metadata copy is what marks the question as
+     answered, so this screen never appears again. Metadata first — if the
+     second write fails, the person is a caregiver who was asked once, which is
+     recoverable. The other order leaves them being asked on every page load. */
+  const { error: metaError } = await supabase.auth.updateUser({ data: { role: picked } });
+  if (metaError) return { error: "Gagal menyimpan pilihanmu. Coba lagi sebentar lagi." };
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({ role: picked })
+    .eq("id", user.id);
+
+  if (profileError) return { error: "Gagal menyimpan pilihanmu. Coba lagi sebentar lagi." };
+
+  /* A patient needs the record the signup trigger would have made for them had
+     it known. Without it their first screen is "belum ada profil pasien" — a
+     dead end for somebody who just told the app who they are. */
+  if (picked === "patient") {
+    const { error } = await supabase.rpc("ensure_my_patient_record");
+    /* Not fatal. The record is also created the moment they pair with a
+       caregiver, so a failure here costs them one awkward screen rather than
+       the account. */
+    if (error && process.env.NODE_ENV === "development") {
+      console.error("[chooseRole] ensure_my_patient_record:", error.message);
+    }
+  }
+
+  revalidatePath("/", "layout");
+
+  /* A deep link that was interrupted by this question wins over the role's
+     default home — they were already going somewhere specific. */
+  const next = String(formData.get("next") ?? "");
+  const safe = next.startsWith("/") && !next.startsWith("//") ? next : "";
+  redirect(safe || HOME_FOR[picked]);
 }
 
 export async function signOut(): Promise<void> {

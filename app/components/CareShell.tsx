@@ -20,6 +20,8 @@ import { EASE } from "./List";
 import { CARE_GROUP } from "../data/careStats";
 import { MOOD_BY_KEY, MOOD_ENTRIES } from "../data/mood";
 import type { CareContextType } from "../data/care";
+import type { CareData } from "../lib/care/view";
+import { colourFor } from "./avatarColour";
 
 export type CareTab = "stats" | "chat";
 
@@ -153,8 +155,21 @@ function TabSwitcher({
 /** Name, mood and members — the identity block, at two sizes. The name, the
  *  chip and the face are the *same* nodes in both, only re-sized: that is what
  *  a CSS transition needs, and it is why nothing here re-mounts. */
-function GroupIdentity({ slim = false }: { slim?: boolean }) {
-  const mood = MOOD_BY_KEY[MOOD_ENTRIES[0].mood];
+function GroupIdentity({ slim = false, data }: { slim?: boolean; data?: CareData }) {
+  /* The chip is the patient's most recent mood, or nothing at all. A face
+     invented for somebody who has not said how they are is the one lie this
+     header must not tell — so with no entries the chip is simply absent. */
+  const latest = data ? data.moods[0] : MOOD_ENTRIES[0];
+  const mood = latest ? MOOD_BY_KEY[latest.mood] : null;
+  const groupName = data ? `Pendamping ${data.patientName}` : CARE_GROUP.name;
+  const members = data
+    ? data.group.members.map((m) => ({
+        id: m.id,
+        name: m.name,
+        initial: m.initial,
+        color: colourFor(m.id),
+      }))
+    : CARE_GROUP.members;
 
   return (
     <div className="min-w-0">
@@ -168,21 +183,23 @@ function GroupIdentity({ slim = false }: { slim?: boolean }) {
               : "text-[18px] leading-[1.35] sm:text-[22px] sm:leading-[1.3] xl:text-[26px]"
           }`}
         >
-          {CARE_GROUP.name}
+          {groupName}
         </p>
 
-        <span
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold ${MORPH} ${
-            slim ? "py-0.5 pl-0.5 pr-2 text-[11px]" : "py-1 pl-1 pr-3 text-[12.5px]"
-          }`}
-          style={{ backgroundColor: mood.soft, color: mood.ink }}
-        >
-          <MoodFace
-            mood={MOOD_ENTRIES[0].mood}
-            className={`${MORPH} ${slim ? "h-4 w-4" : "h-5 w-5"}`}
-          />
-          {mood.label}
-        </span>
+        {mood && latest && (
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full font-semibold ${MORPH} ${
+              slim ? "py-0.5 pl-0.5 pr-2 text-[11px]" : "py-1 pl-1 pr-3 text-[12.5px]"
+            }`}
+            style={{ backgroundColor: mood.soft, color: mood.ink }}
+          >
+            <MoodFace
+              mood={latest.mood}
+              className={`${MORPH} ${slim ? "h-4 w-4" : "h-5 w-5"}`}
+            />
+            {mood.label}
+          </span>
+        )}
       </div>
 
       {/* Members are the first thing to go on a phone: squeezed beside the
@@ -192,7 +209,7 @@ function GroupIdentity({ slim = false }: { slim?: boolean }) {
       {!slim && (
         <div className={`mt-2.5 hidden items-center gap-2.5 sm:flex ${REVEAL}`}>
           <div className="flex -space-x-2">
-            {CARE_GROUP.members.map((member) => (
+            {members.map((member) => (
               <span
                 key={member.id}
                 title={member.name}
@@ -205,9 +222,7 @@ function GroupIdentity({ slim = false }: { slim?: boolean }) {
               </span>
             ))}
           </div>
-          <span className="text-[13px] text-white/70">
-            {CARE_GROUP.members.length} anggota
-          </span>
+          <span className="text-[13px] text-white/70">{members.length} anggota</span>
         </div>
       )}
     </div>
@@ -271,11 +286,13 @@ function HeaderBody({
   tab,
   onSelect,
   toggle,
+  data,
 }: {
   slim: boolean;
   tab: CareTab;
   onSelect: (next: CareTab) => void;
   toggle?: ReactNode;
+  data?: CareData;
 }) {
   return (
     <div
@@ -305,9 +322,11 @@ function HeaderBody({
             slim ? "h-9 w-9" : "h-12 w-12 sm:h-16 sm:w-16 xl:h-[72px] xl:w-[72px]"
           }`}
         />
-        <h1 className="sr-only">{CARE_GROUP.name}</h1>
+        <h1 className="sr-only">
+          {data ? `Pendamping ${data.patientName}` : CARE_GROUP.name}
+        </h1>
 
-        <GroupIdentity slim={slim} />
+        <GroupIdentity slim={slim} data={data} />
 
         {!slim && (
           <div className={`ml-auto flex shrink-0 items-center gap-2 ${REVEAL}`}>
@@ -347,9 +366,13 @@ const Blobs = ({ height }: { height?: number }) => (
 export default function CareShell({
   initialTab,
   context,
+  data,
 }: {
   initialTab: CareTab;
   context?: { type: CareContextType; label: string; detail?: string } | null;
+  /** Everything the cards render. Absent when signed out, which is what keeps
+   *  the placeholder design pages alive — see `CareData`. */
+  data?: CareData;
 }) {
   const [tab, setTab] = useState<CareTab>(initialTab);
   const [collapsed, setCollapsed] = useState(false);
@@ -507,6 +530,7 @@ export default function CareShell({
               slim={slim}
               tab={tab}
               onSelect={setTab}
+              data={data}
               toggle={
                 pinned ? (
                   <ExpandToggle open={expanded} onClick={() => setExpanded((v) => !v)} />
@@ -526,9 +550,22 @@ export default function CareShell({
           transition={fade}
           className="mt-8 space-y-8 xl:mt-10 xl:space-y-10"
         >
-          <CareStats />
-          <PatientActivities />
-          <ImportantInfo />
+          {data?.pending ? (
+            /* The invitation has not been answered, so RLS returns nothing for
+               every card below. Saying that once beats printing three cards of
+               dashes and letting the caregiver conclude the app is broken. */
+            <p className="rounded-3xl bg-amber-50 px-6 py-8 text-center text-[15px] leading-6 text-amber-800 ring-1 ring-amber-200">
+              Menunggu persetujuan dari {data.patientName}.
+              <br />
+              Statistik dan catatannya terbuka setelah dia menyetujui.
+            </p>
+          ) : (
+            <>
+              <CareStats data={data} />
+              <PatientActivities data={data} />
+              <ImportantInfo data={data} />
+            </>
+          )}
         </motion.div>
       ) : (
         /* Chat is not a card on a page — it *is* the page. Full-bleed and flush
@@ -539,6 +576,7 @@ export default function CareShell({
         <div className={`-mb-10 xl:-mb-12 ${BLEED}`}>
           <TeamChat
             context={context}
+            data={data}
             height={hostH ? `calc(100dvh - ${hostH}px - var(--bottom-nav))` : undefined}
           />
         </div>

@@ -20,6 +20,7 @@ import {
   type StatValue,
 } from "../data/careStats";
 import { MOOD_ENTRIES } from "../data/mood";
+import type { CareData } from "../lib/care/view";
 
 /** The card shell. The icon is the headline — big, bare, in the stat's own
  *  colour — and the content spans the full width underneath it, which is what
@@ -138,24 +139,46 @@ function StatFigure({ data, tone }: { data: StatValue; tone: StatTone }) {
   );
 }
 
-export default function CareStats() {
+export default function CareStats({ data }: { data?: CareData }) {
   const [period, setPeriod] = useState<Period>("daily");
   const [menuOpen, setMenuOpen] = useState(false);
   const [added, setAdded] = useState<MonitorKey[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const reduce = useReducedMotion();
 
-  const todayMood = MOOD_ENTRIES[0];
+  const todayMood = data ? data.moods[0] : MOOD_ENTRIES[0];
   const periodLabel = PERIODS.find((p) => p.key === period)!.label;
   const available = MONITOR_STATS.filter((stat) => !added.includes(stat.key));
   const fade = reduce ? { duration: 0 } : { duration: 0.22, ease: EASE };
 
-  const fluid = FIXED_STATS.fluid.byPeriod[period];
-  const meals = FIXED_STATS.meals.byPeriod[period];
+  /* The figures come from the database; the titles, colours and descriptions
+     stay where they are. That split is deliberate — "Tekanan darah" and its
+     pink are facts about the design, not about the patient, and putting them in
+     a table would mean a migration to change a shade. Only the numbers, which
+     *are* facts about the patient, are read from it. */
+  const fixed = (key: keyof typeof FIXED_STATS): StatValue =>
+    data ? data.stats[period].fixed[key] : FIXED_STATS[key].byPeriod[period];
+
+  const monitor = (stat: (typeof MONITOR_STATS)[number]): StatValue =>
+    data ? data.stats[period].monitor[stat.key] : stat.byPeriod[period];
+
+  const fluid = fixed("fluid");
+  const meals = fixed("meals");
 
   /** Null on a day, and the whole period's detail otherwise. Narrowed once
-   *  here so every card below can just ask whether there is a trend to draw. */
-  const trend = period === "daily" ? null : TRENDS[period];
+   *  here so every card below can just ask whether there is a trend to draw.
+   *
+   *  Also null whenever the figures are real, and that is the important half.
+   *  `TRENDS` is a hand-written fortnight of readings — the charts, the day
+   *  labels, the highs and lows. Drawn beside a headline figure computed from
+   *  the database it would make one card half true, which is worse than a card
+   *  that is plainly a placeholder: nobody can tell which half to believe.
+   *
+   *  So a signed-in caregiver gets the real figure at every period and no
+   *  chart, and the chart returns when there is a query behind it. Rolling the
+   *  logs up per day is a straightforward addition to `lib/care/stats` — it is
+   *  left out here rather than faked. */
+  const trend = period === "daily" || data ? null : TRENDS[period];
 
   return (
     <section>
@@ -165,7 +188,7 @@ export default function CareStats() {
             Statistik
           </p>
           <h2 className="mt-1.5 text-[21px] font-bold leading-7 tracking-tight text-neutral-900 xl:text-[23px]">
-            Kondisi Meimei
+            Kondisi {data?.patientName ?? "pasien"}
           </h2>
         </div>
 
@@ -335,7 +358,7 @@ export default function CareStats() {
           tall={Boolean(trend)}
           tone={FIXED_TONES.medication}
           art={<StatArt kind="medication" tone={FIXED_TONES.medication} />}
-          label={`${FIXED_STATS.medication.title}: ${FIXED_STATS.medication.byPeriod[period].value}`}
+          label={`${FIXED_STATS.medication.title}: ${fixed("medication").value}`}
         >
           {trend ? (
             <StatPeriodBody
@@ -346,7 +369,7 @@ export default function CareStats() {
             />
           ) : (
             <StatFigure
-              data={FIXED_STATS.medication.byPeriod[period]}
+              data={fixed("medication")}
               tone={FIXED_TONES.medication}
             />
           )}
@@ -361,11 +384,14 @@ export default function CareStats() {
           tone={FIXED_TONES.mood}
           art={
             <MoodFace
-              mood={trend ? trend.mood.mood!.dominant : todayMood.mood}
+              /* `okay` is the neutral face, and it is only ever reached when
+                 there is nothing logged at all — the card beside it says so in
+                 words, so the face is a placeholder rather than a claim. */
+              mood={trend ? trend.mood.mood!.dominant : (todayMood?.mood ?? "okay")}
               className="h-11 w-11 shrink-0 xl:h-12 xl:w-12"
             />
           }
-          label={`${FIXED_STATS.mood.title}: ${FIXED_STATS.mood.byPeriod[period].value}`}
+          label={`${FIXED_STATS.mood.title}: ${fixed("mood").value}`}
         >
           {trend ? (
             <StatPeriodBody
@@ -374,7 +400,7 @@ export default function CareStats() {
               title={FIXED_STATS.mood.title}
             />
           ) : (
-            <StatFigure data={FIXED_STATS.mood.byPeriod[period]} tone={FIXED_TONES.mood} />
+            <StatFigure data={fixed("mood")} tone={FIXED_TONES.mood} />
           )}
         </StatCard>
 
@@ -383,7 +409,7 @@ export default function CareStats() {
           tall={Boolean(trend)}
           tone={FIXED_TONES.sleep}
           art={<StatArt kind="sleep" tone={FIXED_TONES.sleep} />}
-          label={`${FIXED_STATS.sleep.title}: ${FIXED_STATS.sleep.byPeriod[period].value}`}
+          label={`${FIXED_STATS.sleep.title}: ${fixed("sleep").value}`}
         >
           {trend ? (
             <StatPeriodBody
@@ -392,7 +418,7 @@ export default function CareStats() {
               title={FIXED_STATS.sleep.title}
             />
           ) : (
-            <StatFigure data={FIXED_STATS.sleep.byPeriod[period]} tone={FIXED_TONES.sleep} />
+            <StatFigure data={fixed("sleep")} tone={FIXED_TONES.sleep} />
           )}
         </StatCard>
 
@@ -414,7 +440,7 @@ export default function CareStats() {
                   tall={Boolean(trend)}
                   tone={stat.tone}
                   art={<StatArt kind={stat.key} tone={stat.tone} />}
-                  label={`${stat.title}: ${stat.byPeriod[period].value}`}
+                  label={`${stat.title}: ${monitor(stat).value}`}
                   onRemove={() => setAdded((prev) => prev.filter((k) => k !== key))}
                   removeLabel={`Hapus ${stat.title}`}
                   className="h-full"
@@ -426,7 +452,7 @@ export default function CareStats() {
                       title={stat.title}
                     />
                   ) : (
-                    <StatFigure data={stat.byPeriod[period]} tone={stat.tone} />
+                    <StatFigure data={monitor(stat)} tone={stat.tone} />
                   )}
                 </StatCard>
               </motion.div>

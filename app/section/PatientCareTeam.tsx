@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { Check, Copy, ShieldCheck, UserMinus, X } from "lucide-react";
 import { respondToInvitation, revokeRelationship, type CareResult } from "../lib/care/actions";
 import type { CareTeamMember } from "../lib/care/types";
+import ConnectCaregiver from "../components/ConnectCaregiver";
 
 /** The patient's side of the relationship: who is asking, who already has
  *  access, and the code that lets them ask in the first place.
@@ -27,7 +28,9 @@ export default function PatientCareTeam({
   const active = team.filter((m) => m.status === "active");
 
   return (
-    <div className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
+    /* Wider than the old `max-w-2xl`: from `lg` this is two columns, and a
+       two-column layout inside a 42rem column is two narrow columns. */
+    <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
         Pendamping saya
       </h1>
@@ -35,40 +38,66 @@ export default function PatientCareTeam({
         Siapa saja yang boleh melihat data perawatanmu. Kamu yang menentukan.
       </p>
 
-      {/* Invitations first: they are the only thing here that needs an answer. */}
-      {pending.length > 0 && (
-        <section className="mt-6">
-          <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-            Menunggu jawabanmu
-          </h2>
-          <ul className="mt-3 space-y-3">
-            {pending.map((member) => (
-              <InvitationCard key={member.relationshipId} member={member} />
-            ))}
-          </ul>
-        </section>
-      )}
+      {/* Two halves, and the split is by *kind of act* rather than by size.
+          Left is everything that adds somebody — the code you type, the code
+          you hand out. Right is everybody who already has access, and the
+          invitations waiting on an answer.
 
-      <section className="mt-8">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
-          Pendamping aktif
-        </h2>
+          `items-start` so the columns do not stretch each other: with one long
+          and one short, equal-height tracks would leave a tall empty card
+          beside a full one. Stacks below `lg`, left column first, because
+          connecting is what a patient opens this page to do. */}
+      <div className="mt-6 grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
+        {/* ── Left ─────────────────────────────────────────────────────── */}
+        <div className="min-w-0 space-y-6">
+          {/* Two directions exist for connecting and they are not equivalent:
+              this one starts from a code the caregiver already generated, so
+              the patient does nothing but type six characters. The share code
+              under it is the older path, where the caregiver goes looking. For
+              somebody being helped by their family, being handed a code is far
+              more likely than being asked to read one out. */}
+          <ConnectCaregiver />
 
-        {active.length === 0 ? (
-          <p className="mt-3 rounded-2xl bg-karsa-canvas px-4 py-5 text-[15px] leading-6 text-neutral-500 ring-1 ring-karsa-line">
-            Belum ada yang mendampingimu. Bagikan kode di bawah kalau kamu ingin
-            seseorang membantu.
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-3">
-            {active.map((member) => (
-              <ActiveCard key={member.relationshipId} member={member} />
-            ))}
-          </ul>
-        )}
-      </section>
+          {shareCode && <ShareCode code={shareCode} />}
+        </div>
 
-      {shareCode && <ShareCode code={shareCode} />}
+        {/* ── Right ────────────────────────────────────────────────────── */}
+        <div className="min-w-0 space-y-8">
+          {/* Invitations first: they are the only thing on this page that needs
+              an answer from you. */}
+          {pending.length > 0 && (
+            <section>
+              <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+                Menunggu jawabanmu
+              </h2>
+              <ul className="mt-3 space-y-3">
+                {pending.map((member) => (
+                  <InvitationCard key={member.relationshipId} member={member} />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section>
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
+              Pendamping aktif
+            </h2>
+
+            {active.length === 0 ? (
+              <p className="mt-3 rounded-2xl bg-karsa-canvas px-4 py-5 text-[15px] leading-6 text-neutral-500 ring-1 ring-karsa-line">
+                Belum ada yang mendampingimu. Masukkan kode dari pendampingmu,
+                atau bagikan kode undanganmu.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-3">
+                {active.map((member) => (
+                  <ActiveCard key={member.relationshipId} member={member} />
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
     </div>
   );
 }

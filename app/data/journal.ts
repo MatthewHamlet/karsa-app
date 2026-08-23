@@ -3,19 +3,35 @@
  *  Placeholders — this is a design pass. `HISTORY` is keyed by day-of-month for
  *  one month, which is all the calendar reads. */
 
-export type MoodKey = "segar" | "baik" | "pusing" | "sedih";
+/* ── Moods ──────────────────────────────────────────────────────────────────
+   Re-exported from `./mood`, not defined here.
 
-export const MOODS: { key: MoodKey; emoji: string; label: string }[] = [
-  { key: "segar", emoji: "😄", label: "Segar" },
-  { key: "baik", emoji: "🙂", label: "Baik" },
-  { key: "pusing", emoji: "😵‍💫", label: "Pusing" },
-  { key: "sedih", emoji: "😢", label: "Sedih" },
-];
+   This file used to carry its own four — segar, baik, pusing, sedih — drawn as
+   emoji, while the caregiver's side of the same app used five drawn as
+   `MoodFace`. Two problems came out of that, and only one of them was visual.
 
-export const MOOD_BY_KEY = Object.fromEntries(MOODS.map((m) => [m.key, m])) as Record<
-  MoodKey,
-  (typeof MOODS)[number]
->;
+   The visual one: the patient tapped a yellow emoji and their caregiver read
+   the result as a different face with a different name, so the two halves of a
+   conversation about how somebody felt did not agree on the vocabulary.
+
+   The real one: `mood_entries` accepts exactly `great | good | okay | low |
+   verylow` and nothing else (migration 0006). None of the four words above is
+   in that list, so a mood picked in this journal could not be written to the
+   database at all — the form was a dead end by construction.
+
+   One list now, shared by both. */
+export type { MoodKey } from "./mood";
+export { MOODS, MOOD_BY_KEY } from "./mood";
+
+import type { MoodKey } from "./mood";
+import { MONITOR_STATS, type MonitorKey, type StatTone } from "./careStats";
+
+/** Each reading's colour, taken from the caregiver's stat cards rather than
+ *  chosen again here. One table, so a shade changed for the dashboard changes
+ *  in the journal too instead of the two drifting apart. */
+export const MONITOR_TONE = Object.fromEntries(
+  MONITOR_STATS.map((s) => [s.key, s.tone]),
+) as Record<MonitorKey, StatTone>;
 
 /** One day in the heatmap. `done`/`total` is the medicine ratio the detail
  *  panel prints; `complete` is what colours the square, and it is derived from
@@ -40,21 +56,33 @@ export type JournalDay = {
 };
 
 /** One tile in the report's metric row. */
-export type DayMetric = { emoji: string; label: string; value: string; unit: string };
+/** One tile in the report's metric row.
+ *
+ *  `monitor` is the key of the caregiver's own illustration for this reading —
+ *  see `MONITOR_ART` below. It replaced an `emoji` field: the two halves of the
+ *  app were drawing the same blood pressure as 🩺 here and as a drawn cuff
+ *  there, so a patient and their caregiver were looking at different pictures
+ *  of the same number. */
+export type DayMetric = {
+  monitor: MonitorKey;
+  label: string;
+  value: string;
+  unit: string;
+};
 
 /** Flattens a day's readings into the tiles the carousel shows, in a fixed
  *  order so the row never reshuffles between dates. */
 export function dayMetrics(day: JournalDay): DayMetric[] {
   const out: DayMetric[] = [];
   if (day.glucose !== undefined)
-    out.push({ emoji: "🩸", label: "Gula Darah", value: String(day.glucose), unit: "mg/dL" });
-  if (day.bp) out.push({ emoji: "🩺", label: "Tensi", value: `${day.bp[0]}/${day.bp[1]}`, unit: "mmHg" });
+    out.push({ monitor: "bloodSugar", label: "Gula Darah", value: String(day.glucose), unit: "mg/dL" });
+  if (day.bp) out.push({ monitor: "bloodPressure", label: "Tensi", value: `${day.bp[0]}/${day.bp[1]}`, unit: "mmHg" });
   if (day.hr !== undefined)
-    out.push({ emoji: "❤️", label: "Detak Jantung", value: String(day.hr), unit: "bpm" });
+    out.push({ monitor: "heartRate", label: "Detak Jantung", value: String(day.hr), unit: "bpm" });
   if (day.temp !== undefined)
-    out.push({ emoji: "🌡️", label: "Suhu", value: day.temp.toFixed(1), unit: "°C" });
+    out.push({ monitor: "temperature", label: "Suhu", value: day.temp.toFixed(1), unit: "°C" });
   if (day.weight !== undefined)
-    out.push({ emoji: "⚖️", label: "Berat", value: String(day.weight), unit: "kg" });
+    out.push({ monitor: "weight", label: "Berat", value: String(day.weight), unit: "kg" });
   return out;
 }
 
@@ -66,11 +94,11 @@ export const MONTH_START_OFFSET = 5;
 export const MONTH_DAYS = 31;
 
 export const HISTORY: Record<number, JournalDay> = {
-  1: { mood: "baik", done: 3, total: 3 },
-  2: { mood: "segar", done: 3, total: 3, voice: 24 },
-  3: { mood: "baik", done: 2, total: 3 },
+  1: { mood: "good", done: 3, total: 3 },
+  2: { mood: "great", done: 3, total: 3, voice: 24 },
+  3: { mood: "good", done: 2, total: 3 },
   4: {
-    mood: "pusing",
+    mood: "low",
     done: 1,
     total: 3,
     voice: 41,
@@ -78,11 +106,11 @@ export const HISTORY: Record<number, JournalDay> = {
     glucose: 142,
     bp: [148, 92],
   },
-  5: { mood: "baik", done: 3, total: 3, glucose: 108, bp: [126, 80] },
+  5: { mood: "good", done: 3, total: 3, glucose: 108, bp: [126, 80] },
   /* Four readings on purpose: this is the day the carousel's arrows have to
      appear, and the one the sketch is drawn from. */
   6: {
-    mood: "sedih",
+    mood: "verylow",
     done: 1,
     total: 3,
     voice: 36,
@@ -92,24 +120,24 @@ export const HISTORY: Record<number, JournalDay> = {
     hr: 96,
     temp: 37.8,
   },
-  7: { mood: "baik", done: 3, total: 3, voice: 18, story: "Hari ini enak, sempat jalan pagi.", glucose: 104 },
-  8: { mood: "sedih", done: 0, total: 3, bp: [138, 88] },
-  9: { mood: "baik", done: 2, total: 3 },
-  10: { mood: "segar", done: 3, total: 3 },
-  11: { mood: "baik", done: 3, total: 3 },
-  12: { mood: "pusing", done: 1, total: 3, voice: 33 },
-  13: { mood: "baik", done: 3, total: 3 },
-  14: { mood: "segar", done: 3, total: 3 },
-  15: { mood: "baik", done: 2, total: 3 },
-  16: { mood: "baik", done: 3, total: 3 },
-  17: { mood: "segar", done: 3, total: 3, voice: 52 },
-  18: { mood: "baik", done: 3, total: 3 },
-  19: { mood: "pusing", done: 2, total: 3 },
-  20: { mood: "baik", done: 3, total: 3 },
-  21: { mood: "segar", done: 3, total: 3 },
-  22: { mood: "baik", done: 1, total: 3 },
+  7: { mood: "good", done: 3, total: 3, voice: 18, story: "Hari ini enak, sempat jalan pagi.", glucose: 104 },
+  8: { mood: "verylow", done: 0, total: 3, bp: [138, 88] },
+  9: { mood: "good", done: 2, total: 3 },
+  10: { mood: "great", done: 3, total: 3 },
+  11: { mood: "good", done: 3, total: 3 },
+  12: { mood: "low", done: 1, total: 3, voice: 33 },
+  13: { mood: "good", done: 3, total: 3 },
+  14: { mood: "great", done: 3, total: 3 },
+  15: { mood: "good", done: 2, total: 3 },
+  16: { mood: "good", done: 3, total: 3 },
+  17: { mood: "great", done: 3, total: 3, voice: 52 },
+  18: { mood: "good", done: 3, total: 3 },
+  19: { mood: "low", done: 2, total: 3 },
+  20: { mood: "good", done: 3, total: 3 },
+  21: { mood: "great", done: 3, total: 3 },
+  22: { mood: "good", done: 1, total: 3 },
   23: {
-    mood: "baik",
+    mood: "good",
     done: 3,
     total: 3,
     voice: 27,
@@ -118,9 +146,9 @@ export const HISTORY: Record<number, JournalDay> = {
     bp: [124, 78],
     hr: 74,
   },
-  24: { mood: "segar", done: 3, total: 3, glucose: 99 },
-  25: { mood: "baik", done: 2, total: 3, bp: [130, 82] },
-  26: { mood: "baik", done: 3, total: 3, glucose: 112, bp: [122, 79], weight: 58 },
+  24: { mood: "great", done: 3, total: 3, glucose: 99 },
+  25: { mood: "good", done: 2, total: 3, bp: [130, 82] },
+  26: { mood: "good", done: 3, total: 3, glucose: 112, bp: [122, 79], weight: 58 },
 };
 
 /** Today, in this placeholder month. Days after it are simply blank. */
@@ -134,7 +162,9 @@ export type MetricKind = "bp" | "glucose" | "weight" | "temp" | "hr";
 
 export type MetricSpec = {
   kind: MetricKind;
-  emoji: string;
+  /** The caregiver's illustration for this reading, so both sides of the app
+   *  draw it the same way. */
+  monitor: MonitorKey;
   label: string;
   unit: string;
   /** Stepper metrics only — blood pressure takes two typed numbers instead. */
@@ -146,10 +176,10 @@ export type MetricSpec = {
 };
 
 export const METRICS: Record<MetricKind, MetricSpec> = {
-  bp: { kind: "bp", emoji: "🩺", label: "Tekanan Darah", unit: "mmHg" },
+  bp: { kind: "bp", monitor: "bloodPressure", label: "Tekanan Darah", unit: "mmHg" },
   glucose: {
     kind: "glucose",
-    emoji: "🩸",
+    monitor: "bloodSugar",
     label: "Gula Darah",
     unit: "mg/dL",
     step: 5,
@@ -158,7 +188,7 @@ export const METRICS: Record<MetricKind, MetricSpec> = {
   },
   weight: {
     kind: "weight",
-    emoji: "⚖️",
+    monitor: "weight",
     label: "Berat Badan",
     unit: "kg",
     step: 1,
@@ -167,7 +197,7 @@ export const METRICS: Record<MetricKind, MetricSpec> = {
   },
   temp: {
     kind: "temp",
-    emoji: "🌡️",
+    monitor: "temperature",
     label: "Suhu Tubuh",
     unit: "°C",
     step: 0.1,
@@ -176,7 +206,7 @@ export const METRICS: Record<MetricKind, MetricSpec> = {
   },
   hr: {
     kind: "hr",
-    emoji: "❤️",
+    monitor: "heartRate",
     label: "Detak Jantung",
     unit: "bpm",
     step: 1,

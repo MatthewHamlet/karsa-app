@@ -1,13 +1,18 @@
 import CareShell, { type CareTab } from "../components/CareShell";
 import { CONTEXT_LABEL, type CareContextType } from "../data/care";
+import type { CareData } from "../lib/care/view";
 
 const first = (value: string | string[] | undefined) =>
   Array.isArray(value) ? value[0] : value;
 
 export default function CarePage({
   params,
+  data,
 }: {
   params: Record<string, string | string[] | undefined>;
+  /** Absent when nobody is signed in — the shell then renders from the
+   *  placeholder data so the design pages still work. */
+  data?: CareData;
 }) {
   /* A "Diskusikan" link lands here: it opens the chat tab with the care item
      already attached to the composer. */
@@ -27,7 +32,7 @@ export default function CarePage({
        finished. CareShell's chat tab cancels this same pair. */
     <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
       {/* No separate colour band: the clay is the hub's own background. */}
-      <CareShell initialTab={tab} context={context} />
+      <CareShell initialTab={tab} context={context} data={data} />
     </div>
   );
 }

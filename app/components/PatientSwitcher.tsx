@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Bell, Check, ChevronDown } from "lucide-react";
 import { EASE } from "./List";
@@ -8,6 +9,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { PATIENTS } from "../data/dashboard";
 import { RELATIONSHIP_LABEL, type CarePatient } from "../lib/care/types";
+import { colourFor } from "./avatarColour";
 
 /** Who this page is about, and how to change it.
  *
@@ -16,18 +18,6 @@ import { RELATIONSHIP_LABEL, type CarePatient } from "../lib/care/types";
  *  said who you are and the only place it never said who you are reading
  *  about. The caregiver moved to the rail's foot, where an account belongs,
  *  and the space went to the one question this column actually raises. */
-/** A stable colour per patient.
- *
- *  The mock rows carried a hand-picked `color`; real ones cannot, because a
- *  colour is not a fact about a person and nobody is going to choose one when
- *  adding their mother. Derived from the id instead, so the same patient is the
- *  same colour on every device and after every reload. */
-const AVATAR_COLOURS = ["#56785d", "#8a76bd", "#c08b5e", "#4f8a8b", "#a4676b", "#6f7f9e"];
-function colourFor(id: string): string {
-  let hash = 0;
-  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return AVATAR_COLOURS[hash % AVATAR_COLOURS.length];
-}
 
 /** Real rows when signed in. The placeholder list survives only so the design
  *  pages still render for someone working without credentials — it is used when
@@ -44,14 +34,39 @@ const DESIGN_FALLBACK: CarePatient[] = PATIENTS.map((p) => ({
   patientStatus: "active",
 }));
 
-export default function PatientSwitcher({ patients }: { patients?: CarePatient[] }) {
+export default function PatientSwitcher({
+  patients,
+  activeId: activeFromServer,
+}: {
+  patients?: CarePatient[];
+  /** Which patient the page is currently about. Comes from the URL, because
+   *  every figure on the page around this control was fetched on the server for
+   *  that specific person — a selection held in local state here would change
+   *  the name at the top and nothing underneath it. */
+  activeId?: string;
+}) {
   const list = patients ?? DESIGN_FALLBACK;
-  const [activeId, setActiveId] = useState(list[0]?.patientId ?? "");
   const [open, setOpen] = useState(false);
   const reduce = useReducedMotion();
+  const router = useRouter();
+  const pathname = usePathname();
+  /* The navigation is a server round trip, so the menu would otherwise sit
+     open, unchanged, until the new page streamed in. `pending` is what lets the
+     row show that the press landed. */
+  const [pending, startTransition] = useTransition();
 
+  const activeId = activeFromServer ?? list[0]?.patientId ?? "";
   const active = list.find((p) => p.patientId === activeId) ?? list[0];
   const fade = reduce ? { duration: 0 } : { duration: 0.18, ease: EASE };
+
+  const select = (patientId: string) => {
+    setOpen(false);
+    if (patientId === activeId) return;
+    /* `replace`, not `push`: switching who you are reading about is changing
+       the view, not travelling somewhere. Pushing would make Back walk through
+       every patient you glanced at before leaving the page. */
+    startTransition(() => router.replace(`${pathname}?p=${patientId}`, { scroll: false }));
+  };
 
   const avatar = (patient: CarePatient, size: string) => (
     <span
@@ -88,7 +103,9 @@ export default function PatientSwitcher({ patients }: { patients?: CarePatient[]
   return (
     <div
       data-user-card
-      className="flex shrink-0 items-center gap-2 border-b border-karsa-line/80 pb-4"
+      className={`flex shrink-0 items-center gap-2 border-b border-karsa-line/80 pb-4 transition-opacity duration-200 ${
+        pending ? "opacity-60" : ""
+      }`}
     >
       <div className="relative min-w-0 flex-1">
         <button
@@ -149,10 +166,7 @@ export default function PatientSwitcher({ patients }: { patients?: CarePatient[]
                         type="button"
                         role="option"
                         aria-selected={selected}
-                        onClick={() => {
-                          setActiveId(patient.patientId);
-                          setOpen(false);
-                        }}
+                        onClick={() => select(patient.patientId)}
                         className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
                           selected ? "bg-karsa-soft" : "hover:bg-karsa-canvas"
                         }`}

@@ -234,7 +234,7 @@ export default function AssistantChat({
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) submit(event);
               }}
-              placeholder="Tanya apa saja tentang perawatan Meimei…"
+              placeholder="Tanya apa saja tentang perawatan hari ini…"
               className="min-h-[44px] flex-1 resize-none rounded-full bg-transparent px-4 py-3 text-[14.5px] leading-5 text-neutral-800 outline-none placeholder:text-neutral-400"
             />
 

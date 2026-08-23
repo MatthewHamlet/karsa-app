@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Play, X } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Play, X } from "lucide-react";
+import MoodFace from "./MoodFace";
+import StatArt from "./StatArt";
 import {
   HISTORY,
   MONTH_DAYS,
   MONTH_LABEL,
   MONTH_START_OFFSET,
+  MONITOR_TONE,
   MOOD_BY_KEY,
   TODAY_DATE,
   WEEKDAYS,
@@ -122,7 +125,8 @@ function Shell({
         <header className="flex shrink-0 items-center gap-4 border-b-2 border-karsa-line px-6 py-4">
           <div className="min-w-0 flex-1">
             <h2 className="text-[22px] font-extrabold tracking-tight text-neutral-900">
-              📜 Riwayat Kalender
+              <CalendarDays size={20} strokeWidth={2.6} aria-hidden className="mr-2 inline-block align-[-3px] text-karsa-dark" />
+              Riwayat Kalender
             </h2>
             <p className="mt-0.5 text-[14.5px] text-neutral-500">
               Laporan {pick} {MONTH_LABEL}
@@ -169,7 +173,8 @@ function Shell({
           <SheetHandle />
           <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-karsa-line px-5 pb-4">
             <h2 className="text-[20px] font-extrabold tracking-tight text-neutral-900">
-              📜 Riwayat
+              <CalendarDays size={19} strokeWidth={2.6} aria-hidden className="mr-2 inline-block align-[-3px] text-karsa-dark" />
+              Riwayat
             </h2>
             <CloseButton onClick={onClose} label="TUTUP" />
           </header>
@@ -335,11 +340,15 @@ function ReportPanel({ day, date }: { day: JournalDay | undefined; date: number 
     <div className="flex h-full flex-col">
       {/* Face and words, side by side — the bubble points back at who said it. */}
       <div className="flex items-start gap-4">
+        {/* The same face the form offered and the caregiver's dashboard draws.
+            Tinted with the mood's own wash rather than the neutral canvas, so a
+            bad day is legible from across the room before a word is read. */}
         <span
           aria-hidden
-          className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full bg-karsa-canvas text-[46px] leading-none ring-2 ring-karsa-line"
+          className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-full ring-2"
+          style={{ backgroundColor: mood.soft, borderColor: mood.color }}
         >
-          {mood.emoji}
+          <MoodFace mood={day.mood} className="h-[62px] w-[62px]" />
         </span>
 
         <div className="min-w-0 flex-1 pt-1">
@@ -456,9 +465,11 @@ function MetricCarousel({ metrics }: { metrics: ReturnType<typeof dayMetrics> })
             className="flex min-h-[152px] w-[168px] shrink-0 snap-start flex-col justify-between rounded-2xl bg-karsa-canvas p-4 ring-2 ring-karsa-line lg:min-h-0 lg:w-auto lg:p-3.5"
           >
             <p className="flex items-center gap-2 text-[14px] font-bold leading-5 text-neutral-600 lg:text-[12px] lg:text-neutral-500">
-              <span aria-hidden className="text-[20px] leading-none lg:text-[15px]">
-                {m.emoji}
-              </span>
+              <StatArt
+                kind={m.monitor}
+                tone={MONITOR_TONE[m.monitor]}
+                className="h-5 w-5 lg:h-4 lg:w-4"
+              />
               {m.label}
             </p>
             <div className="mt-2">

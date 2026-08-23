@@ -7,7 +7,7 @@ import {
   CalendarDays,
   ChevronRight,
 } from "lucide-react";
-import type { ScheduleEvent } from "../data/dashboard";
+import type { ScheduleEntry } from "../lib/care/queries";
 
 /** Each kind gets its own wash so the list reads at a glance. The edge is a
  *  border rather than a ring: a ring paints outside the box and the scrolling
@@ -35,7 +35,7 @@ const KIND = {
   },
 } as const;
 
-export default function ScheduleItem({ event }: { event: ScheduleEvent }) {
+export default function ScheduleItem({ event }: { event: ScheduleEntry }) {
   const { icon: Icon, card, tile } = KIND[event.kind];
 
   return (

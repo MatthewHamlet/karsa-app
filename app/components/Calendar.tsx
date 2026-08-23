@@ -4,13 +4,26 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { EASE, PILL_SPRING } from "./List";
-import { MONTHS, SCHEDULE, TODAY, WEEKDAYS, dayKey } from "../data/dashboard";
+import { MONTHS, dayKey, jakartaToday } from "../lib/care/time";
+
+/** Monday-first, matching the sketch. */
+const WEEKDAYS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
 export type Selection = { y: number; m: number; d: number };
 
 type CalendarProps = {
   selected: Selection;
   onSelect: (value: Selection) => void;
+  /** Which day gets the "today" disc. Passed in rather than read from the
+   *  browser clock: the page around this grid is server-rendered in Jakarta
+   *  time, and a calendar that disagreed with it by a day would be the only
+   *  thing on the page telling a different date. */
+  today?: Selection;
+  /** Keys — `dayKey(y, m, d)` — of days with something scheduled. A set rather
+   *  than the events themselves: this grid only ever asks "is anything on",
+   *  and handing it the full list would re-render 42 cells whenever any one
+   *  event changed. */
+  marked?: Set<string>;
   className?: string;
 };
 
@@ -21,7 +34,13 @@ function leadingBlanks(y: number, m: number) {
 
 const daysIn = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
 
-export default function Calendar({ selected, onSelect, className = "" }: CalendarProps) {
+export default function Calendar({
+  selected,
+  onSelect,
+  today = jakartaToday(),
+  marked,
+  className = "",
+}: CalendarProps) {
   const [view, setView] = useState({ y: selected.y, m: selected.m });
   const [direction, setDirection] = useState(1);
   const reduce = useReducedMotion();
@@ -110,8 +129,8 @@ export default function Calendar({ selected, onSelect, className = "" }: Calenda
               const isSelected =
                 selected.y === view.y && selected.m === view.m && selected.d === day;
               const isToday =
-                TODAY.y === view.y && TODAY.m === view.m && TODAY.d === day;
-              const hasEvents = Boolean(SCHEDULE[dayKey(view.y, view.m, day)]);
+                today.y === view.y && today.m === view.m && today.d === day;
+              const hasEvents = marked?.has(dayKey(view.y, view.m, day)) ?? false;
 
               return (
                 <button

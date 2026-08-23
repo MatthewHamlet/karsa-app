@@ -3,7 +3,7 @@
 export default function ProfileAvatar({ className = "h-28 w-28" }: { className?: string }) {
   return (
     <span className={`relative block shrink-0 ${className}`}>
-      <svg viewBox="0 0 120 120" role="img" aria-label="Foto profil Meimei" className="h-full w-full">
+      <svg viewBox="0 0 120 120" role="img" aria-label="Foto profil pasien" className="h-full w-full">
         <defs>
           <clipPath id="pa-clip">
             <circle cx="60" cy="60" r="60" />

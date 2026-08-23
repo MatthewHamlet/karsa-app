@@ -2,44 +2,43 @@
 
 import Link from "next/link";
 import { useActionState, useId, useState } from "react";
-import { ArrowLeft, Check, KeyRound, UserPlus } from "lucide-react";
-import { createPatientProfile, invitePatient, type CareResult } from "../lib/care/actions";
+import { ArrowLeft, Check, KeyRound, QrCode } from "lucide-react";
+import PairingPanel from "../components/PairingPanel";
+import { invitePatient, type CareResult } from "../lib/care/actions";
 
-/** Adding someone to look after.
+/** Connecting to the person you look after.
  *
- *  Two doors, because there are genuinely two situations and pretending
- *  otherwise makes one of them awkward:
+ *  Two options and no form. There used to be a third — type their name, their
+ *  date of birth, and get a profile for somebody who had never heard of Karsa —
+ *  and it is gone: a record created that way belongs to nobody, consents to
+ *  nothing, and the person it describes has no way to see or correct what is
+ *  written about them. Every link now starts from a code that one of the two
+ *  people involved chose to hand over.
  *
- *    · the person already uses Karsa — ask them for access, and wait
- *    · the person has never heard of Karsa — write down what you know, and
- *      start caring for them today
+ *  The two that remain are the same handshake from either end:
  *
- *  The second is the common case for an elderly parent and the one most apps
- *  get wrong, by insisting the patient sign up first. Here the caregiver gets a
- *  working record immediately, and the patient can claim it whenever they are
- *  ready — or never.
+ *    · **Share** — you generate a code and a QR, and they enter it. This is the
+ *      common direction, because the caregiver is the one driving and the
+ *      person being cared for should have to do as little as possible.
+ *    · **Enter** — they already gave you a code, and you type it in. Their
+ *      account then shows the request and they approve it.
  *
- *  Invitations go by **code**, never by email search. A form that finds people
- *  by address is a free way to test whether somebody has an account here. */
-type Mode = "existing" | "new";
+ *  Share is the default for that reason. */
+type Mode = "share" | "enter";
 
 const FIELD =
   "h-14 w-full rounded-2xl border-2 border-karsa-line bg-white px-4 text-[16px] text-neutral-900 outline-none transition-colors duration-200 placeholder:text-neutral-400 focus:border-karsa disabled:opacity-70";
 
-export default function AddPatient() {
-  const [mode, setMode] = useState<Mode>("new");
+export default function AddPatient({ initialMode = "share" }: { initialMode?: Mode }) {
+  /* Which door the caregiver came through. The onboarding screen links straight
+     to one of the two — landing them on the first and making them press the
+     tile they already pressed is the kind of small friction that reads as the
+     app not listening. */
+  const [mode, setMode] = useState<Mode>(initialMode);
 
-  const [inviteState, inviteAction, inviting] = useActionState<CareResult, FormData>(
-    invitePatient,
-    { error: null },
-  );
-  const [createState, createAction, creating] = useActionState<CareResult, FormData>(
-    createPatientProfile,
-    { error: null },
-  );
-
-  const state = mode === "existing" ? inviteState : createState;
-  const busy = inviting || creating;
+  const [state, inviteAction, inviting] = useActionState<CareResult, FormData>(invitePatient, {
+    error: null,
+  });
 
   const uid = useId();
 
@@ -51,12 +50,10 @@ export default function AddPatient() {
             <Check size={30} strokeWidth={2.6} aria-hidden />
           </span>
           <h1 className="mt-5 text-3xl font-bold tracking-tight text-neutral-900">
-            {mode === "existing" ? "Undangan terkirim" : "Pasien ditambahkan"}
+            Undangan terkirim
           </h1>
           <p className="mt-3 text-[16px] leading-6 text-neutral-600">
-            {mode === "existing"
-              ? "Kamu akan bisa melihat datanya setelah dia menyetujui."
-              : "Profilnya sudah dibuat. Nanti dia bisa mengklaimnya sendiri kalau sudah punya akun Karsa."}
+            Kamu akan bisa melihat datanya setelah dia menyetujui.
           </p>
           <Link
             href="/"
@@ -72,7 +69,7 @@ export default function AddPatient() {
   return (
     <Shell>
       <Link
-        href="/"
+        href="/mulai"
         className="inline-flex items-center gap-2 rounded text-[14px] font-semibold text-neutral-500 outline-none transition-colors hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-karsa/40"
       >
         <ArrowLeft size={16} strokeWidth={2.4} aria-hidden />
@@ -82,7 +79,9 @@ export default function AddPatient() {
       <h1 className="mt-4 text-3xl font-bold tracking-tight text-neutral-900">
         Tambahkan pasien
       </h1>
-      <p className="mt-2 text-[15px] text-neutral-500">Siapa yang kamu dampingi?</p>
+      <p className="mt-2 text-[15px] text-neutral-500">
+        Hubungkan lewat kode undangan atau kode QR.
+      </p>
 
       {/* The whole tile is the label, so the tap target is the card rather than
           a small circle beside it. */}
@@ -90,16 +89,16 @@ export default function AddPatient() {
         {(
           [
             {
-              value: "new" as Mode,
-              icon: UserPlus,
-              title: "Belum punya akun",
-              hint: "Buat profilnya sekarang",
+              value: "share" as Mode,
+              icon: QrCode,
+              title: "Bagikan kode saya",
+              hint: "Buat kode & QR untuk dia",
             },
             {
-              value: "existing" as Mode,
+              value: "enter" as Mode,
               icon: KeyRound,
-              title: "Sudah pakai Karsa",
-              hint: "Minta kode undangannya",
+              title: "Saya punya kode",
+              hint: "Masukkan kode darinya",
             },
           ]
         ).map((option) => {
@@ -112,7 +111,9 @@ export default function AddPatient() {
               onClick={() => setMode(option.value)}
               aria-pressed={on}
               className={`rounded-2xl border-2 p-4 text-left outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
-                on ? "border-karsa bg-karsa-soft" : "border-karsa-line bg-white hover:border-karsa/40"
+                on
+                  ? "border-karsa bg-karsa-soft"
+                  : "border-karsa-line bg-white hover:border-karsa/40"
               }`}
             >
               <Icon
@@ -132,7 +133,7 @@ export default function AddPatient() {
         })}
       </div>
 
-      {state.error && (
+      {state.error && mode === "enter" && (
         <p
           role="alert"
           className="mt-5 whitespace-pre-line rounded-2xl border-2 border-rose-200 bg-rose-50 px-4 py-3 text-[14px] font-semibold leading-5 text-rose-800"
@@ -141,20 +142,34 @@ export default function AddPatient() {
         </p>
       )}
 
-      {mode === "new" ? (
-        <form action={createAction} className="mt-5">
-          <label htmlFor={`${uid}-name`} className="sr-only">
-            Nama pasien
+      {mode === "share" ? (
+        <div className="mt-7">
+          <PairingPanel />
+        </div>
+      ) : (
+        <form action={inviteAction} className="mt-6">
+          <label
+            htmlFor={`${uid}-code`}
+            className="block text-[14px] font-semibold text-neutral-700"
+          >
+            Kode undangan dari pasien
           </label>
+          <p className="mt-1 text-[13px] leading-5 text-neutral-500">
+            Minta dia membuka Karsa dan membacakan kode 8 karakter di halaman
+            &ldquo;Pendamping saya&rdquo;.
+          </p>
           <input
-            id={`${uid}-name`}
-            name="display_name"
+            id={`${uid}-code`}
+            name="share_code"
             type="text"
             required
-            maxLength={80}
-            disabled={busy}
-            placeholder="Nama pasien"
-            className={FIELD}
+            maxLength={8}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            disabled={inviting}
+            placeholder="ABCD2345"
+            className={`${FIELD} mt-2 text-center text-2xl font-bold uppercase tracking-widest`}
           />
 
           <label htmlFor={`${uid}-rel`} className="sr-only">
@@ -165,80 +180,21 @@ export default function AddPatient() {
             name="relation"
             type="text"
             maxLength={40}
-            disabled={busy}
+            disabled={inviting}
             placeholder="Hubunganmu — Ibu, Ayah, Nenek (opsional)"
             className={`${FIELD} mt-3`}
           />
 
-          <label
-            htmlFor={`${uid}-dob`}
-            className="mt-4 block text-[14px] font-semibold text-neutral-700"
+          <button
+            type="submit"
+            disabled={inviting}
+            className="mt-6 flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#3f6b44] text-[17px] font-bold tracking-wide text-white outline-none transition-colors duration-200 hover:bg-[#345a39] focus-visible:ring-2 focus-visible:ring-[#3f6b44] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Tanggal lahir <span className="font-medium text-neutral-400">(opsional)</span>
-          </label>
-          <input
-            id={`${uid}-dob`}
-            name="date_of_birth"
-            type="date"
-            disabled={busy}
-            className={`${FIELD} mt-2`}
-          />
-
-          <Submit busy={creating} label="TAMBAHKAN PASIEN" pending="MENYIMPAN…" />
-        </form>
-      ) : (
-        <form action={inviteAction} className="mt-5">
-          <label
-            htmlFor={`${uid}-code`}
-            className="block text-[14px] font-semibold text-neutral-700"
-          >
-            Kode undangan dari pasien
-          </label>
-          <p className="mt-1 text-[13px] leading-5 text-neutral-500">
-            Minta dia membuka Karsa dan membacakan kode 8 karakter di profilnya.
-          </p>
-          <input
-            id={`${uid}-code`}
-            name="share_code"
-            type="text"
-            required
-            maxLength={8}
-            autoComplete="off"
-            spellCheck={false}
-            disabled={busy}
-            placeholder="ABCD2345"
-            className={`${FIELD} mt-2 text-center font-mono text-[22px] font-bold uppercase tracking-[0.25em]`}
-          />
-
-          <label htmlFor={`${uid}-rel2`} className="sr-only">
-            Hubunganmu dengannya
-          </label>
-          <input
-            id={`${uid}-rel2`}
-            name="relation"
-            type="text"
-            maxLength={40}
-            disabled={busy}
-            placeholder="Hubunganmu — Ibu, Ayah, Nenek (opsional)"
-            className={`${FIELD} mt-3`}
-          />
-
-          <Submit busy={inviting} label="KIRIM UNDANGAN" pending="MENGIRIM…" />
+            {inviting ? "MENGIRIM…" : "KIRIM UNDANGAN"}
+          </button>
         </form>
       )}
     </Shell>
-  );
-}
-
-function Submit({ busy, label, pending }: { busy: boolean; label: string; pending: string }) {
-  return (
-    <button
-      type="submit"
-      disabled={busy}
-      className="mt-6 flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#3f6b44] text-[17px] font-bold tracking-wide text-white outline-none transition-colors duration-200 hover:bg-[#345a39] focus-visible:ring-2 focus-visible:ring-[#3f6b44] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {busy ? pending : label}
-    </button>
   );
 }
 

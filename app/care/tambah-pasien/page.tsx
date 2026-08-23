@@ -11,11 +11,15 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function TambahPasien() {
+export default async function TambahPasien({
+  searchParams,
+}: PageProps<"/care/tambah-pasien">) {
   /* An optimistic gate only — it keeps a signed-out visitor from a form that
      could never work. The actions behind it check again, and RLS decides. */
   if (isSupabaseConfigured() && !(await getSessionProfile())) {
     redirect("/login?next=/care/tambah-pasien");
   }
-  return <AddPatient />;
+
+  const mode = (await searchParams).mode;
+  return <AddPatient initialMode={mode === "enter" ? "enter" : "share"} />;
 }

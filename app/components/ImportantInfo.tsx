@@ -1,23 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowDown, ArrowUp, History, Info, Pencil, Plus, Trash2 } from "lucide-react";
 import Modal from "./Modal";
 import { EASE } from "./List";
 import { IMPORTANT_INFO, INFO_HISTORY } from "../data/careStats";
+import { saveCareNotes, type CareResult } from "../lib/care/actions";
+import type { CareData } from "../lib/care/view";
 
 /** How many instructions the card shows before deferring to "lihat semua". */
 const PREVIEW = 4;
 
-export default function ImportantInfo() {
-  const [items, setItems] = useState<string[]>(IMPORTANT_INFO);
+/** One row of the editor. `id` is `null` for a line that has not been saved
+ *  yet, which is what tells the action to insert rather than update. */
+type Draft = { id: string | null; body: string };
+
+export default function ImportantInfo({ data }: { data?: CareData }) {
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [allOpen, setAllOpen] = useState(false);
   /** The edit modal works on a copy, so cancelling really cancels. */
-  const [draft, setDraft] = useState<string[]>(IMPORTANT_INFO);
+  const [draft, setDraft] = useState<Draft[]>([]);
   const reduce = useReducedMotion();
+
+  const [state, save, saving] = useActionState<CareResult, FormData>(saveCareNotes, {
+    error: null,
+  });
+
+  /* Signed out, the placeholder lines stand in and the editor is a sketch: it
+     has nowhere to save to, so the button that would save is not shown. */
+  const items: Draft[] = data
+    ? data.notes.map((n) => ({ id: n.id, body: n.body }))
+    : IMPORTANT_INFO.map((body) => ({ id: null, body }));
+
+  const history = data
+    ? data.notes.map((n) => ({
+        id: n.id,
+        date: n.updatedLabel,
+        text: n.body,
+        by: n.updatedBy,
+      }))
+    : INFO_HISTORY;
+
+  useEffect(() => {
+    if (state.ok) setEditOpen(false);
+  }, [state.ok]);
 
   const openEditor = () => {
     setDraft(items);
@@ -33,19 +61,16 @@ export default function ImportantInfo() {
       return next;
     });
 
-  const save = () => {
-    setItems(draft.map((line) => line.trim()).filter(Boolean));
-    setEditOpen(false);
-  };
-
-  const List = ({ lines }: { lines: string[] }) => (
+  const List = ({ lines }: { lines: Draft[] }) => (
     <ol className="space-y-3">
       {lines.map((line, i) => (
-        <li key={`${line}-${i}`} className="flex items-start gap-3.5">
+        <li key={line.id ?? `${line.body}-${i}`} className="flex items-start gap-3.5">
           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-info-100 text-[12px] font-bold tabular-nums text-info-600">
             {i + 1}
           </span>
-          <p className="min-w-0 flex-1 pt-0.5 text-[14.5px] leading-6 text-neutral-700">{line}</p>
+          <p className="min-w-0 flex-1 pt-0.5 text-[14.5px] leading-6 text-neutral-700">
+            {line.body}
+          </p>
         </li>
       ))}
     </ol>
@@ -91,7 +116,13 @@ export default function ImportantInfo() {
       </header>
 
       <div className="rounded-2xl bg-white/70 p-5 ring-1 ring-info-edge/70 xl:p-6">
-        <List lines={items.slice(0, PREVIEW)} />
+        {items.length === 0 ? (
+          <p className="py-3 text-center text-[14px] leading-5 text-neutral-500">
+            Belum ada instruksi. Tambahkan yang perlu diingat semua pendamping.
+          </p>
+        ) : (
+          <List lines={items.slice(0, PREVIEW)} />
+        )}
 
         {items.length > PREVIEW && (
           <button
@@ -113,6 +144,11 @@ export default function ImportantInfo() {
         size="lg"
         footer={
           <div className="flex items-center justify-end gap-2">
+            {state.error && (
+              <p role="alert" className="mr-auto text-[13px] font-medium text-rose-700">
+                {state.error}
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setEditOpen(false)}
@@ -120,13 +156,22 @@ export default function ImportantInfo() {
             >
               Batal
             </button>
-            <button
-              type="button"
-              onClick={save}
-              className="rounded-full bg-karsa px-5 py-2.5 text-[14px] font-semibold text-white outline-none transition-colors hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2"
-            >
-              Simpan
-            </button>
+            {/* The list is submitted as one JSON field rather than a row of
+                inputs — see `saveCareNotes`. The form is here in the footer
+                because that is where its submit button is; the fields it
+                serialises live in React state above. */}
+            <form action={save}>
+              <input type="hidden" name="patient_id" value={data?.activePatientId ?? ""} />
+              <input type="hidden" name="notes" value={JSON.stringify(draft)} />
+              <button
+                type="submit"
+                disabled={saving || !data}
+                title={data ? undefined : "Masuk untuk menyimpan"}
+                className="rounded-full bg-karsa px-5 py-2.5 text-[14px] font-semibold text-white outline-none transition-colors hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 disabled:opacity-50"
+              >
+                {saving ? "Menyimpan…" : "Simpan"}
+              </button>
+            </form>
           </div>
         }
       >
@@ -134,7 +179,7 @@ export default function ImportantInfo() {
           <AnimatePresence initial={false}>
             {draft.map((line, i) => (
               <motion.li
-                key={i}
+                key={line.id ?? `new-${i}`}
                 layout
                 exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0 }}
                 transition={reduce ? { duration: 0 } : { duration: 0.22, ease: EASE }}
@@ -146,10 +191,14 @@ export default function ImportantInfo() {
                   </span>
 
                   <textarea
-                    value={line}
+                    value={line.body}
                     rows={2}
                     onChange={(e) =>
-                      setDraft((prev) => prev.map((v, index) => (index === i ? e.target.value : v)))
+                      setDraft((prev) =>
+                        prev.map((v, index) =>
+                          index === i ? { ...v, body: e.target.value } : v,
+                        ),
+                      )
                     }
                     aria-label={`Instruksi ${i + 1}`}
                     className="min-w-0 flex-1 resize-none rounded-xl bg-karsa-canvas/60 px-3 py-2 text-[14.5px] leading-6 text-neutral-800 outline-none ring-1 ring-karsa-line focus-visible:ring-2 focus-visible:ring-karsa/40"
@@ -191,7 +240,7 @@ export default function ImportantInfo() {
 
         <button
           type="button"
-          onClick={() => setDraft((prev) => [...prev, ""])}
+          onClick={() => setDraft((prev) => [...prev, { id: null, body: "" }])}
           className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[13.5px] font-semibold text-karsa-dark outline-none ring-1 ring-karsa-line transition-colors hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
         >
           <Plus size={15} strokeWidth={2.5} />
@@ -207,7 +256,7 @@ export default function ImportantInfo() {
         description="Perubahan pada informasi dan rencana perawatan."
       >
         <ol className="space-y-2">
-          {INFO_HISTORY.map((change) => (
+          {history.map((change) => (
             <li
               key={change.id}
               className="flex gap-4 rounded-2xl bg-white p-4 ring-1 ring-karsa-line"

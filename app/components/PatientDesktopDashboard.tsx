@@ -10,11 +10,13 @@ import TasksDone from "./TasksDone";
 import { EASE } from "./List";
 import {
   AFFIRMATION,
-  ENERGY_TARGET,
+  ENERGY_TARGET as DESIGN_TARGET,
   MASCOT_LINES,
   PATIENT_TASKS,
   type PatientTask,
 } from "../data/patient";
+import { toggleTask } from "../lib/care/actions";
+import type { PatientHome } from "../lib/care/queries";
 
 /** Long enough for the line to finish drawing before the row goes. */
 const STRIKE_MS = 560;
@@ -38,9 +40,9 @@ const STRIKE_MS = 560;
  *  cannot hold a room and seven tasks at a legible size, and shrinking the
  *  type to make it fit would trade away the one thing this audience needs. */
 
-export default function PatientDesktopDashboard() {
+export default function PatientDesktopDashboard({ home }: { home?: PatientHome | null }) {
   const reduce = useReducedMotion();
-  const [tasks, setTasks] = useState<PatientTask[]>(PATIENT_TASKS);
+  const [tasks, setTasks] = useState<PatientTask[]>(home?.tasks ?? PATIENT_TASKS);
   const [talking, setTalking] = useState(false);
   /** Ticked, striking through, still on screen. */
   const [striking, setStriking] = useState<string[]>([]);
@@ -54,7 +56,9 @@ export default function PatientDesktopDashboard() {
     () => tasks.reduce((sum, task) => (task.done ? sum + task.points : sum), 0),
     [tasks],
   );
-  const pct = Math.min(100, Math.round((energy / ENERGY_TARGET) * 100));
+  const energyTarget = home?.energyTarget ?? DESIGN_TARGET;
+  const pct = Math.min(100, Math.round((energy / energyTarget) * 100));
+  const affirmation = home ? home.affirmation : AFFIRMATION;
 
   /** Done tasks leave the list entirely — the list is what is left to do. */
   const visible = tasks.filter((task) => !task.done);
@@ -90,6 +94,16 @@ export default function PatientDesktopDashboard() {
           );
           setStriking((prev) => prev.filter((taskId) => taskId !== id));
           setBurst((n) => n + 1);
+
+          /* Written once the undo window has closed, which is what makes the
+             window real: tapping again before the line finishes drawing takes
+             the row back and nothing was ever saved. Not awaited — the row is
+             already gone, and the next render reads the database. */
+          if (!home) return;
+          const fd = new FormData();
+          fd.set("task_id", id);
+          fd.set("patient_id", home.patientId);
+          void toggleTask({ error: null }, fd);
         },
         reduce ? 0 : STRIKE_MS,
       ),
@@ -176,21 +190,26 @@ export default function PatientDesktopDashboard() {
                 Frosted rather than solid: it sits on the room, and a hard
                 white slab would read as a panel dropped on top of the scene
                 instead of something resting in it. */}
-            <div className="rounded-3xl bg-white/70 p-4 shadow-[0_1px_2px_rgba(24,32,24,0.04),0_18px_36px_-24px_rgba(24,32,24,0.45)] ring-1 ring-white/70 backdrop-blur-md lg:p-5">
-              <div className="flex items-center gap-3.5">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-nut-100 text-2xl lg:h-14 lg:w-14 lg:text-[26px]">
-                  💌
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
-                    Pesan dari {AFFIRMATION.relation} — {AFFIRMATION.from}
+            {/* Only when somebody has actually written something. An invented
+                message of encouragement, signed with a real relative's name, is
+                the one thing this screen must never print. */}
+            {affirmation && (
+              <div className="rounded-3xl bg-white/70 p-4 shadow-[0_1px_2px_rgba(24,32,24,0.04),0_18px_36px_-24px_rgba(24,32,24,0.45)] ring-1 ring-white/70 backdrop-blur-md lg:p-5">
+                <div className="flex items-center gap-3.5">
+                  <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-nut-100 text-2xl lg:h-14 lg:w-14 lg:text-[26px]">
+                    💌
                   </span>
-                  <span className="mt-1 block text-[16px] font-bold leading-6 text-neutral-800 lg:text-[17px]">
-                    {AFFIRMATION.text}
+                  <span className="min-w-0">
+                    <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
+                      Pesan dari {affirmation.relation} — {affirmation.from}
+                    </span>
+                    <span className="mt-1 block text-[16px] font-bold leading-6 text-neutral-800 lg:text-[17px]">
+                      {affirmation.text}
+                    </span>
                   </span>
-                </span>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* ── The one action ───────────────────────────────────────────
                 Opaque, deliberately. The frosting stops here: this is the
@@ -248,7 +267,7 @@ export default function PatientDesktopDashboard() {
                   Energi Sehat Hari Ini
                 </span>
                 <span className="text-[16px] font-extrabold tabular-nums text-karsa-dark">
-                  {energy} / {ENERGY_TARGET}
+                  {energy} / {energyTarget}
                 </span>
               </div>
 
@@ -256,7 +275,7 @@ export default function PatientDesktopDashboard() {
                 role="progressbar"
                 aria-valuenow={energy}
                 aria-valuemin={0}
-                aria-valuemax={ENERGY_TARGET}
+                aria-valuemax={energyTarget}
                 aria-label="Energi sehat hari ini"
                 className="mt-2.5 h-4 overflow-hidden rounded-full bg-karsa/15"
               >

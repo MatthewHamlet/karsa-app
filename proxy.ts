@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "./app/lib/supabase/config";
+import { hasChosenRole } from "./app/lib/roles";
 
 /** Session upkeep, on every request.
  *
@@ -38,6 +39,24 @@ const PUBLIC_PREFIXES = ["/login", "/auth"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/** The only routes a caregiver with nobody to care for may reach.
+ *
+ *  Everything else in the app divides by a patient, so until there is one there
+ *  is nothing behind those pages but zeroes. The rule is enforced here rather
+ *  than page by page for the same reason `PUBLIC_PREFIXES` is an allow-list: a
+ *  page added next month is closed by default, and the mistake shows up
+ *  immediately as "I cannot reach my own page" instead of silently as a
+ *  dashboard full of nothing.
+ *
+ *  `/pasien` is on the list because a person can be both — somebody's carer and
+ *  somebody else's patient — and being locked out of their own patient screen
+ *  for not yet having added a patient of their own would be absurd. */
+const ONBOARDING_ALLOWED = ["/mulai", "/care/tambah-pasien", "/pair", "/pasien"];
+
+function allowedWhileOnboarding(pathname: string): boolean {
+  return ONBOARDING_ALLOWED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export async function proxy(request: NextRequest) {
@@ -90,6 +109,62 @@ export async function proxy(request: NextRequest) {
 
   /* A signed-in visitor to `/login` is not bounced from here — the page does it,
      and one place owning that decision beats two. */
+
+  /* ── The role question ──────────────────────────────────────────────────
+     An account that has never said whether it is a pendamping or a pasien is
+     sent to answer before it reaches either app.
+
+     `/auth/callback` already redirects there straight after a Google sign-in,
+     so in the ordinary case this never fires. It exists for the two ways round
+     that: an account created by Google *before* this screen existed, and
+     anybody who closes the tab on the question and comes back later.
+
+     Costs nothing — `user` is already in hand from the `getUser` above, and
+     this is a property read on it. Public paths are excluded, which is what
+     keeps `/login/peran` itself reachable rather than redirecting to itself. */
+  if (user && !isPublic(pathname) && !hasChosenRole(user.user_metadata)) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login/peran";
+    url.search = "";
+    if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
+    return NextResponse.redirect(url);
+  }
+
+  /* ── The onboarding gate ────────────────────────────────────────────────
+     A caregiver who is not yet looking after anybody gets exactly one screen.
+
+     Only for caregivers, and only for pages they are not already allowed. The
+     role comes off the token's metadata, which is already in hand from the
+     `getUser` above — reading `profiles` instead would be a second database
+     round trip on every navigation in the app, to answer a question that
+     changes roughly never.
+
+     Metadata can be stale or, for a Google account, absent. That is survivable
+     in both directions: a patient mislabelled as a caregiver is asked to add
+     somebody and can walk to `/pasien`, and a caregiver mislabelled as a
+     patient is not gated here — `app/page.tsx` still sends them to `/mulai`.
+     This layer is the net, not the only check. */
+  if (user && !isPublic(pathname) && !allowedWhileOnboarding(pathname)) {
+    const role = user.user_metadata?.role;
+    const isCaregiver = role !== "patient" && role !== "pasien";
+
+    if (isCaregiver) {
+      /* `head: true` fetches no rows at all — this asks the database "is there
+         at least one" and nothing more. RLS scopes it to their own side. */
+      const { count } = await supabase
+        .from("care_relationships")
+        .select("id", { count: "exact", head: true })
+        .eq("caregiver_id", user.id)
+        .in("status", ["pending", "active"]);
+
+      if ((count ?? 0) === 0) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/mulai";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
+  }
 
   return response;
 }

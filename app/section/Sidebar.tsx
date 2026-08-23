@@ -359,7 +359,17 @@ export default function Sidebar({
    *  exact path meant `/login/daftar` rendered inside the caregiver navigation:
    *  a signed-out visitor who pressed "Daftar sekarang" landed on a 404 wearing
    *  the app's sidebar and bottom bar. */
-  const bareShell = pathname === "/login" || pathname.startsWith("/login/");
+  /*  `/mulai` and `/pair` join it for the opposite reason. Those two are
+   *  full-screen by design — the onboarding screen is the only page a caregiver
+   *  with nobody to care for may open, and a rail full of links that all bounce
+   *  straight back to it is a navigation that lies. `/pair` is opened by
+   *  somebody who scanned a QR and may have no idea what this app is; one
+   *  screen with one field is the whole point of it. */
+  const bareShell =
+    pathname === "/login" ||
+    pathname.startsWith("/login/") ||
+    pathname === "/mulai" ||
+    pathname === "/pair";
 
   /* The rail lives in the layout and survives navigation, so the highlight has
      to follow the route. Keyed on pathname only: in-page hash links leave it
