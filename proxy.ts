@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { SUPABASE_ANON_KEY, SUPABASE_URL, isSupabaseConfigured } from "./app/lib/supabase/config";
+import {
+  SUPABASE_ANON_KEY,
+  SUPABASE_URL,
+  isSupabaseConfigured,
+} from "./app/lib/supabase/config";
 import { hasChosenRole } from "./app/lib/roles";
 
 /** Session upkeep, on every request.
@@ -38,7 +42,9 @@ import { hasChosenRole } from "./app/lib/roles";
 const PUBLIC_PREFIXES = ["/login", "/auth"];
 
 function isPublic(pathname: string): boolean {
-  return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return PUBLIC_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
 }
 
 /** The only routes a caregiver with nobody to care for may reach.
@@ -53,10 +59,17 @@ function isPublic(pathname: string): boolean {
  *  `/pasien` is on the list because a person can be both — somebody's carer and
  *  somebody else's patient — and being locked out of their own patient screen
  *  for not yet having added a patient of their own would be absurd. */
-const ONBOARDING_ALLOWED = ["/mulai", "/care/tambah-pasien", "/pair", "/pasien"];
+const ONBOARDING_ALLOWED = [
+  "/mulai",
+  "/care/tambah-pasien",
+  "/pair",
+  "/pasien",
+];
 
 function allowedWhileOnboarding(pathname: string): boolean {
-  return ONBOARDING_ALLOWED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  return ONBOARDING_ALLOWED.some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
 }
 
 export async function proxy(request: NextRequest) {
@@ -73,7 +86,8 @@ export async function proxy(request: NextRequest) {
         /* Written twice, and both are needed. Onto `request` so anything
            rendering later in this same pass sees the fresh token, and onto a
            newly built `response` so the browser is told to store it. */
-        for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
+        for (const { name, value } of cookiesToSet)
+          request.cookies.set(name, value);
 
         response = NextResponse.next({ request });
 
@@ -103,7 +117,8 @@ export async function proxy(request: NextRequest) {
     /* Where they were headed, so signing in returns them there instead of
        dumping everyone on the home page. `/login` itself is never carried —
        that would bounce someone back to the door they just came through. */
-    if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
+    if (pathname !== "/")
+      url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
@@ -126,7 +141,8 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login/peran";
     url.search = "";
-    if (pathname !== "/") url.searchParams.set("next", pathname + request.nextUrl.search);
+    if (pathname !== "/")
+      url.searchParams.set("next", pathname + request.nextUrl.search);
     return NextResponse.redirect(url);
   }
 
@@ -144,13 +160,23 @@ export async function proxy(request: NextRequest) {
      somebody and can walk to `/pasien`, and a caregiver mislabelled as a
      patient is not gated here — `app/page.tsx` still sends them to `/mulai`.
      This layer is the net, not the only check. */
+  // ── The onboarding gate ────────────────────────────────────────────────
   if (user && !isPublic(pathname) && !allowedWhileOnboarding(pathname)) {
-    const role = user.user_metadata?.role;
-    const isCaregiver = role !== "patient" && role !== "pasien";
+    /* Sumber kebenaran soal peran adalah profiles.role, bukan
+       user_metadata.role — metadata bisa basi (akun Google yang belum
+       pernah menyentuh /login/peran, atau pasien yang di-link lewat kode
+       pairing, yang mana redeem_pairing_code tidak pernah menulis ke
+       auth.users sama sekali). Memercayai metadata di sini adalah yang
+       bikin pasien salah dianggap caregiver dan dilempar ke /mulai. */
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const isCaregiver = profile?.role !== "patient";
 
     if (isCaregiver) {
-      /* `head: true` fetches no rows at all — this asks the database "is there
-         at least one" and nothing more. RLS scopes it to their own side. */
       const { count } = await supabase
         .from("care_relationships")
         .select("id", { count: "exact", head: true })
