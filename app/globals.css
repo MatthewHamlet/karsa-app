@@ -208,6 +208,29 @@ body {
   background-color: #c0b8a6;
 }
 
+/* Scrolls, shows nothing. For panes where the content itself already says
+   which way it runs — a chat thread, where the last message sitting against
+   the fold is the affordance. Scrolling stays fully intact: wheel, touch,
+   keyboard and scrollIntoView all behave, only the drawn bar is gone. */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* The patient home is a dashboard, not a document: on a phone the body is what
+   scrolls, so killing the rubber-band has to happen on the scroller itself
+   rather than on any element inside the page. Scoped by `:has` so every other
+   route keeps its ordinary scrolling. */
+html:has(.patient-home),
+html:has(.patient-home) body {
+  overscroll-behavior: none;
+}
+
 #sb ul {
   list-style: none;
 }

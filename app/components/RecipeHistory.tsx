@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CalendarDays, ChevronRight, Clock, Pill, Stethoscope, X } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { SCAN_HISTORY, type Prescription } from "../data/prescriptions";
+import type { ScannedPrescription as Prescription } from "../lib/scan/queries";
 
 /** Every sheet scanned before, newest first.
  *
@@ -11,7 +11,7 @@ import { SCAN_HISTORY, type Prescription } from "../data/prescriptions";
  *  whether it is still being taken. The drugs are chips rather than a list —
  *  you are looking for a name you half-remember, not reading a label. */
 export default function RecipeHistory({
-  prescriptions = SCAN_HISTORY,
+  prescriptions = [],
 }: {
   prescriptions?: Prescription[];
 }) {
@@ -175,12 +175,21 @@ function DetailSheet({
                 <h3 className="mb-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
                   Foto resep asli
                 </h3>
-                <div
-                  aria-hidden
-                  className="grid aspect-[4/3] w-full place-items-center rounded-2xl bg-slate-800 text-[13px] text-slate-400"
-                >
-                  Foto resep
-                </div>
+                {prescription.imageUrl ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={prescription.imageUrl}
+                    alt="Foto resep asli"
+                    className="w-full rounded-2xl bg-slate-800 object-contain"
+                  />
+                ) : (
+                  <div
+                    aria-hidden
+                    className="grid aspect-[4/3] w-full place-items-center rounded-2xl bg-slate-800 px-6 text-center text-[13px] text-slate-400"
+                  >
+                    Resep ini disimpan tanpa foto.
+                  </div>
+                )}
               </div>
 
               <div>

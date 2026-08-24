@@ -29,7 +29,7 @@ const ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/", icon: Home, label: "Beranda" },
   { link: "/care", icon: HeartPulse, label: "Perawatan" },
   { link: "/scan", icon: ScanText, label: "Scan" },
-  { link: "/mascot", icon: PawPrint, label: "Maskot" },
+  { link: "/mascot", icon: PawPrint, label: "Arsa" },
 ];
 
 /** The patient app's own bar. Five equal destinations, no raised disc and no
@@ -41,7 +41,7 @@ const PATIENT_ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/pasien/jurnal", icon: NotebookPen, label: "Jurnal" },
   { link: "/pasien/scan", icon: ScanText, label: "Scan" },
   { link: "/pasien/komunitas", icon: MessagesSquare, label: "Komunitas" },
-  { link: "/pasien/maskot", icon: Sparkles, label: "Maskot" },
+  { link: "/pasien/maskot", icon: Sparkles, label: "Arsa" },
   { link: "/pasien/profil", icon: UserRound, label: "Profil" },
 ];
 

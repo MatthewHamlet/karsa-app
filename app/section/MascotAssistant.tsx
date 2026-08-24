@@ -1,109 +1,159 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { History, MessageCircle, ShieldAlert } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { History, MessageCircle, ShieldAlert, Trash2 } from "lucide-react";
+import { clearAssistantHistory, deleteAssistantThread } from "../lib/assistant/actions";
 import AssistantChat, { type ChatTurn } from "../components/AssistantChat";
 import HealthPattern from "../components/HealthPattern";
 import MascotStage from "../components/MascotStage";
-import { THINK_SEQUENCE_MS } from "../components/MascotAvatar";
 import Modal from "../components/Modal";
 import {
-  HISTORY,
-  PATIENT,
-  PROMPT_FOR,
-  REPLIES,
+  greetingFor,
+  promptFor,
   type HistorySession,
   type Intent,
   type MascotState,
 } from "../data/mascot";
 
-/** How long the mascot spends thinking, and how long it holds its pointing pose
- *  before settling back. Both are stand-ins for a real request. */
-/** Long enough for the whole thinking sequence to land — equations, the bulb,
- *  then the jolt. Shorter and the answer arrives on top of the punchline.
- *  `THINK_SEQUENCE_MS` is what the mascot actually needs; the extra beat lets
- *  the shock read before the cards slide in. */
-const THINKING_MS = THINK_SEQUENCE_MS + 300;
-const PRESENTING_MS = 4200;
+const PRESENTING_MS = 2400;
 
-/** Which canned answer a free-typed message gets. Keyword matching, not
- *  understanding — enough for the page to behave believably while it is
- *  designed, and the one place to replace when a model goes behind it. */
-function intentFor(text: string): Intent {
-  const t = text.toLowerCase();
-  if (/(darurat|gawat|sesak|pingsan|jatuh|ambulan|nyeri dada|119)/.test(t)) return "urgent";
-  if (/(obat|dosis|minum obat|amlodipine|metformin)/.test(t)) return "meds";
-  if (/(tensi|tekanan darah|detak|jantung|vital|suhu|bpm)/.test(t)) return "vitals";
-  return "general";
-}
+export type MascotAssistantProps = {
+  patientName: string;
+  patientAge: number | null;
+  viewerName: string;
+  alerts: string[];
+  history: HistorySession[];
+  ready: boolean;
+};
 
-export default function MascotAssistant() {
+export default function MascotAssistant({
+  patientName,
+  patientAge,
+  viewerName,
+  alerts,
+  history,
+  ready,
+}: MascotAssistantProps) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState("");
   const [state, setState] = useState<MascotState>("idle");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [threads, setThreads] = useState(history);
 
-  /* One turn is two timers deep, and either can outlive the component if the
-     caregiver navigates away mid-answer. */
-  const timers = useRef<number[]>([]);
-  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+  useEffect(() => setThreads(history), [history]);
 
-  const ask = (text: string, intent: Intent) => {
+  const threadRef = useRef<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const settleRef = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      abortRef.current?.abort();
+      if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+    },
+    [],
+  );
+
+  const ask = async (text: string) => {
     if (state === "thinking") return;
 
-    timers.current.forEach(window.clearTimeout);
-    timers.current = [];
+    if (settleRef.current !== null) window.clearTimeout(settleRef.current);
+    abortRef.current?.abort();
 
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const replyId = `karsa-${Date.now()}`;
     setTurns((prev) => [...prev, { id: `me-${Date.now()}`, from: "me", text }]);
     setDraft("");
     setState("thinking");
 
-    timers.current.push(
-      window.setTimeout(() => {
-        const reply = REPLIES[intent];
-        /* The cards ride on the reply. Past answers keep theirs, so scrolling
-           back up finds the whole exchange intact rather than a bare sentence
-           whose buttons were replaced by the next question's. */
-        setTurns((prev) => [
-          ...prev,
-          {
-            id: `karsa-${Date.now()}`,
-            from: "karsa",
-            text: reply.text,
-            cards: reply.cards,
-          },
-        ]);
-        setState("presenting");
+    const settle = (message: string) => {
+      setTurns((prev) => [...prev, { id: replyId, from: "karsa", text: message }]);
+      setState("idle");
+    };
 
-        /* The pose is a gesture, not a mode: it hands the cards over and then
-           goes back to waiting. */
-        timers.current.push(
-          window.setTimeout(() => setState("idle"), PRESENTING_MS),
+    try {
+      const response = await fetch("/api/mascot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, threadId: threadRef.current }),
+        signal: controller.signal,
+      });
+
+      if (!response.ok || !response.body) {
+        const payload = await response.json().catch(() => null);
+        settle(
+          (payload as { error?: string } | null)?.error ??
+            "Maskot sedang tidak bisa dihubungi. Coba lagi sebentar lagi.",
         );
-      }, THINKING_MS),
-    );
+        return;
+      }
+
+      threadRef.current = response.headers.get("X-Thread-Id") ?? threadRef.current;
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let full = "";
+      let started = false;
+
+      /* The bubble is created by the first chunk, not before it: an empty
+         bubble sitting under the thinking dots reads as a failed answer. */
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const piece = decoder.decode(value, { stream: true });
+        if (!piece) continue;
+        full += piece;
+
+        if (!started) {
+          started = true;
+          setState("presenting");
+          setTurns((prev) => [...prev, { id: replyId, from: "karsa", text: full }]);
+        } else {
+          setTurns((prev) =>
+            prev.map((turn) => (turn.id === replyId ? { ...turn, text: full } : turn)),
+          );
+        }
+      }
+
+      if (!started) {
+        settle("Maaf, aku belum punya jawaban untuk itu. Coba tanya dengan cara lain ya.");
+        return;
+      }
+
+      settleRef.current = window.setTimeout(() => setState("idle"), PRESENTING_MS);
+    } catch (error) {
+      if ((error as { name?: string })?.name === "AbortError") return;
+      settle("Koneksi terputus. Coba tanya lagi ya.");
+    }
   };
 
-  const send = (text: string) => ask(text, intentFor(text));
-
-  /** Reopening a past session restores its whole thread. Any answer still in
-     flight is cancelled first — otherwise a reply from the conversation the
-     caregiver just left would land on top of the one they opened. */
   const openSession = (session: HistorySession) => {
-    timers.current.forEach(window.clearTimeout);
-    timers.current = [];
+    abortRef.current?.abort();
+    if (settleRef.current !== null) window.clearTimeout(settleRef.current);
 
+    threadRef.current = session.id;
     setTurns(session.turns.map((turn, i) => ({ id: `${session.id}-${i}`, ...turn })));
     setState("idle");
     setDraft("");
     setHistoryOpen(false);
   };
 
-  const quickAction = (intent: Intent) => ask(PROMPT_FOR[intent], intent);
+  const quickAction = (intent: Intent) => {
+    const prompt = promptFor(intent, patientName);
+    if (prompt) void ask(prompt);
+  };
 
   return (
     <div className="flex h-[calc(100dvh-var(--bottom-nav))] flex-col bg-karsa-canvas">
-      <PatientBanner onHistory={() => setHistoryOpen(true)} />
+      <PatientBanner
+        patientName={patientName}
+        patientAge={patientAge}
+        alerts={alerts}
+        onHistory={() => setHistoryOpen(true)}
+      />
 
       {/* ── Stage ────────────────────────────────────────────────────────
           One column on a phone. The tab switcher that used to sit here paid a
@@ -117,14 +167,19 @@ export default function MascotAssistant() {
         <div className="relative flex min-h-0 flex-col">
           <HealthPattern className="text-karsa-dark" opacity={0.14} />
 
-          <AssistantChat
-            turns={turns}
-            draft={draft}
-            onDraft={setDraft}
-            onSend={send}
-            onQuickAction={quickAction}
-            state={state}
-          />
+          {ready ? (
+            <AssistantChat
+              turns={turns}
+              draft={draft}
+              onDraft={setDraft}
+              onSend={(text) => void ask(text)}
+              onQuickAction={quickAction}
+              state={state}
+              greeting={greetingFor(patientName, viewerName)}
+            />
+          ) : (
+            <NotReady />
+          )}
         </div>
 
         {/* Karsa keeps a presence beside the thread from `lg` — where there is
@@ -132,7 +187,7 @@ export default function MascotAssistant() {
             live on this element's background; the room fills the panel now, so
             it moved inside as a wash over the scene. */}
         <aside
-          aria-label="Karsa"
+          aria-label="Arsa"
           className="hidden min-h-0 flex-col border-karsa-line lg:flex lg:border-l"
         >
           <MascotStage state={state} />
@@ -143,7 +198,35 @@ export default function MascotAssistant() {
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
         onOpenSession={openSession}
+        history={threads}
+        onForget={(ids) => {
+          setThreads((prev) => prev.filter((t) => !ids.includes(t.id)));
+          if (threadRef.current && ids.includes(threadRef.current)) {
+            threadRef.current = null;
+            setTurns([]);
+            setState("idle");
+          }
+        }}
       />
+    </div>
+  );
+}
+
+/** The mascot answers from the patient's own record. Without one there is
+ *  nothing to personalise against, and a general chatbot on a care page is
+ *  worse than an honest empty state. */
+function NotReady() {
+  return (
+    <div className="relative grid flex-1 place-items-center px-6 text-center">
+      <div className="max-w-[38ch]">
+        <h2 className="font-nohemi text-[20px] font-bold tracking-tight text-neutral-800">
+          Maskot belum bisa dimulai
+        </h2>
+        <p className="mt-2 text-[14.5px] leading-6 text-neutral-600">
+          Hubungkan satu pasien dulu lewat kode undangan atau QR. Setelah itu Arsa
+          bisa menjawab berdasarkan catatan perawatan yang sebenarnya.
+        </p>
+      </div>
     </div>
   );
 }
@@ -157,12 +240,47 @@ function HistoryModal({
   open,
   onClose,
   onOpenSession,
+  history,
+  onForget,
 }: {
   open: boolean;
   onClose: () => void;
   onOpenSession: (session: HistorySession) => void;
+  history: HistorySession[];
+  onForget: (ids: string[]) => void;
 }) {
-  const days = HISTORY.reduce<{ day: string; sessions: HistorySession[] }[]>((acc, session) => {
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!open) {
+      setConfirmId(null);
+      setConfirmAll(false);
+      setError(null);
+    }
+  }, [open]);
+
+  const removeOne = (id: string) =>
+    startTransition(async () => {
+      const result = await deleteAssistantThread(id);
+      if (result.error) return setError(result.error);
+      setConfirmId(null);
+      setError(null);
+      onForget([id]);
+    });
+
+  const removeAll = () =>
+    startTransition(async () => {
+      const result = await clearAssistantHistory();
+      if (result.error) return setError(result.error);
+      setConfirmAll(false);
+      setError(null);
+      onForget(history.map((s) => s.id));
+    });
+
+  const days = history.reduce<{ day: string; sessions: HistorySession[] }[]>((acc, session) => {
     const last = acc[acc.length - 1];
     if (last && last.day === session.day) last.sessions.push(session);
     else acc.push({ day: session.day, sessions: [session] });
@@ -174,59 +292,156 @@ function HistoryModal({
       open={open}
       onClose={onClose}
       title="Riwayat percakapan"
-      description="Percakapan sebelumnya dengan Karsa. Pilih satu untuk membukanya kembali."
+      description="Percakapan sebelumnya dengan Arsa. Pilih satu untuk membukanya kembali."
       size="lg"
     >
-      <div className="space-y-6">
-        {days.map((group) => (
-          <section key={group.day}>
-            <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
-              {group.day}
-            </h3>
+      {days.length === 0 ? (
+        <p className="rounded-2xl bg-white px-4 py-8 text-center text-[14px] leading-6 text-neutral-500 ring-1 ring-karsa-line">
+          Belum ada percakapan. Yang kamu tanyakan hari ini akan tersimpan di sini.
+        </p>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[12.5px] leading-5 text-neutral-500">
+              {history.length} percakapan tersimpan
+            </p>
 
-            <ul className="divide-y divide-karsa-line/70 overflow-hidden rounded-2xl bg-white ring-1 ring-karsa-line">
-              {group.sessions.map((session) => {
-                const opener = session.turns.find((turn) => turn.from === "me");
+            {confirmAll ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-[12.5px] font-semibold text-rose-700">
+                  Hapus semua?
+                </span>
+                <button
+                  type="button"
+                  onClick={removeAll}
+                  disabled={pending}
+                  className="rounded-full bg-rose-600 px-3 py-1.5 text-[12.5px] font-bold text-white outline-none transition-colors duration-200 hover:bg-rose-700 focus-visible:ring-2 focus-visible:ring-rose-300 disabled:opacity-60"
+                >
+                  Ya, hapus
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmAll(false)}
+                  disabled={pending}
+                  className="rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-neutral-600 outline-none transition-colors duration-200 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40"
+                >
+                  Batal
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmAll(true);
+                  setConfirmId(null);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold text-rose-700 outline-none ring-1 ring-rose-100 transition-colors duration-200 hover:bg-rose-50 focus-visible:ring-2 focus-visible:ring-rose-300"
+              >
+                <Trash2 size={13} strokeWidth={2.3} aria-hidden />
+                Hapus semua
+              </button>
+            )}
+          </div>
 
-                return (
-                  <li key={session.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOpenSession(session)}
-                      className="group/row flex w-full items-start gap-3.5 px-4 py-3.5 text-left outline-none transition-colors duration-200 hover:bg-karsa-canvas/60 focus-visible:bg-karsa-canvas/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
-                    >
-                      <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-karsa-soft text-karsa-dark">
-                        <MessageCircle size={16} strokeWidth={2.2} />
-                      </span>
+          {error && (
+            <p className="rounded-xl bg-rose-50 px-3 py-2 text-[12.5px] font-semibold text-rose-700 ring-1 ring-rose-100">
+              {error}
+            </p>
+          )}
 
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[14.5px] font-bold leading-5 text-neutral-800">
-                          {session.title}
+          {days.map((group) => (
+            <section key={group.day}>
+              <h3 className="mb-2 px-1 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
+                {group.day}
+              </h3>
+
+              <ul className="divide-y divide-karsa-line/70 overflow-hidden rounded-2xl bg-white ring-1 ring-karsa-line">
+                {group.sessions.map((session) => {
+                  const opener = session.turns.find((turn) => turn.from === "me");
+
+                  return (
+                    <li key={session.id} className="flex items-stretch">
+                      <button
+                        type="button"
+                        onClick={() => onOpenSession(session)}
+                        className="group/row flex min-w-0 flex-1 items-start gap-3.5 py-3.5 pl-4 pr-2 text-left outline-none transition-colors duration-200 hover:bg-karsa-canvas/60 focus-visible:bg-karsa-canvas/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+                      >
+                        <span className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-karsa-soft text-karsa-dark">
+                          <MessageCircle size={16} strokeWidth={2.2} />
                         </span>
-                        {opener && (
-                          <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">
-                            {opener.text}
+
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[14.5px] font-bold leading-5 text-neutral-800">
+                            {session.title}
                           </span>
-                        )}
-                        <span className="mt-1 block text-[12px] tabular-nums text-neutral-400">
-                          {session.time} · {session.turns.length} pesan
+                          {opener && (
+                            <span className="mt-0.5 block truncate text-[13px] leading-5 text-neutral-500">
+                              {opener.text}
+                            </span>
+                          )}
+                          <span className="mt-1 block text-[12px] tabular-nums text-neutral-400">
+                            {session.time} · {session.turns.length} pesan
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        ))}
-      </div>
+                      </button>
+
+                      {confirmId === session.id ? (
+                        <span className="flex shrink-0 items-center gap-1 pr-2.5">
+                          <button
+                            type="button"
+                            onClick={() => removeOne(session.id)}
+                            disabled={pending}
+                            className="rounded-full bg-rose-600 px-2.5 py-1.5 text-[12px] font-bold text-white outline-none transition-colors duration-200 hover:bg-rose-700 focus-visible:ring-2 focus-visible:ring-rose-300 disabled:opacity-60"
+                          >
+                            Hapus
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmId(null)}
+                            disabled={pending}
+                            className="rounded-full px-2.5 py-1.5 text-[12px] font-semibold text-neutral-600 outline-none transition-colors duration-200 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40"
+                          >
+                            Batal
+                          </button>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmId(session.id);
+                            setConfirmAll(false);
+                          }}
+                          aria-label={`Hapus percakapan ${session.title}`}
+                          className="grid w-11 shrink-0 place-items-center text-neutral-400 outline-none transition-colors duration-200 hover:bg-rose-50 hover:text-rose-600 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-300"
+                        >
+                          <Trash2 size={15} strokeWidth={2.2} />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
     </Modal>
   );
 }
 
 /** Who this is about, and the two facts that change what is safe to suggest.
  *  Kept to one line so it can stay on screen the whole session. */
-function PatientBanner({ onHistory }: { onHistory: () => void }) {
+function PatientBanner({
+  patientName,
+  patientAge,
+  alerts,
+  onHistory,
+}: {
+  patientName: string;
+  patientAge: number | null;
+  alerts: string[];
+  onHistory: () => void;
+}) {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const alertsRef = useRef<HTMLDivElement>(null);
 
@@ -253,55 +468,60 @@ function PatientBanner({ onHistory }: { onHistory: () => void }) {
        wrapped to a second row on a phone, which cost the thread a chunk of the
        screen to say something that doesn't change all day. They live behind the
        count now — present, and one tap from being read in full. */
-    <header className="shrink-0 border-b border-karsa-line bg-white/70 px-4 py-2 backdrop-blur-sm sm:px-6 xl:px-8">
+    <header className="relative z-30 shrink-0 border-b border-karsa-line bg-white/70 px-4 py-2 backdrop-blur-sm sm:px-6 xl:px-8">
       <div className="flex items-center gap-2.5">
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-nohemi text-[15px] font-bold leading-5 tracking-tight text-neutral-800">
-            Maskot Karsa
+            Arsa
           </h1>
-          <p className="truncate text-[12px] leading-4 text-neutral-500">
-            Merawat{" "}
-            <span className="font-semibold text-neutral-700">
-              {PATIENT.name}, {PATIENT.age}
-            </span>
-          </p>
-        </div>
-
-        <div ref={alertsRef} className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setAlertsOpen((open) => !open)}
-            aria-expanded={alertsOpen}
-            aria-label={`Peringatan medis (${PATIENT.alerts.length})`}
-            className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1.5 text-[12px] font-bold text-rose-700 outline-none ring-1 ring-rose-100 transition-colors duration-200 hover:bg-rose-100 focus-visible:ring-2 focus-visible:ring-rose-300"
-          >
-            <ShieldAlert size={14} strokeWidth={2.4} aria-hidden />
-            <span className="tabular-nums">{PATIENT.alerts.length}</span>
-          </button>
-
-          {alertsOpen && (
-            <div
-              role="dialog"
-              aria-label="Peringatan medis"
-              className="absolute right-0 z-40 mt-2 w-[15rem] rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_44px_-24px_rgba(24,32,24,0.45)] ring-1 ring-karsa-line"
-            >
-              <p className="px-1 pb-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
-                Perlu diperhatikan
-              </p>
-              <ul className="space-y-1.5">
-                {PATIENT.alerts.map((alert) => (
-                  <li
-                    key={alert}
-                    className="flex items-start gap-2 rounded-xl bg-rose-50 px-2.5 py-2 text-[13px] font-semibold leading-5 text-rose-700 ring-1 ring-rose-100"
-                  >
-                    <ShieldAlert size={14} strokeWidth={2.4} className="mt-0.5 shrink-0" />
-                    {alert}
-                  </li>
-                ))}
-              </ul>
-            </div>
+          {patientName && (
+            <p className="truncate text-[12px] leading-4 text-neutral-500">
+              Merawat{" "}
+              <span className="font-semibold text-neutral-700">
+                {patientName}
+                {patientAge !== null ? `, ${patientAge}` : ""}
+              </span>
+            </p>
           )}
         </div>
+
+        {alerts.length > 0 && (
+          <div ref={alertsRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setAlertsOpen((open) => !open)}
+              aria-expanded={alertsOpen}
+              aria-label={`Catatan penting (${alerts.length})`}
+              className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-1.5 text-[12px] font-bold text-rose-700 outline-none ring-1 ring-rose-100 transition-colors duration-200 hover:bg-rose-100 focus-visible:ring-2 focus-visible:ring-rose-300"
+            >
+              <ShieldAlert size={14} strokeWidth={2.4} aria-hidden />
+              <span className="tabular-nums">{alerts.length}</span>
+            </button>
+
+            {alertsOpen && (
+              <div
+                role="dialog"
+                aria-label="Catatan penting"
+                className="absolute right-0 z-40 mt-2 w-[15rem] rounded-2xl bg-white p-2.5 shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_44px_-24px_rgba(24,32,24,0.45)] ring-1 ring-karsa-line"
+              >
+                <p className="px-1 pb-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
+                  Perlu diperhatikan
+                </p>
+                <ul className="space-y-1.5">
+                  {alerts.map((alert) => (
+                    <li
+                      key={alert}
+                      className="flex items-start gap-2 rounded-xl bg-rose-50 px-2.5 py-2 text-[13px] font-semibold leading-5 text-rose-700 ring-1 ring-rose-100"
+                    >
+                      <ShieldAlert size={14} strokeWidth={2.4} className="mt-0.5 shrink-0" />
+                      {alert}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Was a "Terhubung" status pill. A connection light is only worth the
             corner when it is off, and this one never is — so the space goes to

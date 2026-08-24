@@ -50,7 +50,7 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
   const [tasks, feed, schedule, moods, summary] = await Promise.all([
     getTodayTasks(patientId),
-    getActivityFeed(patientId),
+    getActivityFeed(patientId, 5),
     getScheduleByDay(patientId, today),
     getMoodLog(patientId, 14),
     getDaySummary(patientId),

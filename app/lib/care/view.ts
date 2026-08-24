@@ -9,6 +9,7 @@ import type {
 import type { FixedStatKey, MonitorKey, Period, StatValue } from "./stats";
 import type { CarePatient } from "./types";
 import type { CalendarDay } from "./time";
+import type { TrendPeriod, SerialDetail } from "./trends";
 
 /** The view model the Perawatan page is rendered from.
  *
@@ -38,6 +39,10 @@ export type CareData = {
       monitor: Record<MonitorKey, StatValue>;
     }
   >;
+  /** Real per-day detail behind the weekly and monthly cards — the charts and
+   *  the compliance heatmap. Empty per metric when nothing was recorded. */
+  trends: Record<TrendPeriod, Record<string, SerialDetail>>;
+  monthShort: string;
   feed: FeedItem[];
   activitiesByDate: CarePatientActivityMap;
   notes: CareNote[];

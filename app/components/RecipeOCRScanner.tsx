@@ -18,12 +18,11 @@ import {
   Zap,
   ZapOff,
 } from "lucide-react";
-import { EXTRACTED, SCAN_TIPS, type Medicine } from "../data/prescriptions";
+import { SCAN_TIPS, type Medicine } from "../data/prescriptions";
+import { useCameraOcr, type OcrResult } from "./useCameraOcr";
+import { lockScroll } from "../lib/scrollLock";
 
 type Stage = "camera" | "review";
-
-/** How long the "shutter" pretends to be reading the sheet. */
-const READ_MS = 1600;
 
 /** Bright emerald, not the app's sage: this is the one surface in Karsa that is
  *  black, and the sage green disappears against it. Everything outside the
@@ -38,14 +37,14 @@ export default function RecipeOCRScanner({
   open,
   onClose,
   onSave,
-  /** A photo picked from the gallery has already been taken — that flow opens
-   *  straight on the reading, not on a viewfinder pointed at nothing. */
   from = "camera",
+  initialFile,
 }: {
   open: boolean;
   onClose: () => void;
-  onSave: (medicines: Medicine[]) => void;
+  onSave: (medicines: Medicine[], result: OcrResult | null) => void;
   from?: "camera" | "gallery";
+  initialFile?: File | null;
 }) {
   return (
     <AnimatePresence>
@@ -53,7 +52,8 @@ export default function RecipeOCRScanner({
         <ScannerSheet
           onClose={onClose}
           onSave={onSave}
-          initialStage={from === "gallery" ? "review" : "camera"}
+          initialStage="camera"
+          initialFile={initialFile ?? null}
         />
       )}
     </AnimatePresence>
@@ -64,10 +64,12 @@ function ScannerSheet({
   onClose,
   onSave,
   initialStage,
+  initialFile,
 }: {
   onClose: () => void;
-  onSave: (medicines: Medicine[]) => void;
+  onSave: (medicines: Medicine[], result: OcrResult | null) => void;
   initialStage: Stage;
+  initialFile: File | null;
 }) {
   const reduce = useReducedMotion();
   const [stage, setStage] = useState<Stage>(initialStage);
@@ -75,10 +77,13 @@ function ScannerSheet({
   const [flash, setFlash] = useState(false);
   const [tipsOpen, setTipsOpen] = useState(false);
   const [photoOpen, setPhotoOpen] = useState(false);
-  const [medicines, setMedicines] = useState<Medicine[]>(EXTRACTED);
+  const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
-  const timer = useRef<number | undefined>(undefined);
+  const [result, setResult] = useState<OcrResult | null>(null);
+  const [nothingFound, setNothingFound] = useState(false);
   const sheetRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const ocr = useCameraOcr();
 
   useEffect(() => {
     sheetRef.current?.focus();
@@ -89,24 +94,60 @@ function ScannerSheet({
     document.addEventListener("keydown", onKey);
 
     /* The page behind must not scroll under a full-height sheet. */
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
 
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
+      unlock();
     };
   }, [onClose]);
 
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const accept = (next: OcrResult | null) => {
+    if (!next) return;
+    setResult(next);
+    setMedicines(
+      next.medicines.map((m) => ({
+        id: m.id,
+        name: m.name,
+        dose: m.dose,
+        rule: m.rule,
+        times: m.times,
+        confident: m.confident,
+      })),
+    );
+    setNothingFound(next.medicines.length === 0);
+    setStage("review");
+  };
 
-  const capture = () => {
-    if (reading) return;
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (!initialFile || startedRef.current) return;
+    startedRef.current = true;
+    void fromFile(initialFile);
+    /* `fromFile` is recreated every render but the guard above makes this run
+       exactly once per mounted sheet. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFile]);
+
+  const capture = async () => {
+    if (ocr.busy) return;
     setReading(true);
-    timer.current = window.setTimeout(() => {
+    try {
+      accept(await ocr.capture());
+    } finally {
       setReading(false);
-      setStage("review");
-    }, READ_MS);
+    }
+  };
+
+  const fromFile = async (file: File | null) => {
+    if (!file || ocr.busy) return;
+    setReading(true);
+    try {
+      accept(await ocr.readBlob(file));
+    } finally {
+      setReading(false);
+    }
   };
 
   const patch = (id: string, next: Partial<Medicine>) =>
@@ -174,9 +215,19 @@ function ScannerSheet({
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [contain:paint]">
               {stage === "camera" ? (
-                <CameraStage reading={reading} flash={flash} reduce={Boolean(reduce)} />
+                <CameraStage
+                  reading={reading}
+                  flash={flash}
+                  reduce={Boolean(reduce)}
+                  attach={ocr.attach}
+                  cameraError={ocr.cameraError}
+                  progress={ocr.progress}
+                  onPickFile={() => fileRef.current?.click()}
+                />
               ) : (
                 <ReviewStage
+                  nothingFound={nothingFound}
+                  previewUrl={result?.previewUrl ?? null}
                   medicines={medicines}
                   editing={editing}
                   onEdit={setEditing}
@@ -194,14 +245,16 @@ function ScannerSheet({
             <div className="shrink-0 border-t border-slate-200/80 bg-white/80 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm">
               {stage === "camera" ? (
                 <ShutterBar
-                  reading={reading}
+                  reading={reading || ocr.busy}
                   onCapture={capture}
                   onTips={() => setTipsOpen(true)}
+                  onGallery={() => fileRef.current?.click()}
                 />
               ) : (
                 <button
                   type="button"
-                  onClick={() => onSave(medicines)}
+                  onClick={() => onSave(medicines, result)}
+                  disabled={medicines.length === 0}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-karsa py-3.5 text-[15px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa focus-visible:ring-offset-2"
                 >
                   <Check size={18} strokeWidth={2.6} aria-hidden />
@@ -212,7 +265,7 @@ function ScannerSheet({
           </motion.div>
 
           <TipsSheet open={tipsOpen} onClose={() => setTipsOpen(false)} />
-          <PhotoViewer open={photoOpen} onClose={() => setPhotoOpen(false)} />
+          <PhotoViewer open={photoOpen} onClose={() => setPhotoOpen(false)} url={result?.previewUrl ?? null} />
     </>
   );
 }
@@ -275,18 +328,45 @@ function CameraStage({
   reading,
   flash,
   reduce,
+  attach,
+  cameraError,
+  progress,
+  onPickFile,
 }: {
   reading: boolean;
   flash: boolean;
   reduce: boolean;
+  attach: (node: HTMLVideoElement | null) => void;
+  cameraError: string | null;
+  progress: number;
+  onPickFile: () => void;
 }) {
   return (
     <div className="px-5 pb-5">
-      {/* A stand-in for the camera feed, not a camera. Wiring `getUserMedia`
-          here would put a permission prompt in front of a design that hasn't
-          been agreed yet — the frame, the beam and the geometry are what this
-          screen is for, and a real stream drops straight in behind them. */}
       <div className="relative aspect-[3/4] w-full overflow-hidden rounded-2xl bg-slate-900">
+        {cameraError ? (
+          <div className="absolute inset-0 grid place-items-center px-6 text-center">
+            <div>
+              <p className="text-[15px] leading-6 text-white/80">{cameraError}</p>
+              <button
+                type="button"
+                onClick={onPickFile}
+                className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-5 py-3 text-[14.5px] font-bold text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-white"
+              >
+                <ImageIcon size={17} strokeWidth={2.3} aria-hidden />
+                Pilih foto resep
+              </button>
+            </div>
+          </div>
+        ) : (
+          <video
+            ref={attach}
+            muted
+            playsInline
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+
         <div
           aria-hidden
           className={`absolute inset-0 transition-opacity duration-300 ${
@@ -294,77 +374,66 @@ function CameraStage({
           } bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.22),transparent_60%)]`}
         />
 
-        {/* The paper the frame is looking for, suggested rather than drawn. */}
-        <div
-          aria-hidden
-          className="absolute left-1/2 top-1/2 h-[62%] w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-sm bg-slate-700/40 blur-[1px]"
-        />
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute left-1/2 top-1/2 h-[74%] w-[84%] -translate-x-1/2 -translate-y-1/2">
+            <span className="absolute left-0 top-0 h-8 w-8 rounded-tl-lg border-l-[3px] border-t-[3px]" style={{ borderColor: BEAM }} />
+            <span className="absolute right-0 top-0 h-8 w-8 rounded-tr-lg border-r-[3px] border-t-[3px]" style={{ borderColor: BEAM }} />
+            <span className="absolute bottom-0 left-0 h-8 w-8 rounded-bl-lg border-b-[3px] border-l-[3px]" style={{ borderColor: BEAM }} />
+            <span className="absolute bottom-0 right-0 h-8 w-8 rounded-br-lg border-b-[3px] border-r-[3px]" style={{ borderColor: BEAM }} />
 
-        {/* Frame */}
-        <div
-          className="absolute inset-x-[10%] inset-y-[12%] rounded-xl border-2 border-dashed"
-          style={{ borderColor: BEAM }}
-        >
-          {/* Beam. Travels the frame's height and comes back, so it reads as
-              sweeping rather than looping in one direction. */}
-          <motion.span
-            aria-hidden
-            initial={{ top: "4%" }}
-            animate={reduce ? { top: "50%" } : { top: ["4%", "94%", "4%"] }}
-            transition={
-              reduce
-                ? { duration: 0 }
-                : { duration: reading ? 1.1 : 2.6, repeat: Infinity, ease: "easeInOut" }
-            }
-            className="absolute inset-x-0 h-[2px]"
-            style={{
-              backgroundColor: BEAM,
-              boxShadow: `0 0 12px 2px ${BEAM}`,
-            }}
-          />
+            {reading && !reduce && (
+              <motion.span
+                aria-hidden
+                initial={{ top: "0%" }}
+                animate={{ top: ["0%", "100%", "0%"] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-x-0 h-[3px]"
+                style={{ backgroundColor: BEAM, boxShadow: `0 0 18px 4px ${BEAM}` }}
+              />
+            )}
+          </div>
         </div>
 
-        <AnimatePresence>
-          {reading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-x-0 bottom-4 flex justify-center"
-            >
-              <span className="inline-flex items-center gap-2 rounded-full bg-slate-950/70 px-3.5 py-2 text-[12.5px] font-semibold text-white backdrop-blur-sm">
-                <ScanLine size={14} strokeWidth={2.4} className="animate-pulse" aria-hidden />
-                Membaca resep…
-              </span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {reading && (
+          <div className="absolute inset-x-0 bottom-0 bg-slate-950/75 px-5 py-4 text-center">
+            <p className="text-[14.5px] font-bold text-white">
+              Membaca resep… {progress > 0 ? `${progress}%` : ""}
+            </p>
+            <div className="mx-auto mt-2 h-1.5 w-48 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full transition-[width] duration-300"
+                style={{ width: `${Math.max(6, progress)}%`, backgroundColor: BEAM }}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
-      <p className="mx-auto mt-4 max-w-[34ch] text-center text-[13.5px] leading-5 text-slate-500">
-        Posisikan kertas resep dokter di dalam bingkai
+      <p className="mt-4 text-center text-[13.5px] leading-5 text-slate-500">
+        Letakkan resep di dalam bingkai, pastikan tulisannya terbaca jelas.
       </p>
     </div>
   );
 }
-
 function ShutterBar({
   reading,
   onCapture,
   onTips,
+  onGallery,
 }: {
   reading: boolean;
   onCapture: () => void;
   onTips: () => void;
+  onGallery: () => void;
 }) {
   const side =
     "flex w-[72px] shrink-0 flex-col items-center gap-1 rounded-2xl py-1.5 text-[11.5px] font-semibold text-slate-600 outline-none transition-colors duration-200 hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-karsa/40";
 
   return (
     <div className="flex items-center justify-between">
-      <button type="button" className={side}>
+      <button type="button" onClick={onGallery} className={side}>
         <ImageIcon size={20} strokeWidth={2.1} aria-hidden />
-        Galeri
+        File
       </button>
 
       <button
@@ -398,6 +467,8 @@ function ShutterBar({
 /* ── State 2: review ──────────────────────────────────────────────────────── */
 
 function ReviewStage({
+  nothingFound,
+  previewUrl,
   medicines,
   editing,
   onEdit,
@@ -406,6 +477,8 @@ function ReviewStage({
   onAdd,
   onViewPhoto,
 }: {
+  nothingFound: boolean;
+  previewUrl: string | null;
   medicines: Medicine[];
   editing: string | null;
   onEdit: (id: string | null) => void;
@@ -416,6 +489,12 @@ function ReviewStage({
 }) {
   return (
     <div className="space-y-4 px-5 pb-5">
+      {nothingFound && (
+        <p className="rounded-2xl bg-amber-50 px-4 py-3.5 text-[13.5px] leading-5 text-amber-800 ring-1 ring-amber-200">
+          Tidak ada obat yang terbaca dari foto ini. Coba foto ulang lebih dekat
+          dan terang, atau tambahkan obatnya manual di bawah.
+        </p>
+      )}
       {/* Thumbnail. Small on purpose — the photo is evidence to check against,
           not the subject of this screen. */}
       <div className="flex items-center gap-3 rounded-2xl bg-white p-2.5 ring-1 ring-slate-200">
@@ -423,7 +502,12 @@ function ReviewStage({
           aria-hidden
           className="relative grid h-14 w-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-900"
         >
-          <span className="h-[62%] w-[62%] rounded-sm bg-slate-600/60" />
+          {previewUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={previewUrl} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="h-[62%] w-[62%] rounded-sm bg-slate-600/60" />
+          )}
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[13.5px] font-bold leading-5 text-slate-800">Foto resep</p>
@@ -657,7 +741,15 @@ function TipsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   );
 }
 
-function PhotoViewer({ open, onClose }: { open: boolean; onClose: () => void }) {
+function PhotoViewer({
+  open,
+  onClose,
+  url,
+}: {
+  open: boolean;
+  onClose: () => void;
+  url: string | null;
+}) {
   return (
     <AnimatePresence>
       {open && (
@@ -670,11 +762,20 @@ function PhotoViewer({ open, onClose }: { open: boolean; onClose: () => void }) 
           onClick={onClose}
           className="fixed inset-0 z-[64] flex items-center justify-center bg-neutral-950/90 p-6"
         >
-          <div aria-hidden className="aspect-[3/4] w-full max-w-sm rounded-xl bg-slate-800">
-            <div className="grid h-full place-items-center text-[13px] text-slate-400">
-              Foto resep
+          {url ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              src={url}
+              alt="Foto resep"
+              className="max-h-full w-auto max-w-full rounded-xl object-contain"
+            />
+          ) : (
+            <div aria-hidden className="aspect-[3/4] w-full max-w-sm rounded-xl bg-slate-800">
+              <div className="grid h-full place-items-center text-[13px] text-slate-400">
+                Belum ada foto
+              </div>
             </div>
-          </div>
+          )}
           <button
             type="button"
             onClick={onClose}

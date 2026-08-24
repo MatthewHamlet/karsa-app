@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { EASE } from "./List";
+import { lockScroll } from "../lib/scrollLock";
 
 /** The one dialog every "lihat semua" on this page opens.
  *
@@ -36,8 +37,7 @@ export default function Modal({
     if (!open) return;
 
     opener.current = document.activeElement;
-    const { overflow } = document.body.style;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -49,7 +49,7 @@ export default function Modal({
 
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = overflow;
+      unlock();
       cancelAnimationFrame(focus);
       (opener.current as HTMLElement | null)?.focus?.();
     };

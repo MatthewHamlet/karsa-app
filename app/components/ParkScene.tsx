@@ -26,8 +26,6 @@
  *  The bench ships from this file too, as `ParkBench`, but it is not part of
  *  this drawing — see the note on that component. */
 
-const TREE_TRUNK = "#8a6247";
-
 /** The park bench — deliberately *not* part of the scene above.
  *
  *  The scene is one fixed viewBox stretched over the whole hero, so anything
@@ -61,18 +59,6 @@ export function ParkBench({ className = "" }: { className?: string }) {
       <rect x="30" y="58" width="11" height="38" rx="5.5" fill="#8a6247" />
       <rect x="199" y="58" width="11" height="38" rx="5.5" fill="#8a6247" />
     </svg>
-  );
-}
-
-/** One rounded canopy on a trunk. Two blobs, so the silhouette is not a circle. */
-function Tree({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
-  return (
-    <g transform={`translate(${x} ${y}) scale(${s})`}>
-      <rect x="-7" y="-38" width="14" height="44" rx="6" fill={TREE_TRUNK} />
-      <circle cx="0" cy="-62" r="40" fill="#5fa564" />
-      <circle cx="-24" cy="-46" r="28" fill="#6cb471" />
-      <circle cx="26" cy="-48" r="26" fill="#549a5a" />
-    </g>
   );
 }
 
@@ -147,14 +133,14 @@ export default function ParkScene({ className = "" }: { className?: string }) {
       <path d="M0 348 C 200 308, 380 344, 560 336 C 720 329, 810 364, 900 340 L900 700 L0 700 Z" fill="#84c37c" />
       <path d="M0 396 C 220 368, 400 408, 620 392 C 760 382, 840 406, 900 394 L900 700 L0 700 Z" fill="#6fb86a" />
 
-      {/* Trees on the far left and across the right third. Nothing between
-          x≈150 and x≈600: that band holds the mascot on a desktop and the bench
-          on a phone, and the bench is nearly full-width down there. */}
-      <Tree x={40} y={402} s={1} />
-      <Tree x={124} y={372} s={0.68} />
-      <Tree x={866} y={400} s={0.95} />
-      <Tree x={776} y={370} s={0.62} />
-      <Tree x={654} y={356} s={0.55} />
+      {/* The back line, on the far left and across the right third. Nothing
+          between x≈150 and x≈680: that band holds the mascot on a desktop and
+          the bench on a phone, and the bench is nearly full-width down there. */}
+      <Bush x={40} y={396} s={1.5} fill="#5fa564" />
+      <Bush x={124} y={372} s={1.05} fill="#6cb471" />
+      <Bush x={866} y={396} s={1.42} fill="#5fa564" />
+      <Bush x={776} y={370} s={0.95} fill="#6cb471" />
+      <Bush x={712} y={358} s={0.85} fill="#66ad6b" />
 
       {/* Bushes at the tree line, then a much larger pair in the bottom corners:
           the near ones are what give the open lawn a sense of depth. */}

@@ -133,11 +133,15 @@ function StatusDots({
   days,
   tone,
   unit,
+  monthShort = MONTH.short,
 }: {
   days: ComplianceDay[];
   tone: StatTone;
   /** "dosis", "porsi makan" — what the two numbers in the tooltip count. */
   unit: string;
+  /** The month the day numbers belong to. Real data knows its own month; the
+   *  mock does not, so it keeps the constant. */
+  monthShort?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
 
@@ -151,19 +155,19 @@ function StatusDots({
   if (days.length > 7) {
     return (
       <DayStrip
-        label={`Kepatuhan harian bulan ${MONTH.short}`}
+        label={`Kepatuhan harian bulan ${monthShort}`}
         cells={days.map((day) => ({
           key: day.label,
           color: fill(day.status),
           tip: (
             <>
               <span className="text-neutral-400">
-                {day.label} {MONTH.short} ·{" "}
+                {day.label} {monthShort} ·{" "}
               </span>
               {detail(day)}
             </>
           ),
-          sr: `${day.label} ${MONTH.short}: ${detail(day)}`,
+          sr: `${day.label} ${monthShort}: ${detail(day)}`,
         }))}
       />
     );
@@ -275,11 +279,13 @@ function ComplianceBody({
   detail,
   tone,
   unit,
+  monthShort,
 }: {
   detail: PeriodDetail;
   tone: StatTone;
   /** "dosis", "porsi" — what is being counted. */
   unit: string;
+  monthShort?: string;
 }) {
   const { done, target, days } = detail.compliance!;
   const pct = Math.round((done / target) * 100);
@@ -312,12 +318,12 @@ function ComplianceBody({
         </div>
       </div>
 
-      <StatusDots days={days} tone={tone} unit={unit} />
+      <StatusDots days={days} tone={tone} unit={unit} monthShort={monthShort} />
     </div>
   );
 }
 
-function MoodBody({ detail }: { detail: PeriodDetail }) {
+function MoodBody({ detail, monthShort = MONTH.short }: { detail: PeriodDetail; monthShort?: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const { dominant, dominantDays, days } = detail.mood!;
   const mood = MOOD_BY_KEY[dominant];
@@ -340,19 +346,19 @@ function MoodBody({ detail }: { detail: PeriodDetail }) {
            card the grid is the point rather than a footnote: it is the only
            place a caregiver can see a bad week sitting next to a good one. */
         <DayStrip
-          label={`Suasana hati harian bulan ${MONTH.short}`}
+          label={`Suasana hati harian bulan ${monthShort}`}
           cells={days.map((day) => ({
             key: day.label,
             color: MOOD_BY_KEY[day.mood].color,
             tip: (
               <>
                 <span className="text-neutral-400">
-                  {day.label} {MONTH.short} ·{" "}
+                  {day.label} {monthShort} ·{" "}
                 </span>
                 {MOOD_BY_KEY[day.mood].label}
               </>
             ),
-            sr: `${day.label} ${MONTH.short}: ${MOOD_BY_KEY[day.mood].label}`,
+            sr: `${day.label} ${monthShort}: ${MOOD_BY_KEY[day.mood].label}`,
           }))}
         />
       ) : (
@@ -398,15 +404,17 @@ export default function StatPeriodBody({
   tone,
   title,
   unit = "catatan",
+  monthShort,
 }: {
   detail: PeriodDetail;
   tone: StatTone;
   title: string;
   unit?: string;
+  monthShort?: string;
 }) {
   if (detail.chart === "compliance") {
-    return <ComplianceBody detail={detail} tone={tone} unit={unit} />;
+    return <ComplianceBody detail={detail} tone={tone} unit={unit} monthShort={monthShort} />;
   }
-  if (detail.chart === "mood") return <MoodBody detail={detail} />;
+  if (detail.chart === "mood") return <MoodBody detail={detail} monthShort={monthShort} />;
   return <ChartBody detail={detail} tone={tone} title={title} />;
 }

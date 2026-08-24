@@ -125,7 +125,7 @@ export default function PatientDesktopDashboard({ home }: { home?: PatientHome |
           invisible however far the page scrolls. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden bg-gradient-to-b from-[#6fb86a] from-40% to-[#5c9f59]"
+        className="pointer-events-none absolute inset-x-0 top-0 bottom-[calc(var(--bottom-nav)*-1)] overflow-hidden bg-gradient-to-b from-[#6fb86a] from-40% to-[#5c9f59] lg:bottom-0"
       >
         <ParkScene />
       </div>
@@ -140,7 +140,7 @@ export default function PatientDesktopDashboard({ home }: { home?: PatientHome |
             `justify-between`: the room takes whatever height is left and the
             stack below is pinned to the bottom edge, so the button sits in the
             same place on every display rather than floating up on tall ones. */}
-        <section className="relative flex min-w-0 flex-col lg:h-full lg:min-h-0 lg:justify-between">
+        <section className="relative flex min-h-[calc((100dvh-var(--bottom-nav))*0.6)] min-w-0 flex-col lg:min-h-0 lg:h-full lg:justify-between">
           {/* Hero. `min-h-0` + `h-full` on the mascot: the character is sized
               by the space left over, so it can never be the thing that pushes
               the button off the bottom of the screen. */}
@@ -171,7 +171,7 @@ export default function PatientDesktopDashboard({ home }: { home?: PatientHome |
                 viewBox does not know where the mascot ended up. Drawn first, so
                 it is behind without needing a z-index. */}
             <div className="flex min-h-0 flex-1 items-end justify-center">
-              <div className="relative flex h-48 items-end sm:h-56 lg:h-full lg:max-h-[19rem]">
+              <div className="relative flex h-60 items-end sm:h-72 lg:h-full lg:max-h-[19rem]">
                 {/* Wider than the character by a good margin, or it stops
                     reading as a bench: at 110% the mascot covered it end to end
                     and all that showed was a sliver of armrest. A real bench is

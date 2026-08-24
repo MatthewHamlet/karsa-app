@@ -163,7 +163,7 @@ export default function Mascot({
     <svg
       viewBox="0 0 180 180"
       role="img"
-      aria-label="Maskot Karsa"
+      aria-label="Arsa"
       className={`shrink-0 overflow-visible ${className}`}
     >
       <BottsDefs uid={uid} />

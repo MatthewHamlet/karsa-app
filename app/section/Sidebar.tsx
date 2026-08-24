@@ -46,7 +46,7 @@ const NAV: NavItem[] = [
   { link: "/care", icon: HeartPulse, text: "Perawatan" },
   { link: "/scan", icon: ScanText, text: "Scan Resep" },
   { link: "/community", icon: UsersRound, text: "Komunitas" },
-  { link: "/mascot", icon: PawPrint, text: "Maskot Karsa" },
+  { link: "/mascot", icon: PawPrint, text: "Arsa" },
 ];
 
 /** The same rail, pointed somewhere else.
@@ -66,7 +66,7 @@ const PATIENT_NAV: NavItem[] = [
   { link: "/pasien/scan", icon: ScanText, text: "Scan Resep" },
   { link: "/pasien/pendamping", icon: HeartHandshake, text: "Pendamping" },
   { link: "/pasien/komunitas", icon: UsersRound, text: "Komunitas" },
-  { link: "/pasien/maskot", icon: PawPrint, text: "Maskot Karsa" },
+  { link: "/pasien/maskot", icon: PawPrint, text: "Arsa" },
 ];
 
 type RailProps = {
@@ -511,10 +511,11 @@ export default function Sidebar({
             Pages that fill the viewport subtract it; everything else just needs
             its last row to clear the bar. */}
         <main
+          data-rail={isOpen ? "open" : "closed"}
           className={`min-w-0 flex-1 pb-[var(--bottom-nav)] ${
             patientApp ? "patient-shell" : ""
           } ${
-            patientHome ? "lg:h-full lg:min-h-0 lg:pb-0" : ""
+            patientHome ? "patient-home lg:h-full lg:min-h-0 lg:pb-0" : ""
           }`}
         >
           {children}

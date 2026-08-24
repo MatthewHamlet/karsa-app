@@ -9,7 +9,7 @@ import type { MascotState } from "../data/mascot";
  *  A status line is also the accessible version of an animation. */
 const CAPTION: Record<MascotState, { title: string; body: string }> = {
   idle: {
-    title: "Karsa siap menemani",
+    title: "Arsa siap menemani",
     body: "Tanya apa saja tentang perawatan hari ini.",
   },
   thinking: {

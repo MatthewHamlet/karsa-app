@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, ChevronDown, Plus, X } from "lucide-react";
 import Modal from "./Modal";
@@ -8,7 +8,9 @@ import MoodFace from "./MoodFace";
 import StatArt from "./StatArt";
 import StatPeriodBody from "./StatPeriod";
 import { EASE } from "./List";
-import { TRENDS } from "../data/careTrends";
+import { TRENDS, type PeriodDetail } from "../data/careTrends";
+import { TREND_FORMAT } from "../data/trendFormats";
+import type { SerialDetail } from "../lib/care/trends";
 import {
   FIXED_STATS,
   FIXED_TONES,
@@ -168,17 +170,32 @@ export default function CareStats({ data }: { data?: CareData }) {
   /** Null on a day, and the whole period's detail otherwise. Narrowed once
    *  here so every card below can just ask whether there is a trend to draw.
    *
-   *  Also null whenever the figures are real, and that is the important half.
-   *  `TRENDS` is a hand-written fortnight of readings — the charts, the day
-   *  labels, the highs and lows. Drawn beside a headline figure computed from
-   *  the database it would make one card half true, which is worse than a card
-   *  that is plainly a placeholder: nobody can tell which half to believe.
+   *  Real figures now come with real charts: `getTrendDetail` rolls the logs up
+   *  per day, so a signed-in caregiver gets both halves of the card from the
+   *  same source. `TRENDS` stays behind the design-mode path only.
    *
-   *  So a signed-in caregiver gets the real figure at every period and no
-   *  chart, and the chart returns when there is a query behind it. Rolling the
-   *  logs up per day is a straightforward addition to `lib/care/stats` — it is
-   *  left out here rather than faked. */
-  const trend = period === "daily" || data ? null : TRENDS[period];
+   *  A metric with nothing recorded is simply absent from the record, so every
+   *  card below asks for its own key rather than trusting this to be complete
+   *  — the headline figure is still shown, without a chart under it. */
+  /* The server sends every series without its formatter — a function cannot be
+     serialised across the boundary — so the lookup happens here and the cards
+     below receive exactly the shape they were designed against. */
+  const trend = useMemo<Record<string, PeriodDetail> | null>(() => {
+    if (period === "daily") return null;
+    if (!data) return TRENDS[period];
+
+    return Object.fromEntries(
+      Object.entries(data.trends[period]).map(([key, detail]: [string, SerialDetail]) => [
+        key,
+        {
+          ...detail,
+          series: detail.series
+            ? { ...detail.series, format: TREND_FORMAT[detail.series.formatKey] }
+            : undefined,
+        },
+      ]),
+    );
+  }, [period, data]);
 
   return (
     <section>
@@ -296,8 +313,9 @@ export default function CareStats({ data }: { data?: CareData }) {
             )
           }
         >
-          {trend ? (
+          {trend?.fluid ? (
             <StatPeriodBody
+              monthShort={data?.monthShort}
               detail={trend.fluid}
               tone={FIXED_TONES.fluid}
               title={FIXED_STATS.fluid.title}
@@ -318,16 +336,22 @@ export default function CareStats({ data }: { data?: CareData }) {
           art={<StatArt kind="meals" tone={FIXED_TONES.meals} />}
           label={`${FIXED_STATS.meals.title}: ${meals.value} ${meals.caption}`}
         >
-          {trend ? (
+          {trend?.meals ? (
             <StatPeriodBody
+              monthShort={data?.monthShort}
               detail={trend.meals}
               tone={FIXED_TONES.meals}
               title={FIXED_STATS.meals.title}
               unit="porsi makan"
             />
+          ) : !meals.meals ? (
+            <StatFigure
+              data={{ value: meals.value, caption: meals.caption, progress: meals.progress }}
+              tone={FIXED_TONES.meals}
+            />
           ) : (
             <ul className="space-y-2.5">
-              {meals.meals!.map((meal) => (
+              {meals.meals.map((meal) => (
                 <li key={meal.label} className="flex items-center gap-2.5">
                   <span
                     className="grid h-[21px] w-[21px] shrink-0 place-items-center rounded-full text-white"
@@ -360,8 +384,9 @@ export default function CareStats({ data }: { data?: CareData }) {
           art={<StatArt kind="medication" tone={FIXED_TONES.medication} />}
           label={`${FIXED_STATS.medication.title}: ${fixed("medication").value}`}
         >
-          {trend ? (
+          {trend?.medication ? (
             <StatPeriodBody
+              monthShort={data?.monthShort}
               detail={trend.medication}
               tone={FIXED_TONES.medication}
               title={FIXED_STATS.medication.title}
@@ -387,14 +412,15 @@ export default function CareStats({ data }: { data?: CareData }) {
               /* `okay` is the neutral face, and it is only ever reached when
                  there is nothing logged at all — the card beside it says so in
                  words, so the face is a placeholder rather than a claim. */
-              mood={trend ? trend.mood.mood!.dominant : (todayMood?.mood ?? "okay")}
+              mood={trend?.mood?.mood ? trend.mood.mood.dominant : (todayMood?.mood ?? "okay")}
               className="h-11 w-11 shrink-0 xl:h-12 xl:w-12"
             />
           }
           label={`${FIXED_STATS.mood.title}: ${fixed("mood").value}`}
         >
-          {trend ? (
+          {trend?.mood ? (
             <StatPeriodBody
+              monthShort={data?.monthShort}
               detail={trend.mood}
               tone={FIXED_TONES.mood}
               title={FIXED_STATS.mood.title}
@@ -411,8 +437,9 @@ export default function CareStats({ data }: { data?: CareData }) {
           art={<StatArt kind="sleep" tone={FIXED_TONES.sleep} />}
           label={`${FIXED_STATS.sleep.title}: ${fixed("sleep").value}`}
         >
-          {trend ? (
+          {trend?.sleep ? (
             <StatPeriodBody
+              monthShort={data?.monthShort}
               detail={trend.sleep}
               tone={FIXED_TONES.sleep}
               title={FIXED_STATS.sleep.title}
@@ -445,8 +472,9 @@ export default function CareStats({ data }: { data?: CareData }) {
                   removeLabel={`Hapus ${stat.title}`}
                   className="h-full"
                 >
-                  {trend ? (
+                  {trend?.[stat.key] ? (
                     <StatPeriodBody
+                      monthShort={data?.monthShort}
                       detail={trend[stat.key]}
                       tone={stat.tone}
                       title={stat.title}

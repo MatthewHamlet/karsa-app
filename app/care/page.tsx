@@ -13,6 +13,7 @@ import {
   getPatientDetail,
 } from "../lib/care/queries";
 import { getFixedStats, getMonitorStats, type Period } from "../lib/care/stats";
+import { getTrendDetail, monthShortOf } from "../lib/care/trends";
 import { jakartaToday } from "../lib/care/time";
 import type { CareData } from "../lib/care/view";
 
@@ -53,10 +54,12 @@ export default async function Care({ searchParams }: PageProps<"/care">) {
      is a client-side control with its own animation — going back to the server
      for each press would put a network round trip inside a 200ms transition,
      and the whole set is one indexed scan per period. */
-  const [fixed, monitor, patient, feed, byDate, notes, messages, group, moods] =
+  const [fixed, monitor, weekly, monthly, patient, feed, byDate, notes, messages, group, moods] =
     await Promise.all([
       Promise.all(PERIODS.map((p) => getFixedStats(patientId, p))),
       Promise.all(PERIODS.map((p) => getMonitorStats(patientId, p))),
+      getTrendDetail(patientId, "weekly"),
+      getTrendDetail(patientId, "monthly"),
       getPatientDetail(patientId),
       getActivityFeed(patientId, 6),
       getActivitiesByDate(patientId, today),
@@ -81,6 +84,8 @@ export default async function Care({ searchParams }: PageProps<"/care">) {
         pending: active.status !== "active",
         today,
         stats: byPeriod,
+        trends: { weekly, monthly },
+        monthShort: monthShortOf(),
         feed,
         activitiesByDate: byDate,
         notes,

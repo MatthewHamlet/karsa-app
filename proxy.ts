@@ -110,6 +110,20 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  /* ── Route handlers answer in JSON, never in HTML ───────────────────────
+     The gates below redirect, which is right for a page and wrong for a
+     `fetch`. A redirect to `/login` is followed transparently, so the caller
+     gets 200 and a page of markup where it expected its own payload — the
+     mascot would stream the login screen into a chat bubble. Route handlers
+     state their own preconditions and answer with a status; this hands them
+     the request instead of guessing on their behalf. */
+  if (pathname.startsWith("/api/")) {
+    if (!user) {
+      return NextResponse.json({ error: "Belum masuk." }, { status: 401 });
+    }
+    return response;
+  }
+
   if (!user && !isPublic(pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -167,27 +181,28 @@ export async function proxy(request: NextRequest) {
      It costs one indexed lookup per navigation, which is the right price for
      not locking people out of the product. */
   if (user && !isPublic(pathname) && !allowedWhileOnboarding(pathname)) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .maybeSingle();
 
-    const isCaregiver = profile?.role !== "patient";
+    if (profileError || !profile) return response;
+    if (profile.role === "patient") return response;
 
-    if (isCaregiver) {
-      const { count } = await supabase
-        .from("care_relationships")
-        .select("id", { count: "exact", head: true })
-        .eq("caregiver_id", user.id)
-        .in("status", ["pending", "active"]);
+    const { count, error: countError } = await supabase
+      .from("care_relationships")
+      .select("id", { count: "exact", head: true })
+      .eq("caregiver_id", user.id)
+      .in("status", ["pending", "active"]);
 
-      if ((count ?? 0) === 0) {
-        const url = request.nextUrl.clone();
-        url.pathname = "/mulai";
-        url.search = "";
-        return NextResponse.redirect(url);
-      }
+    if (countError || count === null) return response;
+
+    if (count === 0) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/mulai";
+      url.search = "";
+      return NextResponse.redirect(url);
     }
   }
 

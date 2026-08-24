@@ -6,7 +6,6 @@ import { Mic, Send } from "lucide-react";
 import MascotAvatar from "./MascotAvatar";
 import CareActionCards from "./CareActionCards";
 import {
-  GREETING,
   QUICK_ACTIONS,
   type ActionCard,
   type Intent,
@@ -43,6 +42,7 @@ export default function AssistantChat({
   onSend,
   onQuickAction,
   state,
+  greeting,
 }: {
   turns: ChatTurn[];
   draft: string;
@@ -50,6 +50,7 @@ export default function AssistantChat({
   onSend: (text: string) => void;
   onQuickAction: (intent: Intent) => void;
   state: MascotState;
+  greeting: string;
 }) {
   const reduce = useReducedMotion();
   const streamRef = useRef<HTMLDivElement>(null);
@@ -74,7 +75,7 @@ export default function AssistantChat({
        it — an absolutely positioned sibling would otherwise sit on top. */
     <section
       className="relative flex min-h-0 flex-1 flex-col"
-      aria-label="Percakapan dengan Karsa"
+      aria-label="Percakapan dengan Arsa"
     >
       {/* ── Stream ──────────────────────────────────────────────────────────
           `pb-28` is what the floating composer costs. The composer is out of
@@ -82,7 +83,7 @@ export default function AssistantChat({
           just sent — would sit underneath it. */}
       <div
         ref={streamRef}
-        className="min-h-0 flex-1 overflow-y-auto px-4 pb-32 pt-5 sm:px-6 xl:px-8"
+        className="scrollbar-none min-h-0 flex-1 overflow-y-auto overscroll-none px-4 pb-32 pt-5 sm:px-6 xl:px-8"
       >
         {/* Empty, the greeting is the whole screen and sits in the middle of
             it. Once there is a conversation the column goes back to the top,
@@ -112,7 +113,7 @@ export default function AssistantChat({
                 Ada yang bisa kubantu?
               </h2>
               <p className="mx-auto mt-2 max-w-[52ch] text-[14.5px] leading-6 text-neutral-600">
-                {GREETING}
+                {greeting}
               </p>
             </div>
           )}
@@ -132,10 +133,10 @@ export default function AssistantChat({
 
                 <div className={`min-w-0 max-w-[80%] ${turn.from === "me" ? "" : "flex-1"}`}>
                   <div
-                    className={`rounded-2xl px-4 py-3 text-[14.5px] leading-6 ${
+                    className={`rounded-2xl px-4 py-3 text-[14.5px] font-medium leading-6 ${
                       turn.from === "me"
                         ? "rounded-br-md bg-karsa text-white"
-                        : "rounded-bl-md bg-white text-neutral-800 ring-1 ring-karsa-line"
+                        : "rounded-bl-md bg-white text-neutral-900 ring-1 ring-karsa-line"
                     }`}
                   >
                     {turn.text}
@@ -175,7 +176,7 @@ export default function AssistantChat({
                     so the wait reads as counting rather than pulsing.
                     `role="status"` with a hidden label keeps that legible to a
                     screen reader, which cannot see dots arriving. */}
-                <div role="status" aria-label="Karsa sedang berpikir" className="flex items-center gap-1.5 self-end pb-2">
+                <div role="status" aria-label="Arsa sedang berpikir" className="flex items-center gap-1.5 self-end pb-2">
                   {[0, 1, 2].map((i) => (
                     <motion.span
                       key={i}
@@ -224,7 +225,7 @@ export default function AssistantChat({
         <div className="mx-auto w-full max-w-[760px] rounded-[28px] border border-white/70 bg-white/90 p-1.5 shadow-[0_8px_20px_-8px_rgba(24,32,24,0.18),0_24px_48px_-24px_rgba(24,32,24,0.45)] backdrop-blur-xl">
           <form onSubmit={submit} className="flex items-end gap-1.5">
             <label htmlFor="karsa-draft" className="sr-only">
-              Tulis pesan untuk Karsa
+              Tulis pesan untuk Arsa
             </label>
             <textarea
               id="karsa-draft"
@@ -240,7 +241,7 @@ export default function AssistantChat({
 
             <button
               type="button"
-              aria-label="Bicara dengan Karsa"
+              aria-label="Bicara dengan Arsa"
               className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-karsa-dark outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
             >
               <Mic size={18} strokeWidth={2.1} />

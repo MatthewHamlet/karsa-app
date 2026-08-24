@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
+import { lockScroll } from "../lib/scrollLock";
 
 /** A panel that comes in from the right edge.
  *
@@ -40,12 +41,11 @@ export default function SlideOver({
 
     /* The page behind must not scroll while a full-height sheet is over it —
        otherwise flicking the sheet's edge scrolls the feed underneath. */
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
 
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
+      unlock();
       returnTo.current?.focus?.();
     };
   }, [open, onClose]);

@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "./supabase/server";
 import { isSupabaseConfigured } from "./supabase/config";
-import type { SessionProfile } from "./roles";
+import { normaliseRole, type Role, type SessionProfile } from "./roles";
 
 /** Who is signed in, as the application understands them.
  *
@@ -44,7 +44,10 @@ export const getSessionProfile = cache(async (): Promise<SessionProfile | null> 
      usable session with a name derived from the email than a crash. */
   const email = user.email ?? "";
   const fullName = profile?.full_name?.trim() || email.split("@")[0] || "Pengguna";
-  const role = profile?.role === "patient" ? "patient" : "caregiver";
+  const role: Role =
+    profile?.role === "patient" || profile?.role === "caregiver"
+      ? profile.role
+      : normaliseRole(user.user_metadata?.role);
 
   return {
     id: user.id,

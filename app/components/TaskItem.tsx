@@ -74,7 +74,7 @@ export default function TaskItem({ label, hint, done, onToggle }: TaskItemProps)
 
         {hint && (
           <span
-            className={`shrink-0 text-[12px] font-medium tabular-nums transition-colors duration-200 xl:text-[12.5px] ${
+            className={`shrink-0 text-[12px] font-medium tabular-nums transition-colors duration-200 md:[[data-rail=open]_&]:hidden xl:text-[12.5px] ${
               done ? "text-neutral-300" : "text-neutral-400"
             }`}
           >

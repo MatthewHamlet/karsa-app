@@ -53,6 +53,7 @@ import {
   updateProfile,
 } from "../lib/settings/actions";
 import { CARE_GROUP } from "../data/careStats";
+import Modal from "../components/Modal";
 import {
   ACCOUNT,
   ACCOUNT_STATS,
@@ -165,22 +166,17 @@ export default function SettingsPage({
     [selectedId],
   );
 
-  /* Under `lg` the rail sits above the panel and is taller than the screen, so
-     picking a section would otherwise change something the caregiver cannot
-     see. Skipped on the first render — nobody asked for that one. */
-  useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    if (window.matchMedia("(min-width: 1024px)").matches) return;
-    mainRef.current?.scrollIntoView({
-      behavior: reduce ? "auto" : "smooth",
-      block: "start",
-    });
-  }, [selectedId, reduce]);
-
   const fade = reduce ? { duration: 0 } : { duration: 0.24, ease: EASE };
+
+  const detailNode = selected ? (
+    <Detail
+      item={selected}
+      switches={switches}
+      onSwitch={(key, next) => setSwitches((prev) => ({ ...prev, [key]: next }))}
+      me={me}
+      access={access}
+    />
+  ) : null;
 
   return (
     /* Same rest at the foot of the page as every other route — see Care. */
@@ -219,7 +215,7 @@ export default function SettingsPage({
           role="tabpanel"
           aria-labelledby={tabId(selectedId)}
           tabIndex={-1}
-          className="min-w-0 max-w-[1280px] scroll-mt-6 outline-none"
+          className="hidden min-w-0 max-w-[1280px] scroll-mt-6 outline-none lg:block"
         >
           <motion.div
             key={selectedId ?? "overview"}
@@ -228,13 +224,7 @@ export default function SettingsPage({
             transition={fade}
           >
             {selected ? (
-              <Detail
-                item={selected}
-                switches={switches}
-                onSwitch={(key, next) => setSwitches((prev) => ({ ...prev, [key]: next }))}
-                me={me}
-                access={access}
-              />
+              detailNode
             ) : (
               <Overview
                 contributions={contributions}
@@ -245,6 +235,20 @@ export default function SettingsPage({
             )}
           </motion.div>
         </div>
+      </div>
+
+      {/* On a phone the rail is the whole page, so a section opens over it
+          instead of stacking underneath — same `Detail`, different container. */}
+      <div className="lg:hidden">
+        <Modal
+          open={Boolean(selected)}
+          onClose={() => setSelectedId(null)}
+          title={selected?.title ?? ""}
+          description={selected?.description}
+          size="lg"
+        >
+          {detailNode}
+        </Modal>
       </div>
     </div>
   );
@@ -376,14 +380,16 @@ function ProfileRail({
         onKeyDown={onKeyDown}
         className="mt-6 pb-2"
       >
-        <NavRow
-          id={tabId(null)}
-          icon={SettingsIcon}
-          tone="neutral"
-          label="Semua pengaturan"
-          active={selectedId === null}
-          onClick={() => onSelect(null)}
-        />
+        <div className="hidden lg:block">
+          <NavRow
+            id={tabId(null)}
+            icon={SettingsIcon}
+            tone="neutral"
+            label="Semua pengaturan"
+            active={selectedId === null}
+            onClick={() => onSelect(null)}
+          />
+        </div>
 
         {SETTINGS.map((group) => (
           <div key={group.id} className="mt-5" role="presentation">

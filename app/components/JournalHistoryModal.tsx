@@ -14,6 +14,7 @@ import {
 } from "../data/journal";
 import { loadJournalMonth } from "../lib/care/actions";
 import type { JournalDayData, JournalMonth } from "../lib/care/queries";
+import { lockScroll } from "../lib/scrollLock";
 
 /** Past days, at two very different sizes.
  *
@@ -126,12 +127,11 @@ function Shell({
     };
     document.addEventListener("keydown", onKey);
 
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const unlock = lockScroll();
 
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
+      unlock();
     };
   }, [onClose]);
 
