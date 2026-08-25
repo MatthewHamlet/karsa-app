@@ -291,7 +291,7 @@ export default function TeamChat({
 
   return (
     <section
-      className="relative flex h-[calc(100dvh-16rem-var(--bottom-nav))] min-h-[320px] flex-col"
+      className="relative flex h-[calc(100svh-16rem-var(--bottom-nav))] min-h-[320px] flex-col"
       style={{ backgroundColor: WALLPAPER, ...(height ? { height } : null) }}
     >
 

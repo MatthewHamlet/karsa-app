@@ -12,7 +12,7 @@ export default function StartHere({ name }: { name?: string }) {
   const [pairing, setPairing] = useState(false);
 
   return (
-    <div className="relative flex min-h-[100dvh] w-full items-center justify-center px-5 py-10 sm:px-8">
+    <div className="relative flex min-h-[100svh] w-full items-center justify-center px-5 py-10 sm:px-8">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 overflow-hidden"

@@ -471,7 +471,7 @@ export default function CareShell({
           <TeamChat
             context={context}
             data={data}
-            height={hostH ? `calc(100dvh - ${hostH}px - var(--bottom-nav))` : undefined}
+            height={hostH ? `calc(100svh - ${hostH}px - var(--bottom-nav))` : undefined}
           />
         </div>
       )}

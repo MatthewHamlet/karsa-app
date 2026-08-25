@@ -237,7 +237,7 @@ export default function PatientDesktopDashboard({ home }: { home?: PatientHome |
 
       <div className="relative grid gap-6 lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.72fr)] lg:gap-8 xl:gap-10">
 
-        <section className="relative flex min-h-[calc((100dvh-var(--bottom-nav))*0.6)] min-w-0 flex-col lg:min-h-0 lg:h-full lg:justify-between">
+        <section className="relative flex min-h-[calc((100svh-var(--bottom-nav))*0.6)] min-w-0 flex-col lg:min-h-0 lg:h-full lg:justify-between">
 
           <div className="relative flex flex-1 flex-col items-center justify-center pb-2 pt-4 lg:min-h-0">
 

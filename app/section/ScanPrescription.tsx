@@ -131,7 +131,7 @@ export default function ScanPrescriptionPage({
 
   return (
 
-    <div className="flex min-h-[calc(100dvh-var(--bottom-nav))] w-full flex-col px-4 pb-6 pt-6 sm:px-6 md:px-8 md:pt-10 lg:block lg:min-h-0 lg:pb-10 xl:px-12 xl:pb-12 xl:pt-12">
+    <div className="flex min-h-[calc(100svh-var(--bottom-nav))] w-full flex-col px-4 pb-6 pt-6 sm:px-6 md:px-8 md:pt-10 lg:block lg:min-h-0 lg:pb-10 xl:px-12 xl:pb-12 xl:pt-12">
       <PageHeader
         tone="amber"
         eyebrow="Karsa"

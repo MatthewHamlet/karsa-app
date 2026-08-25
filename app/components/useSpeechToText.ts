@@ -87,6 +87,23 @@ export function useSpeechToText(
     setInterim("");
   }, [stopRecorder]);
 
+  useEffect(() => {
+    if (!listening) return;
+
+    const bail = () => stop();
+    const onVisibility = () => {
+      if (document.hidden) stop();
+    };
+
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", bail);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", bail);
+    };
+  }, [listening, stop]);
+
   const startRecorder = useCallback(async () => {
     if (!clipRef.current || typeof MediaRecorder === "undefined") return;
 

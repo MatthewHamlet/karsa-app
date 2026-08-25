@@ -179,7 +179,7 @@ export default function PatientJournalPage({
 
   return (
 
-    <div className="flex h-[calc(100dvh-var(--bottom-nav))] flex-col overflow-hidden px-4 pb-3 pt-4 sm:px-6">
+    <div className="flex h-[calc(100svh-var(--bottom-nav))] flex-col overflow-hidden px-4 pb-3 pt-4 sm:px-6">
 
       <header
         className="relative -mx-4 -mt-4 mb-4 shrink-0 overflow-hidden rounded-b-[28px] px-4 pb-5 pt-4 sm:-mx-6 sm:px-6"

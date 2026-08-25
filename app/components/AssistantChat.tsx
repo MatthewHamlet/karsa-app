@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ListChecks, Mic, Send, Siren, Stethoscope } from "lucide-react";
+import { ListChecks, Mic, Send, Siren, Square, Stethoscope } from "lucide-react";
 import MascotAvatar from "./MascotAvatar";
+import { useSpeechToText } from "./useSpeechToText";
 import CareActionCards from "./CareActionCards";
 import {
   QUICK_ACTIONS,
@@ -57,6 +58,10 @@ export default function AssistantChat({
   const streamRef = useRef<HTMLDivElement>(null);
   const empty = turns.length === 0;
 
+  const voice = useSpeechToText((chunk) => {
+    onDraft(`${draft} ${chunk}`.trim());
+  });
+
 
   useEffect(() => {
     const stream = streamRef.current;
@@ -70,6 +75,7 @@ export default function AssistantChat({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    voice.stop();
     const text = draft.trim();
     if (!text || state === "thinking") return;
     onSend(text);
@@ -195,6 +201,12 @@ export default function AssistantChat({
 
       <div className="absolute inset-x-0 bottom-9 z-10 px-4 sm:bottom-3 sm:px-6 xl:px-8">
         <div className="mx-auto w-full max-w-[760px] rounded-[28px] border border-white/70 bg-white/90 p-1.5 shadow-[0_8px_20px_-8px_rgba(24,32,24,0.18),0_24px_48px_-24px_rgba(24,32,24,0.45)] backdrop-blur-xl">
+          {voice.error ? (
+            <p className="mb-1.5 px-1 text-[12px] leading-snug text-rose-600">
+              {voice.error}
+            </p>
+          ) : null}
+
           <form onSubmit={submit} className="flex items-end gap-1.5">
             <label htmlFor="karsa-draft" className="sr-only">
               Tulis pesan untuk Arsa
@@ -207,16 +219,28 @@ export default function AssistantChat({
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) submit(event);
               }}
-              placeholder="Tanya apa saja tentang perawatan hari ini…"
+              placeholder={voice.listening ? "Mendengar…" : "Tanya apa saja tentang perawatan hari ini…"}
               className="min-h-[44px] flex-1 resize-none rounded-full bg-transparent px-4 py-3 text-[14.5px] leading-5 text-neutral-800 outline-none placeholder:text-neutral-400"
             />
 
             <button
               type="button"
-              aria-label="Bicara dengan Arsa"
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-karsa-dark outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
+              onClick={() => (voice.listening ? voice.stop() : voice.start())}
+              aria-label={voice.listening ? "Berhenti merekam" : "Bicara dengan Arsa"}
+              aria-pressed={voice.listening}
+              disabled={!voice.supported}
+              title={voice.supported ? undefined : "Browser ini belum mendukung suara ke teks"}
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-full outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 disabled:opacity-40 ${
+                voice.listening
+                  ? "bg-rose-600 text-white ring-rose-600"
+                  : "bg-white text-karsa-dark ring-karsa-line hover:bg-karsa-soft"
+              }`}
             >
-              <Mic size={18} strokeWidth={2.1} />
+              {voice.listening ? (
+                <Square size={16} strokeWidth={2.8} />
+              ) : (
+                <Mic size={18} strokeWidth={2.1} />
+              )}
             </button>
 
             <button

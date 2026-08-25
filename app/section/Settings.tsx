@@ -285,7 +285,7 @@ function ProfileRail({
 
   return (
 
-    <aside className="lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-3 scrollbar-none">
+    <aside className="lg:sticky lg:top-6 lg:h-[calc(100svh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-3 scrollbar-none">
       <div className="flex flex-col items-start">
         <span className="relative inline-block">
           <UserAvatar

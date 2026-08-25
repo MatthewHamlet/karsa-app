@@ -183,11 +183,11 @@ export default function Homepage({
         <div className="@container min-w-0 space-y-6 md:space-y-7 xl:space-y-8">
 
 
-          <div className="flex flex-col gap-6 md:gap-7 xl:gap-8 lg:min-h-[calc(100dvh-2.5rem-1.5rem)] xl:min-h-[calc(100dvh-3rem-1.75rem)]">
+          <div className="flex flex-col gap-6 md:gap-7 xl:gap-8 lg:min-h-[calc(100svh-2.5rem-1.5rem)] xl:min-h-[calc(100svh-3rem-1.75rem)]">
 
 
 
-            <section className="relative flex min-h-[calc(100dvh-488px)] flex-1 flex-col justify-center pb-4 pt-1 sm:min-h-0 sm:pb-6 sm:pt-2 xl:pb-8">
+            <section className="relative flex min-h-[calc(100svh-488px)] flex-1 flex-col justify-center pb-4 pt-1 sm:min-h-0 sm:pb-6 sm:pt-2 xl:pb-8">
 
               <div
                 aria-hidden

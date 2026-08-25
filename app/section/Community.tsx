@@ -65,7 +65,7 @@ export default function CommunityPage({ data }: { data: CommunityData }) {
   const feedScrollRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="flex h-[calc(100dvh-var(--bottom-nav))] w-full flex-col px-4 pb-4 pt-4 sm:px-6 md:px-8 xl:px-12">
+    <div className="flex h-[calc(100svh-var(--bottom-nav))] w-full flex-col px-4 pb-4 pt-4 sm:px-6 md:px-8 xl:px-12">
       <div className="shrink-0">
         <CommunityToolbar
           query={query}

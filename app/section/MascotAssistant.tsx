@@ -154,7 +154,7 @@ export default function MascotAssistant({
   };
 
   return (
-    <div className="flex h-[calc(100dvh-var(--bottom-nav))] flex-col bg-karsa-canvas">
+    <div className="flex h-[calc(100svh-var(--bottom-nav))] flex-col bg-karsa-canvas">
       <PatientBanner
         patientName={patientName}
         patientAge={patientAge}
