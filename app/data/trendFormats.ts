@@ -1,12 +1,3 @@
-/** How each metric prints one reading.
- *
- *  These are functions, and a function cannot cross the server-to-client
- *  boundary — React has to serialise what a Server Component hands down, and a
- *  closure has no serialisation. The mock trends got away with it by living in
- *  a module the client imported directly; real trends are computed on the
- *  server, so they travel as a key and the formatter is looked up here, on the
- *  side of the boundary that can hold one. */
-
 export type FormatKey =
   | "ml"
   | "duration"

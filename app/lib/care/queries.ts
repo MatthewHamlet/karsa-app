@@ -16,38 +16,22 @@ import {
   whenLabel,
 } from "./time";
 
-/** Reads for the caregiver–patient relationship system.
- *
- *  Every query here filters by the signed-in user as well as relying on RLS.
- *  That is deliberate belt-and-braces: RLS is the thing that actually stops a
- *  caregiver reaching a patient they have no relationship with, and the filters
- *  are what stop a bug in *this* file quietly returning somebody else's row
- *  before RLS gets asked. Neither is a substitute for the other.
- *
- *  `cache` is per-request, so a layout and three components asking the same
- *  question in one render share one round trip. */
+
 
 const initialOf = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 
-/* Supabase's generated row types are not wired up yet, so the joined shapes are
-   described here. Narrow and local on purpose — a wrong guess shows up as a
-   type error at the mapping below rather than as `any` spreading outwards. */
+
 type PatientRow = {
   id: string;
   display_name: string;
   date_of_birth: string | null;
   status: PatientStatus;
-  /** Only ever selected for the patient's own row. It is what they read out to
-     a caregiver, so it must not travel with a list of other people. */
+
   share_code?: string;
 };
 type CaregiverRow = { id: string; full_name: string | null };
 
-/** Patients this caregiver is connected to, accepted or not.
- *
- *  Pending ones are included on purpose: the dashboard has to be able to say
- *  "menunggu persetujuan" rather than pretend the invitation was never sent.
- *  They carry no access — RLS refuses the care data behind them. */
+
 export const getMyPatients = cache(async (): Promise<CarePatient[]> => {
   if (!isSupabaseConfigured()) return [];
   const me = await getSessionProfile();
@@ -60,14 +44,13 @@ export const getMyPatients = cache(async (): Promise<CarePatient[]> => {
       "id, status, relation, patient:patients!inner(id, display_name, date_of_birth, status)",
     )
     .eq("caregiver_id", me.id)
-    /* Withdrawn and refused relationships are history, not a patient list. */
     .in("status", ["pending", "active"])
     .order("created_at", { ascending: true });
 
   if (error || !data) return [];
 
   return data.flatMap((row) => {
-    /* PostgREST types an embedded row as an array even for a to-one join. */
+
     const p = (Array.isArray(row.patient) ? row.patient[0] : row.patient) as PatientRow | undefined;
     if (!p) return [];
     return [
@@ -85,7 +68,7 @@ export const getMyPatients = cache(async (): Promise<CarePatient[]> => {
   });
 });
 
-/** The patient row belonging to the signed-in user, if they have claimed one. */
+
 export const getMyPatientRecord = cache(async () => {
   if (!isSupabaseConfigured()) return null;
   const me = await getSessionProfile();
@@ -101,7 +84,7 @@ export const getMyPatientRecord = cache(async () => {
   return (data as PatientRow | null) ?? null;
 });
 
-/** Who is asking to look after me, and who already does. */
+
 export const getMyCareTeam = cache(async (): Promise<CareTeamMember[]> => {
   const record = await getMyPatientRecord();
   if (!record) return [];
@@ -118,17 +101,7 @@ export const getMyCareTeam = cache(async (): Promise<CareTeamMember[]> => {
 
   if (error || !data) return [];
 
-  /* `map`, not `flatMap`-with-a-drop. This used to bin any row whose embedded
-     profile came back empty, which turned a *permissions* problem into an
-     invisible one: `profiles` had no policy letting a patient read their own
-     caregiver's row (fixed in migration 0014), so the join returned null, every
-     relationship was silently discarded, and the screen said "belum ada
-     pendamping" about relationships that existed and were active.
 
-     The relationship row is the fact here; the profile is decoration on it. So
-     a missing profile now costs a name, not the row — the patient still sees
-     that somebody has access and can still revoke it. Losing the ability to
-     revoke access you cannot see is the worst failure this page has. */
   return data.map((row) => {
     const c = (Array.isArray(row.caregiver) ? row.caregiver[0] : row.caregiver) as
       | CaregiverRow
@@ -150,21 +123,29 @@ export type DailyTask = {
   id: string;
   label: string;
   hint: string | null;
-  done: boolean; // sudah completed hari ini?
+
+  atTime: string | null;
+
+  note: string | null;
+
+  assigneeId: string | null;
+  assigneeName: string | null;
+  assigneeInitial: string | null;
+  done: boolean;
 };
 
-/** Tugas harian pasien, plus status "sudah dicentang hari ini" — dua query
- *  join di JS daripada SQL supaya tetap kebaca; volumenya kecil per pasien. */
+
 export const getTodayTasks = cache(async (patientId: string): Promise<DailyTask[]> => {
   const supabase = await createClient();
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }); // YYYY-MM-DD
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
 
   const [{ data: tasks }, { data: done }] = await Promise.all([
     supabase
       .from("daily_tasks")
-      .select("id, label, hint")
+      .select("id, label, hint, at_time, note, assignee_id")
       .eq("patient_id", patientId)
       .eq("active", true)
+      .order("at_time", { ascending: true, nullsFirst: false })
       .order("sort_order", { ascending: true }),
     supabase
       .from("task_completions")
@@ -174,10 +155,32 @@ export const getTodayTasks = cache(async (patientId: string): Promise<DailyTask[
   ]);
 
   const doneIds = new Set((done ?? []).map((d) => d.task_id));
-  return (tasks ?? []).map((t) => ({ ...t, done: doneIds.has(t.id) }));
+
+  const assigneeIds = [
+    ...new Set((tasks ?? []).map((t) => t.assignee_id as string | null).filter(Boolean)),
+  ] as string[];
+  const names = assigneeIds.length > 0 ? await namesFor(assigneeIds) : new Map<string, string>();
+
+  return (tasks ?? []).map((t) => {
+    const assigneeId = (t.assignee_id as string | null) ?? null;
+    const assigneeName = assigneeId ? (names.get(assigneeId) ?? "Seseorang") : null;
+
+    return {
+      id: t.id as string,
+      label: t.label as string,
+      hint: (t.hint as string | null) ?? null,
+
+      atTime: t.at_time ? String(t.at_time).slice(0, 5) : null,
+      note: (t.note as string | null) ?? null,
+      assigneeId,
+      assigneeName,
+      assigneeInitial: assigneeName ? initialOf(assigneeName) : null,
+      done: doneIds.has(t.id),
+    };
+  });
 });
 
-/** Satu jenis bacaan (tensi, gula, dst) dalam rentang tanggal, terbaru dulu. */
+
 export async function getHealthReadings(
   patientId: string,
   kind: string,
@@ -197,38 +200,14 @@ export async function getHealthReadings(
   if (error) return [];
   return data;
 }
-/** Unclaimed patient profiles created for this email address, so someone
- *  signing up can be offered "is this you?" instead of starting from nothing.
- *
- *  Not implemented as a lookup by email on purpose — `patients` holds no email,
- *  and adding one would let anybody probe for who is registered. Activation
- *  goes through an explicit invitation code instead; this is the hook that will
- *  read it. */
+
 export async function getPendingActivationFor(_email: string): Promise<CarePatient[]> {
   return [];
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   The rest of the dashboard
-   ═══════════════════════════════════════════════════════════════════════════
 
-   Everything below reads what migration 0007 added. Two conventions hold
-   throughout:
 
-   · Times come back as finished strings, formatted in Asia/Jakarta by
-     `./time`. A component that formats a `Date` itself renders one string on
-     the server and a different one in the browser — see the note in that file.
 
-   · A query that cannot answer returns an empty list, never `null` and never a
-     throw. Every one of these feeds a card that has to render for a caregiver
-     whose patient was added this morning and has no history at all. */
-
-/** Display names for a set of profile ids, resolved in one round trip.
- *
- *  The activity feed is a view, and PostgREST cannot embed across a view the
- *  way it does across a table's foreign key — there is no constraint for it to
- *  follow. So the ids are collected and looked up together rather than one
- *  query per row. */
 async function namesFor(ids: (string | null)[]): Promise<Map<string, string>> {
   const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
   if (unique.length === 0) return new Map();
@@ -244,22 +223,20 @@ async function namesFor(ids: (string | null)[]): Promise<Map<string, string>> {
   );
 }
 
-/* ── Activity feed ───────────────────────────────────────────────────────── */
+
 
 export type FeedKind = "task" | "reading" | "meal" | "medication" | "mood";
 
 export type FeedItem = {
   id: string;
   kind: FeedKind;
-  /** Who did it. "Sistem" when the row has no actor — an import, or a profile
-   *  that has since been deleted. */
+
   actor: string;
-  /** The sentence after the name: "menyiapkan sarapan". Built here rather than
-   *  in the component, so the same wording is used everywhere it appears. */
+
   action: string;
-  /** Already formatted: a clock today, a date and a clock before that. */
+
   when: string;
-  /** For sorting and keys on the client, which must not re-derive the label. */
+
   at: string;
 };
 
@@ -288,7 +265,7 @@ const MOOD_WORD: Record<string, string> = {
   verylow: "sedih",
 };
 
-/** Turns one row of the union view into the sentence the feed prints. */
+
 function phraseFor(row: { kind: string; title: string | null; detail: string | null }): string {
   const title = row.title ?? "";
   switch (row.kind) {
@@ -307,8 +284,7 @@ function phraseFor(row: { kind: string; title: string | null; detail: string | n
   }
 }
 
-/** How the feed's icon is chosen. The view's five kinds collapse to the three
- *  tones the timeline draws. */
+
 export const FEED_TONE: Record<FeedKind, "care" | "health" | "meal"> = {
   task: "care",
   reading: "health",
@@ -317,12 +293,7 @@ export const FEED_TONE: Record<FeedKind, "care" | "health" | "meal"> = {
   mood: "care",
 };
 
-/** Everything that has happened to this patient, newest first.
- *
- *  Reads `activity_feed`, the union view from 0007. The view runs as the caller
- *  and so is governed by the same RLS as the five tables it draws from — a
- *  caregiver with a pending invitation gets an empty list here, not a partial
- *  one. */
+
 export const getActivityFeed = cache(
   async (patientId: string, limit = 8): Promise<FeedItem[]> => {
     if (!isSupabaseConfigured() || !patientId) return [];
@@ -351,18 +322,15 @@ export const getActivityFeed = cache(
   },
 );
 
-/** How the feed's five kinds map onto the Perawatan page's five icons. Finer
- *  than `FEED_TONE` because that list has more room: a glass of water and a
- *  night's sleep are both "readings" to the timeline on Home, and their own
- *  icons here. */
+
 export type ActivityIcon = "medication" | "meal" | "fluid" | "sleep" | "vital";
 
 export type PatientActivityRow = {
   id: string;
   icon: ActivityIcon;
-  /** The whole sentence, including who did it. */
+
   text: string;
-  /** `06:40`, Jakarta. */
+
   time: string;
 };
 
@@ -374,13 +342,10 @@ function iconFor(kind: string, title: string | null): ActivityIcon {
   return "vital";
 }
 
-/** A month of activity, keyed `dayKey(y, m, d)`. */
+
 export type CarePatientActivityMap = Record<string, PatientActivityRow[]>;
 
-/** A month of activity, bucketed by day, for the calendar inside the
- *  "lihat semua" modal on Perawatan.
- *
- *  Keyed `y-m-d` with a zero-based month, matching `dayKey` and the grid. */
+
 export const getActivitiesByDate = cache(
   async (
     patientId: string,
@@ -420,32 +385,24 @@ export const getActivitiesByDate = cache(
   },
 );
 
-/* ── Schedule ────────────────────────────────────────────────────────────── */
+
 
 export type ScheduleEntry = {
   id: string;
   title: string;
   kind: "appointment" | "meds" | "therapy" | "checkup";
-  /** `08:00`, Jakarta. */
+
   start: string;
-  /** The end time, or the start again when the event has no duration — the
-   *  card prints a range, and an empty half reads as a rendering bug. */
+
   end: string;
 };
 
-/** The month's events, bucketed by calendar day.
- *
- *  Returned as a lookup rather than a list because that is the question the
- *  calendar asks: it has a grid of 42 days and needs to know, for each, whether
- *  anything is on. A window is fetched rather than the whole history — a
- *  patient of two years has hundreds of appointments, and the grid can show
- *  42 days of them. */
+
 export const getScheduleByDay = cache(
   async (patientId: string, around = jakartaToday()): Promise<Record<string, ScheduleEntry[]>> => {
     if (!isSupabaseConfigured() || !patientId) return {};
 
-    /* One month either side, so paging the calendar back or forward once does
-       not land on a month that looks empty because it was never fetched. */
+
     const from = jakartaMidnight({ y: around.y, m: around.m - 1, d: 1 });
     const to = jakartaMidnight({ y: around.y, m: around.m + 2, d: 1 });
 
@@ -477,12 +434,12 @@ export const getScheduleByDay = cache(
   },
 );
 
-/* ── Standing care notes ─────────────────────────────────────────────────── */
+
 
 export type CareNote = {
   id: string;
   body: string;
-  /** "14 Agu" — when it last changed, for the history panel. */
+
   updatedLabel: string;
   updatedBy: string;
 };
@@ -513,7 +470,7 @@ export const getCareNotes = cache(async (patientId: string): Promise<CareNote[]>
   });
 });
 
-/* ── Team chat ───────────────────────────────────────────────────────────── */
+
 
 export type CareMessage = {
   id: string;
@@ -523,7 +480,7 @@ export type CareMessage = {
   body: string;
   when: string;
   at: string;
-  /** The care item this message was started from, if any. */
+
   context: { type: string; label: string; detail: string | null } | null;
 };
 
@@ -532,8 +489,7 @@ export const getCareMessages = cache(
     if (!isSupabaseConfigured() || !patientId) return [];
 
     const supabase = await createClient();
-    /* Newest `limit` rows, then flipped: `order desc + limit` is the only way
-       to ask for the *end* of a conversation, but a chat reads oldest-first. */
+
     const { data, error } = await supabase
       .from("care_messages")
       .select("id, author_id, body, context_type, context_label, context_detail, created_at")
@@ -570,22 +526,17 @@ export const getCareMessages = cache(
   },
 );
 
-/* ── The care team, as the caregiver's page shows it ─────────────────────── */
+
 
 export type CareGroupMember = {
   id: string;
   name: string;
   initial: string;
-  /** Whether the invitation has been accepted. Pending members are listed —
-   *  they are part of the plan — but marked. */
+
   active: boolean;
 };
 
-/** Everybody looking after this patient, including the person asking.
- *
- *  `getMyCareTeam` answers the same question from the patient's side, and only
- *  for their own record. This one is scoped by patient id, so a caregiver can
- *  see who else is on the team for someone they look after. */
+
 export const getCareGroup = cache(
   async (patientId: string): Promise<{ members: CareGroupMember[]; since: string | null }> => {
     if (!isSupabaseConfigured() || !patientId) return { members: [], since: null };
@@ -602,9 +553,7 @@ export const getCareGroup = cache(
 
     if (error || !data) return { members: [], since: null };
 
-    /* Same reasoning as `getMyCareTeam`: a member whose profile does not come
-       back is still a member, and dropping them under-counts the team on the
-       card that exists to say how big it is. */
+
     const members = data.map((row) => {
       const c = (Array.isArray(row.caregiver) ? row.caregiver[0] : row.caregiver) as
         | CaregiverRow
@@ -628,7 +577,7 @@ export const getCareGroup = cache(
   },
 );
 
-/* ── The patient record behind a dashboard ───────────────────────────────── */
+
 
 export type PatientDetail = {
   id: string;
@@ -640,10 +589,7 @@ export type PatientDetail = {
   shareCode: string | null;
 };
 
-/** One patient in full, including the targets the stat cards divide by.
- *
- *  Separate from `getMyPatients`, which deliberately selects a narrow set for a
- *  list — a share code must never travel with a list of other people. */
+
 export const getPatientDetail = cache(async (patientId: string): Promise<PatientDetail | null> => {
   if (!isSupabaseConfigured() || !patientId) return null;
 
@@ -667,7 +613,7 @@ export const getPatientDetail = cache(async (patientId: string): Promise<Patient
   };
 });
 
-/* ── Medication ──────────────────────────────────────────────────────────── */
+
 
 export type Medication = {
   id: string;
@@ -675,7 +621,7 @@ export type Medication = {
   dose: string;
   rule: string;
   times: string[];
-  /** Which of `times` has already been logged today. */
+
   takenTimes: string[];
 };
 
@@ -715,7 +661,7 @@ export const getMedications = cache(async (patientId: string): Promise<Medicatio
   }));
 });
 
-/* ── Mood ────────────────────────────────────────────────────────────────── */
+
 
 export type MoodKey = "great" | "good" | "okay" | "low" | "verylow";
 
@@ -725,16 +671,11 @@ export type MoodEntryRow = {
   note: string | null;
   when: string;
   at: string;
-  /** The calendar day it belongs to, so the trend can bucket without
-   *  re-parsing timestamps in the browser. */
+
   day: { y: number; m: number; d: number };
 };
 
-/** The mood log over a window, newest first.
- *
- *  One query rather than three: the trend, the tally and "how are they today"
- *  are three readings of the same rows, and splitting them into separate round
- *  trips only creates a window in which the three can disagree. */
+
 export const getMoodLog = cache(
   async (patientId: string, days = 30): Promise<MoodEntryRow[]> => {
     if (!isSupabaseConfigured() || !patientId) return [];
@@ -762,13 +703,9 @@ export const getMoodLog = cache(
   },
 );
 
-/* ── The patient's own screen ────────────────────────────────────────────── */
 
-/** A task as the patient sees it: an emoji, a line, and what it is worth.
- *
- *  The caregiver's version of the same row is a label and a hint. This is the
- *  same data dressed for a different reader — larger, warmer, and countable,
- *  because the energy bar is the only feedback this screen gives. */
+
+
 export type PatientHomeTask = {
   id: string;
   emoji: string;
@@ -778,14 +715,7 @@ export type PatientHomeTask = {
   done: boolean;
 };
 
-/** Picks the emoji from the words in the task.
- *
- *  Derived rather than stored. Asking a caregiver to choose an icon while they
- *  are writing down "obat malam" is asking them to do design work in the middle
- *  of a care plan, and a column of emoji is a column that has to be migrated
- *  the first time the set changes. The matching is deliberately loose: getting
- *  it wrong costs a generic tick, which is what an unmatched task would have
- *  had anyway. */
+
 const EMOJI_RULES: [RegExp, string][] = [
   [/obat|pil|tablet|vitamin/i, "💊"],
   [/sarapan|makan|nutrisi|bubur/i, "🍚"],
@@ -802,30 +732,20 @@ function emojiFor(label: string): string {
   return "✅";
 }
 
-/** Every task is worth the same.
- *
- *  A weighting would mean somebody deciding that a walk matters twice as much
- *  as a glass of water, for every patient, in a table nobody can see. Equal
- *  points make the bar say exactly one thing — how much of today is done — and
- *  that is the only claim this screen is entitled to make. */
+
 const POINTS_PER_TASK = 10;
 
 export type PatientHome = {
   patientId: string;
   displayName: string;
   tasks: PatientHomeTask[];
-  /** Points for a full day: every task, ticked. */
+
   energyTarget: number;
-  /** The most recent thing a caregiver said, shown as a note on the bench.
-   *  Null when the team has not written anything. */
+
   affirmation: { from: string; relation: string; text: string } | null;
 };
 
-/** Everything the patient's home screen needs, for whoever is signed in.
- *
- *  Returns `null` when the signed-in person has no patient record — a caregiver
- *  who navigated to `/pasien` by hand, or somebody who has not claimed a
- *  profile yet. The page turns that into a sign-post rather than a blank room. */
+
 export const getPatientHome = cache(async (): Promise<PatientHome | null> => {
   if (!isSupabaseConfigured()) return null;
 
@@ -850,8 +770,7 @@ export const getPatientHome = cache(async (): Promise<PatientHome | null> => {
       points: POINTS_PER_TASK,
       done: task.done,
     })),
-    /* Never zero: the bar divides by this, and a patient with no tasks yet
-       would otherwise get `NaN%` across their whole screen. */
+
     energyTarget: Math.max(POINTS_PER_TASK, tasks.length * POINTS_PER_TASK),
     affirmation: latest
       ? { from: latest.author, relation: "Pendamping", text: latest.body }
@@ -859,15 +778,7 @@ export const getPatientHome = cache(async (): Promise<PatientHome | null> => {
   };
 });
 
-/** Has this patient already written today's journal?
- *
- *  Asked of `mood_entries` rather than of a "journal entries" table, because
- *  the mood is the one step of the wizard that is not optional — a day with a
- *  reading but no mood was never finished.
- *
- *  Deliberately not a bar on writing again. A mood is a reading taken at a
- *  moment, and somebody who felt awful this morning and better tonight has two
- *  true things to record; this only decides which screen opens first. */
+
 export const hasJournaledToday = cache(async (patientId: string): Promise<boolean> => {
   if (!isSupabaseConfigured() || !patientId) return false;
 
@@ -886,26 +797,17 @@ export const hasJournaledToday = cache(async (patientId: string): Promise<boolea
   return (count ?? 0) > 0;
 });
 
-/* ── The journal's calendar ──────────────────────────────────────────────── */
 
-/** One day in the heatmap, as the modal reads it.
- *
- *  `mood` is nullable and the rest is optional, because a day is built from
- *  whatever happened to be recorded — somebody who ticked their tasks but never
- *  opened the journal has a `done`/`total` and nothing else. */
+
+
 export type JournalDayData = {
   mood: MoodKey | null;
-  /** The medicine ratio the square is coloured by. */
+
   done: number;
   total: number;
-  /** What they wrote, if anything. */
+
   story: string | null;
-  /** Length of the voice note in seconds.
-   *
-   *  Always `undefined` today: the wizard records but nothing stores the audio
-   *  yet. It is in the shape so the player in the report panel is wired and
-   *  waiting — once a recording is saved against the day, filling this in is
-   *  the only change the calendar needs. */
+
   voice?: number;
   voiceUrl?: string;
   glucose?: number;
@@ -917,19 +819,18 @@ export type JournalDayData = {
 
 export type JournalMonth = {
   year: number;
-  /** 0-based, matching `Date` and the grid. */
+
   month: number;
   label: string;
   days: number;
-  /** Monday-first blanks before the 1st. */
+
   startOffset: number;
-  /** Day-of-month of today, or null when this month is not the current one —
-   *  which is what stops every month drawing a "today" square. */
+
   today: number | null;
   entries: Record<number, JournalDayData>;
 };
 
-/** Which reading maps onto which field of a day. */
+
 const JOURNAL_READING: Record<string, keyof JournalDayData> = {
   blood_sugar: "glucose",
   weight: "weight",
@@ -937,16 +838,7 @@ const JOURNAL_READING: Record<string, keyof JournalDayData> = {
   heart_rate: "hr",
 };
 
-/** A month of the patient's journal, built from what was actually recorded.
- *
- *  Three tables, one month-shaped window, joined in JavaScript. That is the
- *  right trade here: it is at most a few hundred rows, and the alternative —
- *  a SQL function returning a month of json — would put the calendar's layout
- *  rules inside a migration, where changing "Monday first" means a deploy.
- *
- *  Readings are taken newest-first and the first of each kind wins, so a day
- *  with three blood-pressure entries shows the latest rather than an average
- *  nobody measured. */
+
 export const getJournalMonth = cache(
   async (patientId: string, year: number, month: number): Promise<JournalMonth> => {
     const days = new Date(year, month + 1, 0).getDate();
@@ -997,10 +889,7 @@ export const getJournalMonth = cache(
           .eq("active", true),
       ]);
 
-    /* Today's plan, applied to every day of the month. A per-day historical
-       total would need the task list to be versioned, which it is not — so
-       this is an approximation, and an honest one: the ratio is there to
-       colour a square, not to be audited. */
+
     const total = (tasks ?? []).length;
     const entries: Record<number, JournalDayData> = {};
     const voicePaths: { day: number; path: string }[] = [];
@@ -1008,7 +897,7 @@ export const getJournalMonth = cache(
     const dayOf = (n: number): JournalDayData =>
       (entries[n] ??= { mood: null, done: 0, total, story: null });
 
-    /* Newest-first, so the first mood seen for a day is the latest one. */
+
     for (const row of moods ?? []) {
       const d = calendarDayOf(row.recorded_at as string).d;
       const entry = dayOf(d);
@@ -1037,14 +926,13 @@ export const getJournalMonth = cache(
 
       const field = JOURNAL_READING[kind];
       if (field && entry[field] === undefined) {
-        /* The four simple readings are all plain numbers on the day. */
+
         (entry as Record<string, unknown>)[field] = Number(row.value);
       }
     }
 
     for (const row of completions ?? []) {
-      /* `done_on` is already a Jakarta date string, so the day is the last two
-         characters rather than something to re-derive from an instant. */
+
       const d = Number((row.done_on as string).slice(-2));
       if (Number.isFinite(d)) dayOf(d).done += 1;
     }
@@ -1063,7 +951,7 @@ export const getJournalMonth = cache(
   },
 );
 
-/* ── Meals ───────────────────────────────────────────────────────────────── */
+
 
 export type MealKey = "sarapan" | "makan_siang" | "makan_malam";
 
@@ -1073,7 +961,7 @@ export const MEAL_LABEL: Record<MealKey, string> = {
   makan_malam: "Makan malam",
 };
 
-/** Which of today's three meals have been logged. */
+
 export const getTodayMeals = cache(async (patientId: string): Promise<MealKey[]> => {
   if (!isSupabaseConfigured() || !patientId) return [];
 
@@ -1085,4 +973,91 @@ export const getTodayMeals = cache(async (patientId: string): Promise<MealKey[]>
     .eq("done_on", jakartaDateString());
 
   return (data ?? []).map((row) => row.meal as MealKey);
+});
+
+
+export async function getInvitablePatients(
+  profileId: string,
+): Promise<{ id: string; name: string }[]> {
+  if (!isSupabaseConfigured() || !profileId) return [];
+  const me = await getSessionProfile();
+  if (!me || profileId === me.id) return [];
+
+  const supabase = await createClient();
+
+  const { data: mine } = await supabase
+    .from("care_relationships")
+    .select("patient_id, patients(id, display_name)")
+    .eq("caregiver_id", me.id)
+    .eq("status", "active");
+
+  const ids = (mine ?? []).map((r) => r.patient_id as string);
+  if (ids.length === 0) return [];
+
+  const [{ data: theirs }, { data: asked }] = await Promise.all([
+    supabase
+      .from("care_relationships")
+      .select("patient_id")
+      .eq("caregiver_id", profileId)
+      .in("patient_id", ids)
+      .in("status", ["pending", "active"]),
+    supabase
+      .from("care_team_invites")
+      .select("patient_id")
+      .eq("invitee_id", profileId)
+      .in("patient_id", ids)
+      .eq("status", "pending"),
+  ]);
+
+  const taken = new Set([
+    ...(theirs ?? []).map((r) => r.patient_id as string),
+    ...(asked ?? []).map((r) => r.patient_id as string),
+  ]);
+
+  return (mine ?? [])
+    .filter((row) => !taken.has(row.patient_id as string))
+    .map((row) => {
+      const patient = row.patients as unknown as { id: string; display_name: string } | null;
+      return {
+        id: row.patient_id as string,
+        name: patient?.display_name ?? "Pasien",
+      };
+    });
+}
+
+
+export type CareInvite = {
+  id: string;
+  patientName: string;
+  fromName: string;
+  when: string;
+};
+
+export const getMyCareInvites = cache(async (): Promise<CareInvite[]> => {
+  if (!isSupabaseConfigured()) return [];
+  const me = await getSessionProfile();
+  if (!me) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("care_team_invites")
+    .select("id, created_at, invited_by, patients(display_name)")
+    .eq("invitee_id", me.id)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false });
+
+  if (!data?.length) return [];
+
+  const names = await namesFor(data.map((r) => r.invited_by as string));
+  const today = jakartaToday();
+
+  return data.map((row) => {
+    const patient = row.patients as unknown as { display_name: string } | null;
+    return {
+      id: row.id as string,
+      patientName: patient?.display_name ?? "Pasien",
+      fromName: names.get(row.invited_by as string) ?? "Seseorang",
+      when: whenLabel(row.created_at as string, today),
+    };
+  });
 });

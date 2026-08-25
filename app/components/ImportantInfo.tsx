@@ -9,18 +9,34 @@ import { IMPORTANT_INFO, INFO_HISTORY } from "../data/careStats";
 import { saveCareNotes, type CareResult } from "../lib/care/actions";
 import type { CareData } from "../lib/care/view";
 
-/** How many instructions the card shows before deferring to "lihat semua". */
+
 const PREVIEW = 4;
 
-/** One row of the editor. `id` is `null` for a line that has not been saved
- *  yet, which is what tells the action to insert rather than update. */
+
 type Draft = { id: string | null; body: string };
+
+function List({ lines }: { lines: Draft[] }) {
+  return (
+    <ol className="space-y-3">
+      {lines.map((line, i) => (
+        <li key={line.id ?? `${line.body}-${i}`} className="flex items-start gap-3.5">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-info-100 text-[12px] font-bold tabular-nums text-info-600">
+            {i + 1}
+          </span>
+          <p className="min-w-0 flex-1 pt-0.5 text-[14.5px] leading-6 text-neutral-700">
+            {line.body}
+          </p>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 export default function ImportantInfo({ data }: { data?: CareData }) {
   const [editOpen, setEditOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [allOpen, setAllOpen] = useState(false);
-  /** The edit modal works on a copy, so cancelling really cancels. */
+
   const [draft, setDraft] = useState<Draft[]>([]);
   const reduce = useReducedMotion();
 
@@ -28,8 +44,7 @@ export default function ImportantInfo({ data }: { data?: CareData }) {
     error: null,
   });
 
-  /* Signed out, the placeholder lines stand in and the editor is a sketch: it
-     has nowhere to save to, so the button that would save is not shown. */
+
   const items: Draft[] = data
     ? data.notes.map((n) => ({ id: n.id, body: n.body }))
     : IMPORTANT_INFO.map((body) => ({ id: null, body }));
@@ -60,21 +75,6 @@ export default function ImportantInfo({ data }: { data?: CareData }) {
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
-
-  const List = ({ lines }: { lines: Draft[] }) => (
-    <ol className="space-y-3">
-      {lines.map((line, i) => (
-        <li key={line.id ?? `${line.body}-${i}`} className="flex items-start gap-3.5">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-info-100 text-[12px] font-bold tabular-nums text-info-600">
-            {i + 1}
-          </span>
-          <p className="min-w-0 flex-1 pt-0.5 text-[14.5px] leading-6 text-neutral-700">
-            {line.body}
-          </p>
-        </li>
-      ))}
-    </ol>
-  );
 
   return (
     <section className="rounded-3xl bg-info-50 p-6 ring-1 ring-info-edge sm:p-7 xl:p-8">
@@ -135,7 +135,7 @@ export default function ImportantInfo({ data }: { data?: CareData }) {
         )}
       </div>
 
-      {/* ── Edit ─────────────────────────────────────────────────────────── */}
+
       <Modal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -156,10 +156,7 @@ export default function ImportantInfo({ data }: { data?: CareData }) {
             >
               Batal
             </button>
-            {/* The list is submitted as one JSON field rather than a row of
-                inputs — see `saveCareNotes`. The form is here in the footer
-                because that is where its submit button is; the fields it
-                serialises live in React state above. */}
+
             <form action={save}>
               <input type="hidden" name="patient_id" value={data?.activePatientId ?? ""} />
               <input type="hidden" name="notes" value={JSON.stringify(draft)} />
@@ -248,7 +245,7 @@ export default function ImportantInfo({ data }: { data?: CareData }) {
         </button>
       </Modal>
 
-      {/* ── History ──────────────────────────────────────────────────────── */}
+
       <Modal
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
@@ -277,7 +274,7 @@ export default function ImportantInfo({ data }: { data?: CareData }) {
         </ol>
       </Modal>
 
-      {/* ── All instructions ─────────────────────────────────────────────── */}
+
       <Modal
         open={allOpen}
         onClose={() => setAllOpen(false)}

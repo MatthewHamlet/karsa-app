@@ -4,35 +4,12 @@ import { isSupabaseConfigured } from "../supabase/config";
 import { getPatientDetail } from "./queries";
 import { clockOf, jakartaMidnight, jakartaToday } from "./time";
 
-/** The Care page's numbers, computed from the logs rather than typed out.
- *
- *  `app/data/careStats.ts` held these as literals — "1.500 ml dari 3.000 ml",
- *  "2 dari 3 dosis". Everything in here produces the same shapes from the rows
- *  in `health_readings`, `meal_logs`, `medication_logs` and `mood_entries`, so
- *  the cards keep their design and stop being fiction.
- *
- *  All aggregation happens in JavaScript, on rows already narrowed by patient
- *  and date. That is the right trade at this size — a month of one patient's
- *  logs is a few hundred rows — and it keeps the arithmetic somewhere it can be
- *  read, rather than in five SQL functions that have to be migrated to change a
- *  caption. If a patient ever has years of history behind one card, the fix is
- *  a materialised rollup, not a cleverer query here.
- *
- *  Formatting is done server-side and in `id-ID` on purpose: a component
- *  calling `toLocaleString` renders the host's locale during SSR and the
- *  visitor's on hydration, which mismatches. */
-
 export type Period = "daily" | "weekly" | "monthly";
 
-/** The shape every stat card reads. Matches the design's `StatValue`. */
 export type StatValue = {
-  /** The headline figure. */
   value: string;
-  /** The quieter line under it. */
   caption: string;
-  /** 0–100, for cards that show a fill. */
   progress?: number;
-  /** Daily meals only. */
   meals?: { label: string; done: boolean }[];
 };
 
@@ -46,8 +23,6 @@ export type MonitorKey =
   | "temperature"
   | "weight";
 
-/** How many days each period covers. Used both for the query window and as the
- *  divisor for the targets, so the two can never disagree. */
 const DAYS: Record<Period, number> = { daily: 1, weekly: 7, monthly: 30 };
 
 const PERIOD_WORD: Record<Period, string> = {
@@ -56,7 +31,6 @@ const PERIOD_WORD: Record<Period, string> = {
   monthly: "bulan ini",
 };
 
-/** The instant a period starts: midnight in Jakarta, `n - 1` days back. */
 function windowStart(period: Period): Date {
   const today = jakartaToday();
   return jakartaMidnight({ ...today, d: today.d - (DAYS[period] - 1) });
@@ -65,8 +39,6 @@ function windowStart(period: Period): Date {
 const pct = (current: number, target: number) =>
   target <= 0 ? 0 : Math.min(100, Math.round((current / target) * 100));
 
-/** `1.500`, `54,2` — Indonesian digit grouping, pinned to a locale so the
- *  server and the browser produce the same characters. */
 const num = (value: number, decimals = 0) =>
   value.toLocaleString("id-ID", {
     minimumFractionDigits: decimals,
@@ -75,16 +47,8 @@ const num = (value: number, decimals = 0) =>
 
 const EMPTY: StatValue = { value: "—", caption: "belum ada data" };
 
-/* ── Raw rows for a window ───────────────────────────────────────────────── */
-
 type Reading = { kind: string; value: number; secondary: number | null; at: string };
 
-/** Every reading in the window, in one query.
- *
- *  Deliberately not one query per card. Five cards over three periods is
- *  fifteen round trips for what is one narrow index scan — `health_readings`
- *  is already indexed on `(patient_id, kind, recorded_at desc)`, and the split
- *  by kind is cheaper in memory than on the wire. */
 const readingsIn = cache(async (patientId: string, period: Period): Promise<Reading[]> => {
   if (!isSupabaseConfigured() || !patientId) return [];
 
@@ -109,8 +73,6 @@ const ofKind = (rows: Reading[], kind: string) => rows.filter((r) => r.kind === 
 const mean = (values: number[]) =>
   values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length;
 
-/* ── The five fixed cards ────────────────────────────────────────────────── */
-
 const MEALS: { key: string; label: string }[] = [
   { key: "sarapan", label: "Sarapan" },
   { key: "makan_siang", label: "Makan siang" },
@@ -125,7 +87,6 @@ const MOOD_LABEL: Record<string, string> = {
   verylow: "Sedih",
 };
 
-/** Minutes as "7 jam 20 mnt", which is how the card has always printed it. */
 function hoursAndMinutes(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = Math.round(minutes % 60);
@@ -156,9 +117,6 @@ export const getFixedStats = cache(
         .select("meal")
         .eq("patient_id", patientId)
         .gte("logged_at", since),
-      /* The denominator for medication: how many doses a day is supposed to
-         have. Read from the schedule rather than assumed, because "2 dari 3"
-         is meaningless if the 3 is a guess. */
       supabase
         .from("medications")
         .select("times")
@@ -177,7 +135,6 @@ export const getFixedStats = cache(
         .order("recorded_at", { ascending: false }),
     ]);
 
-    /* ── Cairan ── */
     const fluidTotal = ofKind(readings, "fluid").reduce((sum, r) => sum + r.value, 0);
     const fluidTarget = (patient?.fluidTargetMl ?? 2000) * days;
     const fluid: StatValue =
@@ -195,7 +152,6 @@ export const getFixedStats = cache(
               progress: pct(fluidTotal, fluidTarget),
             };
 
-    /* ── Makan ── */
     const logged = new Set((mealRows.data ?? []).map((row) => row.meal as string));
     const mealCount = (mealRows.data ?? []).length;
     const mealTarget = 3 * days;
@@ -212,10 +168,7 @@ export const getFixedStats = cache(
             progress: pct(mealCount, mealTarget),
           };
 
-    /* ── Obat ── */
     const slotsPerDay = (medRows.data ?? []).reduce(
-      /* A medication with no times listed is still taken once a day — the
-         schedule is optional, the dose is not. */
       (sum, row) => sum + Math.max(1, ((row.times as string[]) ?? []).length),
       0,
     );
@@ -230,7 +183,6 @@ export const getFixedStats = cache(
             progress: pct(doseCount, doseTarget),
           };
 
-    /* ── Perasaan ── */
     const moodList = moodRows.data ?? [];
     let mood: StatValue = { ...EMPTY, caption: "belum ada catatan perasaan" };
     if (moodList.length > 0) {
@@ -253,7 +205,6 @@ export const getFixedStats = cache(
       }
     }
 
-    /* ── Tidur ── */
     const sleepMinutes = ofKind(readings, "sleep_minutes").map((r) => r.value);
     const sleepAvg = mean(sleepMinutes);
     const sleep: StatValue =
@@ -269,25 +220,12 @@ export const getFixedStats = cache(
   },
 );
 
-/* ── Yesterday, in three lines ───────────────────────────────────────────── */
-
 export type DaySummary = {
   label: string;
   headline: string;
   points: string[];
 };
 
-/** The recap card at the foot of Home.
- *
- *  Presented as "Ringkasan AI" in the design, and it is worth being honest
- *  about what it is: counting, not a model. Every line below is a fact the
- *  database already knows, phrased. That is a feature rather than a shortcut —
- *  a summary that can only ever say true things about somebody's mother is the
- *  right thing to put on this page, and the day a model writes this card it
- *  should be handed these same counts rather than left to infer them.
- *
- *  Yesterday rather than today, because a day still in progress always reads
- *  as a failure: at nine in the morning every count is near zero. */
 export const getDaySummary = cache(async (patientId: string): Promise<DaySummary | null> => {
   if (!isSupabaseConfigured() || !patientId) return null;
 
@@ -334,9 +272,6 @@ export const getDaySummary = cache(async (patientId: string): Promise<DaySummary
   const moodList = (moods.data ?? []).map((m) => m.mood as string);
   const readingCount = (readings.data ?? []).length;
 
-  /* Nothing at all was logged. A card that says "0 dari 5 tugas selesai" about
-     a day nobody opened the app is an accusation, not a summary — so it says
-     what actually happened instead. */
   if (taskDone === 0 && mealCount === 0 && moodList.length === 0 && readingCount === 0) {
     return {
       label: "Kemarin",
@@ -370,9 +305,6 @@ export const getDaySummary = cache(async (patientId: string): Promise<DaySummary
   return { label: "Kemarin", headline, points };
 });
 
-/* ── The six monitor cards ───────────────────────────────────────────────── */
-
-/** Each card's database kind, unit, and how many decimals it is quoted to. */
 const MONITOR: Record<
   MonitorKey,
   { kind: string; unit: string; decimals: number; dailyCaption: string }
@@ -385,12 +317,6 @@ const MONITOR: Record<
   weight: { kind: "weight", unit: "kg", decimals: 1, dailyCaption: "terakhir ditimbang" },
 };
 
-/** The manual readings, per card.
- *
- *  Daily shows the most recent measurement and when it was taken — an average
- *  of one morning's blood pressure is just that morning's blood pressure, with
- *  the time thrown away. The longer periods show the mean, which is the only
- *  reading of a fortnight of numbers that means anything. */
 export const getMonitorStats = cache(
   async (patientId: string, period: Period): Promise<Record<MonitorKey, StatValue>> => {
     const rows = await readingsIn(patientId, period);

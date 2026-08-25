@@ -15,18 +15,6 @@ export type StatArtKind =
   | "temperature"
   | "weight";
 
-/** Small illustrations rather than line icons — but drawn to one grammar so
- *  the cards still read as a set:
- *
- *  · a 48px square, the object centred with a little air around it
- *  · flat filled shapes, no outlines
- *  · three values only — the card's `ink` at varying alpha, its pale `tile`,
- *    and white for highlights — so nothing introduces a colour the card
- *    doesn't already have
- *  · one white highlight per object, to suggest a light source
- *
- *  They stay this size deliberately: the statistic is the headline, this is
- *  the label. */
 export default function StatArt({
   kind,
   tone,
@@ -54,7 +42,6 @@ export default function StatArt({
             d="M13 13h22l-2.3 25.5a4 4 0 0 1-4 3.5h-9.4a4 4 0 0 1-4-3.5Z"
             fill={tile}
           />
-          {/* Water sits inside the glass, with a wave for a surface. */}
           <g clipPath={`url(#${uid}-glass)`}>
             <path
               d="M8 24c4 0 5-2.2 8-2.2s5 2.2 8 2.2 5-2.2 8-2.2 5 2.2 8 2.2v20H8Z"
@@ -73,7 +60,6 @@ export default function StatArt({
           <path d="M19 9c0-2.2 2.2-2.2 2.2-4.4" stroke={ink} strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.3" />
           <path d="M27 10c0-2.2 2.2-2.2 2.2-4.4" stroke={ink} strokeWidth="2" strokeLinecap="round" fill="none" opacity="0.3" />
 
-          {/* Food heaped above the rim, so the bowl reads as full. */}
           <path d="M12.5 25.5a11.5 8 0 0 1 23 0Z" fill={ink} opacity="0.5" />
           <circle cx="19" cy="21.5" r="3.4" fill={ink} opacity="0.85" />
           <ellipse
@@ -95,7 +81,6 @@ export default function StatArt({
 
       {kind === "medication" && (
         <>
-          {/* Blister pack behind, one loose capsule in front. */}
           <g transform="rotate(-9 21 23)">
             <rect x="9" y="9" width="24" height="28" rx="5" fill={tile} />
             <rect x="9" y="9" width="24" height="28" rx="5" fill={ink} opacity="0.14" />
@@ -126,7 +111,6 @@ export default function StatArt({
           <rect x="4" y="17" width="5" height="20" rx="2.5" fill={ink} opacity="0.5" />
           <rect x="4" y="27" width="40" height="10" rx="4" fill={tile} />
           <rect x="4" y="27" width="40" height="10" rx="4" fill={ink} opacity="0.16" />
-          {/* Blanket folded over the far end. */}
           <path d="M20 27h20a4 4 0 0 1 4 4v2H20Z" fill={ink} opacity="0.42" />
           <rect
             x="8"

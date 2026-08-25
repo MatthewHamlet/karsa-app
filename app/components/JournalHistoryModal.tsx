@@ -16,24 +16,12 @@ import { loadJournalMonth } from "../lib/care/actions";
 import type { JournalDayData, JournalMonth } from "../lib/care/queries";
 import { lockScroll } from "../lib/scrollLock";
 
-/** Past days, at two very different sizes.
- *
- *  A desktop has room to show the month and one day's report at once, so it
- *  does: pick a date on the left, read it on the right, no navigation at all.
- *
- *  A phone does not, so the two become a pair of sheets that hand off. Tapping a
- *  date sends the calendar down and brings the report up; closing the report
- *  sends it down and brings the calendar back — you land where you were, ready
- *  to pick another date, rather than back at the start.
- *
- *  Both slides run 280ms on a shared curve. Springs were tempting and wrong: a
- *  spring's overshoot reads as bounce, and for this reader "did it settle yet?"
- *  is a question the interface should never make them ask. */
 
-/** The handoff. Fast enough to feel immediate, slow enough to be followed. */
+
+
 const SLIDE = { duration: 0.28, ease: [0.32, 0.72, 0, 1] as const };
 
-/** Past this many tiles the metric row gets arrows. */
+
 const CAROUSEL_MIN = 3;
 
 export default function JournalHistoryModal({
@@ -48,10 +36,9 @@ export default function JournalHistoryModal({
   onClose: () => void;
   selected: number;
   onSelect: (date: number) => void;
-  /** The month to open on, already built from the database by the page. */
+
   month: JournalMonth;
-  /** Absent when signed out: the arrows then have nothing to fetch, so they
-   *  stay disabled and the one month that was handed down is all there is. */
+
   patientId?: string;
 }) {
   return (
@@ -84,16 +71,11 @@ function Shell({
 }) {
   const reduce = useReducedMotion();
   const [pick, setPick] = useState(selected);
-  /* The month lives here rather than in the page, so paging the calendar does
-     not close the sheet or reset which day is open. */
+
   const [month, setMonth] = useState(initialMonth);
   const [loading, setLoading] = useState(false);
 
-  /* A save behind the modal revalidates the page, which hands down a fresh
-     `initialMonth`. Without this the calendar would keep showing the month it
-     was opened with and today's new entry would be missing from it. Guarded on
-     the month actually being the same one, so a reload never yanks somebody
-     back from the month they paged to. */
+
   useEffect(() => {
     setMonth((current) =>
       current.year === initialMonth.year && current.month === initialMonth.month
@@ -108,14 +90,13 @@ function Shell({
     try {
       const next = await loadJournalMonth(patientId, month.year, month.month + step);
       setMonth(next);
-      /* Land on a day that exists: paging from the 31st into a 30-day month
-         would otherwise select a square that is not drawn. */
+
       setPick((d) => Math.min(d, next.days));
     } finally {
       setLoading(false);
     }
   };
-  /** Phone only. The desktop shows both panels at once and ignores this. */
+
   const [view, setView] = useState<"calendar" | "report">("calendar");
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -155,7 +136,7 @@ function Shell({
         className="fixed inset-0 z-[60] bg-neutral-950/55"
       />
 
-      {/* ── Desktop: one modal, two columns ──────────────────────────────── */}
+
       <motion.div
         ref={rootRef}
         role="dialog"
@@ -191,18 +172,7 @@ function Shell({
         </div>
       </motion.div>
 
-      {/* ── Phone: two sheets that hand off ────────────────────────────────
-          Both stay mounted, and `view` decides which one is up. They used to be
-          swapped by a nested `AnimatePresence`, which looked identical while
-          handing off — but a nested presence boundary does not pass the parent's
-          exit down to its children, so closing the history killed the sheet
-          outright with no slide at all. Driving `y` from state instead leaves
-          each sheet a plain child of the outer presence, and its `exit` runs
-          like everything else here.
 
-          `max-h`, not `h`: 85dvh is the ceiling, not the target. A day with no
-          story and two readings has no business reserving most of the screen
-          and then leaving it blank. */}
       <div className="lg:hidden">
         <motion.div
           role="dialog"
@@ -243,8 +213,7 @@ function Shell({
           className="fixed inset-x-0 bottom-0 z-[62] flex max-h-[85dvh] flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[0_-16px_48px_-12px_rgba(24,32,24,0.55)] sm:mx-auto sm:max-w-lg"
         >
           <SheetHandle />
-          {/* Back to the month, not out of the history — the caregiver almost
-              always wants a second date after the first. */}
+
           <header className="flex shrink-0 items-center justify-between gap-3 border-b-2 border-karsa-line px-5 pb-4">
             <div className="min-w-0">
               <p className="text-[12.5px] font-bold uppercase tracking-wide text-neutral-400">
@@ -266,7 +235,7 @@ function Shell({
   );
 }
 
-/* ── Pieces ───────────────────────────────────────────────────────────────── */
+
 
 const SheetHandle = () => (
   <div className="flex shrink-0 justify-center pb-2 pt-3">
@@ -287,8 +256,7 @@ function CloseButton({ onClick, label }: { onClick: () => void; label: string })
   );
 }
 
-/** The month. Buttons move it, never a swipe — invisible, undiscoverable and
- *  easy to fire by accident with an unsteady hand. */
+
 function CalendarPanel({
   pick,
   onPick,
@@ -323,9 +291,7 @@ function CalendarPanel({
           <ChevronLeft size={28} strokeWidth={3} />
         </button>
         <p className="text-[19px] font-extrabold tracking-tight text-neutral-900">{month.label}</p>
-        {/* Forward is barred once the month on screen contains today. There is
-            nothing recorded in the future, so the only thing paging into it can
-            show is a grid of empty squares. */}
+
         <button
           type="button"
           onClick={() => onShift(1)}
@@ -353,12 +319,9 @@ function CalendarPanel({
           if (date === null) return <span key={`b-${i}`} className="h-[56px] w-full" aria-hidden />;
 
           const entry = month.entries[date];
-          /* Only the current month has a future half; every earlier one is
-             entirely in the past. */
+
           const future = month.today !== null && date > month.today;
-          /* `total` of 0 means no daily tasks are set up at all — treating that
-             as "complete" would paint the whole month green for somebody who
-             has never had a plan. */
+
           const complete = entry ? entry.total > 0 && entry.done === entry.total : false;
           const on = date === pick;
 
@@ -399,7 +362,7 @@ function CalendarPanel({
   );
 }
 
-/** One day, read out: the face, what they said, and what was measured. */
+
 function ReportPanel({
   day,
   date,
@@ -419,19 +382,15 @@ function ReportPanel({
     );
   }
 
-  /* A day can hold readings and ticked tasks without a mood — somebody who
-     logged their blood pressure but never opened the wizard. The face is then
-     simply absent rather than guessed at. */
+
   const mood = day.mood ? MOOD_BY_KEY[day.mood] : null;
   const metrics = dayMetrics(day);
 
   return (
     <div className="flex h-full flex-col">
-      {/* Face and words, side by side — the bubble points back at who said it. */}
+
       <div className="flex items-start gap-4">
-        {/* The same face the form offered and the caregiver's dashboard draws.
-            Tinted with the mood's own wash rather than the neutral canvas, so a
-            bad day is legible from across the room before a word is read. */}
+
         {mood && day.mood && (
           <span
             aria-hidden
@@ -458,9 +417,7 @@ function ReportPanel({
         </div>
       </div>
 
-      {/* The player sits under both columns rather than inside the right one:
-          it belongs to the whole entry, and a play control the width of its own
-          label is a small target for the reason it is a small button. */}
+
       {day.voiceUrl && (
         <div className="mt-3 rounded-2xl bg-white p-3 ring-2 ring-karsa-line">
           <p className="mb-2 flex items-center gap-2 text-[13px] font-bold text-neutral-600">
@@ -474,12 +431,7 @@ function ReportPanel({
         </div>
       )}
 
-      {/* On a phone the readings follow the player directly. `mt-auto` used to
-          pin them to the floor of an 85dvh sheet, which on a short entry left a
-          236px hole in the middle — and a hole in the middle reads as broken,
-          where the same space at the bottom just reads as a tall sheet. The
-          desktop column keeps the pin: there the grid sits under a fixed-height
-          panel and anchoring it looks deliberate. */}
+
       <div className="mt-5 lg:mt-auto lg:pt-5">
         <MetricCarousel metrics={metrics} />
       </div>
@@ -487,12 +439,7 @@ function ReportPanel({
   );
 }
 
-/** The day's readings.
- *
- *  Two shapes. A phone gets a swipeable row with arrows past three tiles — below
- *  that the row fits, and a pair of controls that do nothing is two more things
- *  to read. A desktop has the width for a three-across grid, so it shows every
- *  reading at once and needs no controls at all. */
+
 function MetricCarousel({ metrics }: { metrics: ReturnType<typeof dayMetrics> }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const many = metrics.length > CAROUSEL_MIN;
@@ -508,7 +455,7 @@ function MetricCarousel({ metrics }: { metrics: ReturnType<typeof dayMetrics> })
   const nudge = (dir: 1 | -1) => {
     const track = trackRef.current;
     if (!track) return;
-    /* One tile plus its gap, so a press always lands on a tile edge. */
+
     const step = (track.firstElementChild as HTMLElement | null)?.offsetWidth ?? 160;
     track.scrollBy({ left: dir * (step + 12), behavior: "smooth" });
   };
@@ -534,21 +481,15 @@ function MetricCarousel({ metrics }: { metrics: ReturnType<typeof dayMetrics> })
         )}
       </div>
 
-      {/* `-mx-1 px-1` keeps the tiles' rings out of the scroller's clip. */}
+
       <div
         ref={trackRef}
-        /* Room on every side, not three. The track clips at its padding box, so
-           the tiles' `ring-2` needs clearance all round — it had none at the top
-           and only 4px at the foot, where the scrollbar also sits. */
-        /* `scroll-px-1` matters: snap points align to the *scrollport* edge, so
-           without scroll padding the browser parks scrollLeft at 4 to seat the
-           first tile — eating the very padding that was sheltering its ring. */
-        className="scrollbar-slim -mx-1 -my-1 flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto px-1 pb-2.5 pt-1 lg:mx-0 lg:my-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:p-0"
+
+
+        className="scrollbar-none -mx-1 -my-1 flex snap-x snap-mandatory scroll-px-1 gap-3 overflow-x-auto px-1 pb-2.5 pt-1 lg:mx-0 lg:my-0 lg:grid lg:grid-cols-3 lg:overflow-visible lg:p-0"
       >
         {metrics.map((m) => (
-          /* Bigger on a phone than in the desktop grid: there they sit three
-             across in a narrow column, here they get the width to be read at
-             arm's length. */
+
           <div
             key={m.label}
             className="flex min-h-[152px] w-[168px] shrink-0 snap-start flex-col justify-between rounded-2xl bg-karsa-canvas p-4 ring-2 ring-karsa-line lg:min-h-0 lg:w-auto lg:p-3.5"

@@ -3,7 +3,13 @@ import { createClient } from "../supabase/server";
 import { isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
 import { MONTHS, calendarDayOf, jakartaDateString } from "../care/time";
-import { getMyCareTeam, getMyPatientRecord, getMyPatients } from "../care/queries";
+import {
+  getMyCareInvites,
+  getMyCareTeam,
+  getMyPatientRecord,
+  getMyPatients,
+} from "../care/queries";
+import type { CareInvite } from "../care/queries";
 import type { CarePatient, CareTeamMember } from "../care/types";
 
 export type MySettings = {
@@ -27,6 +33,8 @@ export type PatientAccess = {
   patients: CarePatient[];
   caregivers: CareTeamMember[];
   shareCode: string | null;
+
+  invites: CareInvite[];
 };
 
 export const getMySettings = cache(async (): Promise<MySettings | null> => {
@@ -134,14 +142,15 @@ export const getContributions = cache(async (): Promise<Contributions> => {
 
 export const getPatientAccess = cache(async (): Promise<PatientAccess> => {
   if (!isSupabaseConfigured()) {
-    return { patients: [], caregivers: [], shareCode: null };
+    return { patients: [], caregivers: [], shareCode: null, invites: [] };
   }
 
-  const [patients, caregivers, record] = await Promise.all([
+  const [patients, caregivers, record, invites] = await Promise.all([
     getMyPatients(),
     getMyCareTeam(),
     getMyPatientRecord(),
+    getMyCareInvites(),
   ]);
 
-  return { patients, caregivers, shareCode: record?.share_code ?? null };
+  return { patients, caregivers, shareCode: record?.share_code ?? null, invites };
 });

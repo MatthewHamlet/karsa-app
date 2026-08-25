@@ -4,33 +4,13 @@ import { createClient } from "../../lib/supabase/server";
 import { isSupabaseConfigured } from "../../lib/supabase/config";
 import { hasChosenRole } from "../../lib/roles";
 
-/** Where every link Supabase sends comes back to: Google, the signup
- *  confirmation email, and the password reset email.
- *
- *  A Route Handler rather than a page because it has to set cookies, which a
- *  Server Component may not. The proxy's matcher skips this path so a session
- *  refresh cannot race the exchange.
- *
- *  ── Two shapes arrive here, not one ───────────────────────────────────────
- *  OAuth returns `?code=`, which is traded for a session. Email links go first
- *  to Supabase's own `/auth/v1/verify`, which then bounces here — and depending
- *  on the project's email templates that arrives either as a `code` too, or as
- *  `token_hash` + `type`, which needs `verifyOtp` instead. Handling only `code`
- *  meant a valid confirmation link fell through to "kode login tidak ditemukan".
- *
- *  ── And failures arrive here as well ──────────────────────────────────────
- *  An expired or already-used link comes back with `error` and `error_code` set
- *  rather than a token. Those used to be answered with a flat "Login Google
- *  dibatalkan", which is wrong and unhelpful for someone who just clicked a
- *  confirmation email. They are translated properly now. */
 
-/** Supabase's failure codes, in the words of the person who hit them. */
+
+
 function readableCallbackError(code: string | null, raw: string | null): string {
   switch (code) {
     case "otp_expired":
-      /* Not only about time. Supabase answers this for any unusable token —
-         already clicked, superseded by a newer email, or prefetched and spent
-         by a mail scanner before the person got to it. */
+
       return "Tautannya sudah tidak berlaku — mungkin kedaluwarsa atau sudah pernah dibuka. Minta kirim ulang ya.";
     case "access_denied":
       return "Akses ditolak. Coba ulangi dari awal.";
@@ -46,8 +26,7 @@ function readableCallbackError(code: string | null, raw: string | null): string 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
 
-  /* Only same-site paths. This value ends up in a redirect, and letting an
-     arbitrary URL through turns the callback into a phishing hop. */
+
   const raw = searchParams.get("next") ?? "/";
   const next = raw.startsWith("/") && !raw.startsWith("//") ? raw : "/";
 
@@ -56,9 +35,7 @@ export async function GET(request: NextRequest) {
 
   if (!isSupabaseConfigured()) return fail("Supabase belum tersambung.");
 
-  /* Supabase reports refusals before it reports anything else, so this is
-     checked first — otherwise the missing-token branch below would answer for
-     it with the wrong explanation. */
+
   const errorCode = searchParams.get("error_code");
   if (searchParams.get("error") || errorCode) {
     return fail(readableCallbackError(errorCode, searchParams.get("error_description")));
@@ -66,8 +43,7 @@ export async function GET(request: NextRequest) {
 
   const supabase = await createClient();
 
-  /* Email links in the token-hash shape. Kept ahead of `code` only because the
-     two never arrive together. */
+
   const tokenHash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
   if (tokenHash && type) {
@@ -81,27 +57,16 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) return fail(readableCallbackError(null, error.message));
 
-    /* Google is the reason this branch exists, and Google tells us nothing
-       about which half of the app this person belongs in. An account that has
-       never answered goes and answers before it goes anywhere else — otherwise
-       `handle_new_user`'s caregiver default stands in for a choice nobody made,
-       and a patient spends their first visit in a compliance dashboard.
 
-       Answered accounts fall straight through, so signing in with Google on
-       every subsequent visit is still one hop. */
     if (!hasChosenRole(data.user?.user_metadata)) {
       const back = `${origin}/login/peran`;
-      /* Deep links survive the detour: `chooseRole` lands them on their role's
-         home, and anything more specific is carried here so it can win. */
+
       return NextResponse.redirect(
         next === "/" ? back : `${back}?next=${encodeURIComponent(next)}`,
       );
     }
 
-    /* `next` defaults to "/", which is the caregiver app's home. Wrong for a
-       patient — user_metadata.role can be stale for Google/pairing accounts,
-       so profiles.role (same source proxy.ts trusts) decides instead. An
-       explicit deep link in `next` still wins over this. */
+
     if (next === "/") {
       const { data: profileRow } = await supabase
         .from("profiles")

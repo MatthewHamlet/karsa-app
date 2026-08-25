@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
+import { BELOW_LG, useMediaQuery } from "../components/useMediaQuery";
+import UserAvatar from "../components/UserAvatar";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   Bell,
@@ -46,7 +48,12 @@ import { count } from "../data/community";
 import { ROLE_LABEL } from "../lib/roles";
 import { UserMinus } from "lucide-react";
 import { useActionState } from "react";
-import { revokeRelationship, type CareResult } from "../lib/care/actions";
+import {
+  respondToCareInvite,
+  revokeRelationship,
+  type CareResult,
+} from "../lib/care/actions";
+import type { CareInvite } from "../lib/care/queries";
 import {
   updateAppearance,
   updatePersonalInfo,
@@ -83,8 +90,7 @@ const ICON: Record<IconKey, LucideIcon> = {
   about: Info,
 };
 
-/** Each overview card gets the hue of the area it sends you to, so the button
- *  you press and the section you land in are the same colour. */
+
 const OVERVIEW_FACE: Record<string, { icon: LucideIcon; tone: Tone }> = {
   team: { icon: UsersRound, tone: "peach" },
   safety: { icon: ShieldCheck, tone: "blue" },
@@ -111,12 +117,11 @@ const LIST =
 const CARD =
   "rounded-[22px] bg-white ring-1 ring-karsa-line shadow-[0_1px_2px_rgba(24,32,24,0.03),0_18px_36px_-30px_rgba(24,32,24,0.4)]";
 
-/** The rail is a tablist, so every destination needs a stable id for the panel
- *  to point back at. `null` is the overview, which is a destination too. */
+
 const tabId = (id: string | null) => `settings-tab-${id ?? "overview"}`;
 const PANEL_ID = "settings-panel";
 
-/** Every destination in rail order — what arrow keys walk along. */
+
 const TAB_ORDER: (string | null)[] = [null, ...SETTING_ITEMS.map((item) => item.id)];
 
 const first = (value: string | string[] | undefined) =>
@@ -135,9 +140,7 @@ export default function SettingsPage({
   stats?: AccountStats;
   contributions?: Contributions;
 }) {
-  /* `?bagian=profile` opens straight onto a section. The rail's profile row
-     uses it, so that row lands somewhere different from the Pengaturan row
-     right under it — two links to the same blank page would be one link. */
+
   const requested = first(params?.bagian);
   const [selectedId, setSelectedId] = useState<string | null>(
     requested && SETTING_ITEMS.some((item) => item.id === requested) ? requested : null,
@@ -146,8 +149,7 @@ export default function SettingsPage({
   const mainRef = useRef<HTMLDivElement>(null);
   const mounted = useRef(false);
 
-  /** Switch state lives here so a row can be flipped and stay flipped, and so
-   *  the quick list and the detail panel are the same switch twice over. */
+
   const [switches, setSwitches] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(
       SETTING_ITEMS.flatMap((item) =>
@@ -167,6 +169,7 @@ export default function SettingsPage({
   );
 
   const fade = reduce ? { duration: 0 } : { duration: 0.24, ease: EASE };
+  const isNarrow = useMediaQuery(BELOW_LG);
 
   const detailNode = selected ? (
     <Detail
@@ -179,12 +182,9 @@ export default function SettingsPage({
   ) : null;
 
   return (
-    /* Same rest at the foot of the page as every other route — see Care. */
+
     <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
-      {/* The banner keeps saying "Pengaturan" whatever is open. The section's
-          own name belongs on the panel that shows it — swapping the page title
-          per selection left the caregiver with two headings competing to say
-          where they were. */}
+
       <PageHeader
         tone="forest"
         eyebrow="Karsa"
@@ -192,12 +192,7 @@ export default function SettingsPage({
         subtitle="Kelola akun, preferensi, dan privasi aplikasi kamu."
       />
 
-      {/* Centred, and capped at exactly what the two columns can use: 360 rail
-          + 40 gap + the panel's own 1280 ceiling. Without the cap the panel
-          column kept growing while the panel inside it stopped at 1280, so on a
-          wide screen every pixel of slack pooled on one side — 48px of margin
-          on the left against 529px on the right at 2560. The cap turns that
-          into a column that is full or centred, never lopsided. */}
+
       <div className="mx-auto grid w-full max-w-[1680px] gap-6 lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-8 xl:grid-cols-[360px_minmax(0,1fr)] xl:gap-10">
         <ProfileRail
           selectedId={selectedId}
@@ -206,9 +201,7 @@ export default function SettingsPage({
           stats={stats}
         />
 
-        {/* Capped rather than uncapped: past about 1280px a settings row puts
-            its control so far from its label that they stop reading as one
-            line. Below that it takes everything it is given. */}
+
         <div
           ref={mainRef}
           id={PANEL_ID}
@@ -237,9 +230,8 @@ export default function SettingsPage({
         </div>
       </div>
 
-      {/* On a phone the rail is the whole page, so a section opens over it
-          instead of stacking underneath — same `Detail`, different container. */}
-      <div className="lg:hidden">
+
+      {isNarrow && (
         <Modal
           open={Boolean(selected)}
           onClose={() => setSelectedId(null)}
@@ -249,12 +241,12 @@ export default function SettingsPage({
         >
           {detailNode}
         </Modal>
-      </div>
+      )}
     </div>
   );
 }
 
-/* ── Left column ──────────────────────────────────────────────────────────── */
+
 
 function ProfileRail({
   selectedId,
@@ -267,13 +259,7 @@ function ProfileRail({
   me?: MySettings | null;
   stats?: AccountStats;
 }) {
-  /** Arrow keys walk the rail and take the selection with them, which is the
-   *  expected behaviour for a tablist whose panels are cheap to render. Home
-   *  and End jump the ends so a fifty-item rail is still one keystroke deep.
-   *
-   *  Focus moves by id rather than through a map of refs: every tab is always
-   *  mounted and already carries the id the panel points at, so there is
-   *  nothing a ref would know that `tabId` does not. */
+
   const onKeyDown = (event: React.KeyboardEvent) => {
     const keys = ["ArrowDown", "ArrowUp", "Home", "End"];
     if (!keys.includes(event.key)) return;
@@ -298,15 +284,15 @@ function ProfileRail({
   };
 
   return (
-    /* Its own scroller on desktop: the rail is far taller than a screen and
-       nothing in it should push the panel beside it down. `overscroll-contain`
-       stops the page taking over once the rail hits an end. */
-    <aside className="lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-3 scrollbar-slim">
+
+    <aside className="lg:sticky lg:top-6 lg:h-[calc(100dvh-3rem)] lg:overflow-y-auto lg:overscroll-contain lg:pr-3 scrollbar-none">
       <div className="flex flex-col items-start">
         <span className="relative inline-block">
-          <span className="grid h-20 w-20 place-items-center rounded-full bg-karsa text-[28px] font-bold text-white xl:h-24 xl:w-24 xl:text-[32px]">
-            {me ? me.fullName.trim().charAt(0).toUpperCase() || "?" : ACCOUNT.initial}
-          </span>
+          <UserAvatar
+            url={me?.avatarUrl}
+            initial={me ? me.fullName.trim().charAt(0).toUpperCase() || "?" : ACCOUNT.initial}
+            className="h-20 w-20 text-[28px] xl:h-24 xl:w-24 xl:text-[32px]"
+          />
           <button
             type="button"
             onClick={() => onSelect("profile")}
@@ -423,8 +409,7 @@ function ProfileRail({
   );
 }
 
-/** A rail entry. Only the selected tab is in the tab order — arrow keys move
- *  between the rest, which is how a tablist is meant to be walked. */
+
 function NavRow({
   id,
   icon,
@@ -486,11 +471,9 @@ function LogOutButton() {
   );
 }
 
-/* ── Detail panels ────────────────────────────────────────────────────────── */
 
-/** The frame every section shares: who you are looking at, then the controls.
- *  The heading lives here rather than in the page banner so the panel can be
- *  read on its own. */
+
+
 function DetailShell({
   item,
   children,
@@ -570,9 +553,7 @@ function Detail({
   );
 }
 
-/** Two forms, one shape. `saved` is the last committed state and `draft` what
- *  is on screen; Cancel is just a copy of one onto the other, which is why it
- *  needs no confirmation of its own. */
+
 function useDraft<T extends Record<string, string>>(
   initial: T,
   persist?: (draft: T) => Promise<{ error: string | null }>,
@@ -652,10 +633,19 @@ function ProfileForm({ item, me }: { item: ResolvedItem; me?: MySettings | null 
       name: me?.fullName ?? PROFILE_FIELDS.name,
       email: me?.email ?? PROFILE_FIELDS.email,
       headline: me?.headline ?? "",
+
+      avatar: me?.avatarUrl ?? "",
     },
     me
       ? (draft) =>
-          updateProfile({ error: null }, formData({ full_name: draft.name, headline: draft.headline }))
+          updateProfile(
+            { error: null },
+            formData({
+              full_name: draft.name,
+              headline: draft.headline,
+              avatar_url: draft.avatar,
+            }),
+          )
       : undefined,
   );
 
@@ -667,10 +657,14 @@ function ProfileForm({ item, me }: { item: ResolvedItem; me?: MySettings | null 
   return (
     <DetailShell item={item}>
       <form onSubmit={submit} noValidate>
-        <AvatarField initial={ACCOUNT.initial} />
+        <AvatarField
 
-        {/* Two columns from `sm` up. The role selector takes the full row: it
-            is the field that changes what the rest of the app lets you do. */}
+          initial={(me?.fullName ?? PROFILE_FIELDS.name).trim().charAt(0).toUpperCase() || ACCOUNT.initial}
+          value={form.draft.avatar || null}
+          onChange={(url) => form.set("avatar")(url ?? "")}
+        />
+
+
         <div className="mt-7 grid gap-5 sm:grid-cols-2">
           <TextField
             label="Nama lengkap"
@@ -790,8 +784,7 @@ function PersonalForm({ item, me }: { item: ResolvedItem; me?: MySettings | null
             />
           </div>
           <div className="sm:col-span-2">
-            {/* Drawn from the care team rather than typed: an emergency contact
-                who is not in the group is one the app cannot actually reach. */}
+
             <TextField
               label="Kontak darurat"
               value={form.draft.emergency}
@@ -902,6 +895,68 @@ function AppearanceForm({ item, me }: { item: ResolvedItem; me?: MySettings | nu
   );
 }
 
+
+function CareInviteRow({ invite }: { invite: CareInvite }) {
+  const [state, respond, busy] = useActionState<CareResult, FormData>(respondToCareInvite, {
+    error: null,
+  });
+
+  return (
+    <li className="rounded-2xl bg-tint-sand p-4 ring-1 ring-edge-sand">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-karsa-dark ring-1 ring-edge-sand"
+        >
+          <HeartHandshake size={18} strokeWidth={2.2} />
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <p className="text-[14.5px] leading-5 text-neutral-800">
+            <span className="font-bold">{invite.fromName}</span> mengajakmu ikut mendampingi{" "}
+            <span className="font-bold">{invite.patientName}</span>.
+          </p>
+          <p className="mt-0.5 text-[12.5px] text-neutral-500">
+            {invite.when} · setelah kamu terima, {invite.patientName} menyetujui aksesnya.
+          </p>
+
+          {state.error && (
+            <p role="alert" className="mt-2 text-[12.5px] font-semibold text-rose-700">
+              {state.error}
+            </p>
+          )}
+
+          <div className="mt-3 flex flex-wrap gap-2.5">
+            <form action={respond}>
+              <input type="hidden" name="invite_id" value={invite.id} />
+              <input type="hidden" name="accept" value="true" />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-full bg-karsa px-4 py-2 text-[13.5px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 disabled:opacity-60"
+              >
+                Terima
+              </button>
+            </form>
+
+            <form action={respond}>
+              <input type="hidden" name="invite_id" value={invite.id} />
+              <input type="hidden" name="accept" value="false" />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-full bg-white px-4 py-2 text-[13.5px] font-semibold text-neutral-700 outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40 disabled:opacity-60"
+              >
+                Tolak
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 function AccessPanel({
   item,
   access,
@@ -913,9 +968,19 @@ function AccessPanel({
 }) {
   const isPatient = me?.role === "patient";
   const rows = isPatient ? (access?.caregivers ?? []) : (access?.patients ?? []);
+  const invites = access?.invites ?? [];
 
   return (
     <DetailShell item={item}>
+
+      {invites.length > 0 && (
+        <ul className="mb-5 space-y-3">
+          {invites.map((invite) => (
+            <CareInviteRow key={invite.id} invite={invite} />
+          ))}
+        </ul>
+      )}
+
       <p className="text-[14px] leading-6 text-neutral-500">
         {isPatient
           ? "Mereka bisa melihat catatan perawatanmu. Cabut akses kapan saja."
@@ -1014,7 +1079,7 @@ const SCALE_VALUE: Record<string, string> = {
   Besar: "large",
 };
 
-/* ── Overview ─────────────────────────────────────────────────────────────── */
+
 
 function QuickSettings({
   onSelect,
@@ -1101,20 +1166,24 @@ function Contributions({ data }: { data?: Contributions }) {
           const t = TONES[entry.tone];
 
           return (
+
             <li
               key={entry.id}
-              className={`flex items-start gap-3.5 rounded-2xl p-4 ring-1 ${t.card} ${t.ring}`}
+              className={`rounded-2xl p-4 ring-1 ${t.card} ${t.ring}`}
             >
               <AccentIcon icon={CONTRIBUTION_ICON[entry.id]} tone={entry.tone} size="md" />
-              <div className="min-w-0">
-                <p className="text-[23px] font-bold leading-8 tabular-nums text-neutral-900">
+
+
+              <p className="mt-3 flex flex-wrap items-baseline gap-x-2">
+                <span className="text-[23px] font-bold leading-8 tabular-nums text-neutral-900">
                   {entry.value}
-                </p>
-                <p className="text-[13.5px] font-semibold leading-5 text-neutral-700">
+                </span>
+                <span className="text-[13.5px] font-semibold leading-5 text-neutral-700">
                   {entry.label}
-                </p>
-                <p className="mt-0.5 text-[12.5px] leading-4 text-neutral-500">{entry.note}</p>
-              </div>
+                </span>
+              </p>
+
+              <p className="mt-0.5 text-[12.5px] leading-4 text-neutral-500">{entry.note}</p>
             </li>
           );
         })}
@@ -1139,35 +1208,35 @@ function Overview({
       <Contributions data={contributions} />
       <QuickSettings onSelect={onSelect} switches={switches} onSwitch={onSwitch} />
 
-      {/* Side by side once there is room — three full-width cards in a column
-          was most of the empty space this page used to end on. */}
-      <div className="grid gap-5 xl:grid-cols-3 xl:gap-6">
+
+      <div className="space-y-4">
         {OVERVIEW.map((card) => {
           const face = OVERVIEW_FACE[card.id];
 
           return (
             <section
               key={card.id}
-              className={`${CARD} flex flex-col px-6 py-8 text-center sm:px-8 xl:py-9`}
+              className={`${CARD} flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:px-7`}
             >
-              <span className="mx-auto inline-grid">
+              <span className="inline-grid shrink-0">
                 <AccentIcon icon={face.icon} tone={face.tone} size="lg" />
               </span>
 
-              <h2 className="mx-auto mt-4 max-w-[30ch] text-[18px] font-bold leading-6 tracking-tight text-neutral-900">
-                {card.title}
-              </h2>
-              <p className="mx-auto mt-2 max-w-[46ch] text-[14px] leading-6 text-neutral-500">
-                {card.body}
-              </p>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[18px] font-bold leading-6 tracking-tight text-neutral-900">
+                  {card.title}
+                </h2>
+                <p className="mt-1.5 text-[14px] leading-6 text-neutral-500">{card.body}</p>
+              </div>
 
-              <div className="mt-6 flex flex-wrap justify-center gap-2.5 pt-0 xl:mt-auto xl:pt-6">
+
+              <div className="flex shrink-0 flex-wrap gap-2.5 sm:justify-end">
                 {card.actions.map((action) => (
                   <button
                     key={action.target}
                     type="button"
                     onClick={() => onSelect(action.target)}
-                    className={`rounded-full px-4 py-2.5 text-[13.5px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 ${
+                    className={`whitespace-nowrap rounded-full px-4 py-2.5 text-[13.5px] font-bold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 ${
                       action.primary
                         ? "bg-karsa text-white hover:bg-karsa-dark"
                         : "bg-tint-sand text-karsa-dark ring-1 ring-edge-sand hover:bg-karsa-soft"

@@ -112,8 +112,7 @@ export function useSpeechToText(
       recorder.start();
       recorderRef.current = recorder;
     } catch {
-      /* Recognition can still run without a parallel capture; the transcript is
-         the part that must not fail. */
+
     }
   }, []);
 
@@ -157,7 +156,7 @@ export function useSpeechToText(
           recognition.start();
           return;
         } catch {
-          /* restart already in flight */
+
         }
       }
       setListening(false);

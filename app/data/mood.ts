@@ -1,17 +1,11 @@
-/** The patient's own emotional log. This is Meimei's space to say how she is
- *  — not a clinical instrument, and nothing here is treated as a diagnosis. */
-
 export type MoodKey = "great" | "good" | "okay" | "low" | "verylow";
 
 export type Mood = {
   key: MoodKey;
   label: string;
-  /** Ordered 5 (best) → 1, used as the vertical scale on the trend. */
   value: number;
-  /** The face's colour, and the darker ink its features are drawn in. */
   color: string;
   ink: string;
-  /** A soft wash of the same hue, for selected states and bubbles. */
   soft: string;
 };
 
@@ -28,8 +22,6 @@ export const MOOD_BY_KEY = Object.fromEntries(MOODS.map((m) => [m.key, m])) as R
   Mood
 >;
 
-/* ── This month's tally ───────────────────────────────────────────────────── */
-
 export const MOOD_COUNTS: Record<MoodKey, number> = {
   good: 12,
   okay: 8,
@@ -40,13 +32,9 @@ export const MOOD_COUNTS: Record<MoodKey, number> = {
 
 export const TOTAL_ENTRIES = Object.values(MOOD_COUNTS).reduce((a, b) => a + b, 0);
 
-/** Most logged mood, computed rather than hard-coded so the copy can't drift
- *  away from the numbers beside it. */
 export const MOST_COMMON = (Object.entries(MOOD_COUNTS) as [MoodKey, number][]).reduce(
   (best, current) => (current[1] > best[1] ? current : best),
 );
-
-/* ── The last fortnight, for the trend ───────────────────────────────────── */
 
 export type TrendPoint = { label: string; mood: MoodKey };
 
@@ -66,8 +54,6 @@ export const MOOD_TREND: TrendPoint[] = [
   { label: "2", mood: "good" },
   { label: "3", mood: "great" },
 ];
-
-/* ── Journal ──────────────────────────────────────────────────────────────── */
 
 export type MoodEntry = {
   id: string;

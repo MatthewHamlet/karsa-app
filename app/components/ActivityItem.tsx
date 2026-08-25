@@ -10,26 +10,16 @@ const TONE = {
 
 export type ActivityTone = keyof typeof TONE;
 
-/** One line of the activity timeline.
- *
- *  Takes finished strings, not a timestamp. The label is formatted in
- *  Asia/Jakarta by the query that produced it — see `lib/care/time` — because a
- *  `Date` formatted here renders in the server's timezone during SSR and in the
- *  visitor's on hydration, and React calls that a mismatch. */
 export type ActivityRow = {
   id: string;
-  /** Who did it. */
   actor: string;
-  /** What they did, as it follows the name: "menyiapkan sarapan". */
   action: string;
-  /** Already formatted: a clock today, a date and clock before that. */
   when: string;
   tone: ActivityTone;
 };
 
 type ActivityItemProps = {
   activity: ActivityRow;
-  /** The last row stops the timeline instead of trailing into nothing. */
   isLast?: boolean;
 };
 
@@ -38,7 +28,6 @@ export default function ActivityItem({ activity, isLast }: ActivityItemProps) {
 
   return (
     <li className="relative flex gap-4 pb-6 last:pb-0">
-      {/* Timeline spine, tucked behind the icon tiles. */}
       {!isLast && (
         <span
           aria-hidden
@@ -46,8 +35,6 @@ export default function ActivityItem({ activity, isLast }: ActivityItemProps) {
         />
       )}
 
-      {/* The ring masks the spine where it passes behind the tile, so it has to
-          match the card this list sits on. */}
       <span className={`relative z-10 grid h-10 w-10 shrink-0 place-items-center rounded-full ring-[3px] ring-tint-sky ${ring}`}>
         <Icon size={18} strokeWidth={2.2} />
       </span>

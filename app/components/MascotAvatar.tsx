@@ -5,37 +5,25 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import Mascot, { type Gaze } from "./Mascot";
 import type { MascotState } from "../data/mascot";
 
-/** The mascot on the assistant page: the same character as everywhere else,
- *  wrapped in the chrome this screen needs — an aura while it thinks, a bed of
- *  light so it sits in a place rather than on a flat panel, and a ground shadow
- *  that tightens as it rises.
- *
- *  The figure itself is `Mascot`. It used to be a second, hand-built character
- *  living only here, which meant the app had two mascots that had to be kept
- *  looking alike by hand — and didn't. Now the state just picks where it looks
- *  and how hard the bulb is working. */
 
-/** Thinking looks up and away, the way anyone does while working something out;
- *  presenting looks down at the cards it just put on the table. */
+
+
 const GAZE: Record<MascotState, Gaze> = {
   idle: "center",
   thinking: "up",
   presenting: "down",
 };
 
-/** The three beats of working something out: scribbling, the idea landing, and
- *  the small shock of having found it. */
+
 type Beat = "math" | "bulb" | "shock";
 type Phase = "none" | Beat;
 
 const MATH_MS = 1300;
 const BULB_MS = 600;
-/** Kept in step with `THINKING_MS` in MascotAssistant — the sequence has to
- *  finish before the answer arrives, or the jolt lands under a reply. */
+
 export const THINK_SEQUENCE_MS = MATH_MS + BULB_MS + 700;
 
-/** Nonsense on purpose. It is the *look* of hard sums, not a calculation — a
- *  real formula invites reading, and there is nothing here to read. */
+
 const EQUATIONS = [
   { text: "∫ x² dx", x: "4%", y: "10%", delay: 0 },
   { text: "α + β = ?", x: "68%", y: "4%", delay: 0.12 },
@@ -55,19 +43,13 @@ export default function MascotAvatar({
   const [beat, setBeat] = useState<Beat>("math");
   const [seen, setSeen] = useState<MascotState>(state);
 
-  /* Rewinding to the first beat during render, not in an effect: React's own
-     pattern for adjusting state when a prop changes. An effect runs a frame
-     late, and that frame would show the previous answer's shocked face sitting
-     under a question that was only just asked. */
+
   if (state !== seen) {
     setSeen(state);
     setBeat("math");
   }
 
-  /* The sequence runs on its own clock inside the thinking state — equations,
-     then the bulb, then the jolt. Timers rather than one keyframe timeline
-     because the three beats belong to different elements, and a shared
-     timeline would tie the bulb's spring to the equations' fade. */
+
   useEffect(() => {
     if (state !== "thinking" || reduce) return;
 
@@ -78,8 +60,7 @@ export default function MascotAvatar({
     return () => timers.forEach(window.clearTimeout);
   }, [state, reduce]);
 
-  /* Derived, so nothing has to remember to switch it off when the answer
-     arrives — the sequence simply stops existing outside the thinking state. */
+
   const phase: Phase = state === "thinking" && !reduce ? beat : "none";
 
   const lean = reduce
@@ -90,14 +71,7 @@ export default function MascotAvatar({
 
   return (
     <div className={`relative grid place-items-center ${className}`}>
-      {/* ── Aura ────────────────────────────────────────────────────────────
-          Two rings, offset in time so one is always expanding. Only visible
-          while thinking — an idle glow would make the resting state look busy.
 
-          Never unmounted, though. Under `AnimatePresence` the `repeat: Infinity`
-          that drives the pulse governs the exit too, so the rings never finish
-          leaving and the glow stayed on through the answer. Animating to a
-          resting target instead lets the pulse simply stop. */}
       {[0, 0.7].map((delay) => (
         <motion.span
           key={delay}
@@ -117,7 +91,7 @@ export default function MascotAvatar({
         />
       ))}
 
-      {/* A soft bed of colour. Warms up while presenting, cools while thinking. */}
+
       <motion.span
         aria-hidden
         animate={{
@@ -138,16 +112,12 @@ export default function MascotAvatar({
           gaze={GAZE[state]}
           mood={phase === "shock" ? "shock" : "normal"}
           busy={state === "thinking"}
-          /* Tilts and hops belong to a character with nothing to do. Mid-answer
-             they read as not listening. */
+
           idle={state === "idle"}
         />
       </motion.div>
 
-      {/* ── Equations ───────────────────────────────────────────────────────
-          Sums drifting up past the head while it works. Staggered so they
-          arrive one at a time — all five at once is a background texture, one
-          after another is somebody thinking. */}
+
       <AnimatePresence>
         {phase === "math" &&
           EQUATIONS.map((eq) => (
@@ -166,10 +136,7 @@ export default function MascotAvatar({
           ))}
       </AnimatePresence>
 
-      {/* ── The idea ────────────────────────────────────────────────────────
-          Pops above the head on a spring with a little overshoot, then holds
-          through the jolt. The rays are drawn, not glowed: a blur at this size
-          turns into a smudge. */}
+
       <AnimatePresence>
         {(phase === "bulb" || phase === "shock") && (
           <motion.span
@@ -191,8 +158,7 @@ export default function MascotAvatar({
         )}
       </AnimatePresence>
 
-      {/* Ground shadow. Tightens as the character rises, which is what sells
-          the float as height rather than drift. */}
+
       <motion.span
         aria-hidden
         animate={

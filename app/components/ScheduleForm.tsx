@@ -5,16 +5,6 @@ import Modal from "./Modal";
 import { addScheduleEvent, type CareResult } from "../lib/care/actions";
 import { MONTHS, type CalendarDay } from "../lib/care/time";
 
-/** Putting something on the calendar.
- *
- *  The date is pre-filled from whichever day is selected in the grid behind
- *  this dialog, because that is almost always the answer — somebody presses
- *  "+" while looking at a day. It stays editable; guessing right is not the
- *  same as deciding.
- *
- *  A plain `<form action={…}>` around a server action rather than a fetch: it
- *  works before hydration, the browser validates the fields, and there is no
- *  client-side copy of the write to keep in step with the one on the server. */
 const KINDS = [
   { value: "appointment", label: "Janji temu" },
   { value: "checkup", label: "Kontrol rutin" },
@@ -26,9 +16,6 @@ const FIELD =
   "h-12 w-full rounded-xl border-2 border-karsa-line bg-white px-3.5 text-[15px] text-neutral-900 outline-none transition-colors duration-200 focus:border-karsa disabled:opacity-70";
 const LABEL = "block text-[13px] font-semibold text-neutral-600";
 
-/** `YYYY-MM-DD` for a calendar day. The `date` input wants this exact form, and
- *  the action parses it back the same way — no timezone is involved in either
- *  direction, which is the point. */
 const isoDate = (day: CalendarDay) =>
   `${day.y}-${String(day.m + 1).padStart(2, "0")}-${String(day.d).padStart(2, "0")}`;
 
@@ -48,9 +35,6 @@ export default function ScheduleForm({
   });
   const uid = useId();
 
-  /* Closing on success rather than showing a confirmation: the new row appears
-     in the list behind the dialog, which is a better confirmation than a
-     sentence saying it did. */
   useEffect(() => {
     if (state.ok) onClose();
   }, [state.ok, onClose]);

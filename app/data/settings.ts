@@ -1,8 +1,4 @@
-/** Everything the caregiver can manage about their own account and the app.
- *
- *  Two levels: a group (Akun, Aplikasi, …) holds items (Profil, Notifikasi, …),
- *  and each item holds the rows you actually change. The landing lists the
- *  items; picking one shows its rows. */
+
 
 import type { Tone } from "../components/tones";
 
@@ -19,7 +15,7 @@ export type IconKey =
   | "support"
   | "about";
 
-/** What sits at the end of a row. */
+
 export type Control =
   | { kind: "link" }
   | { kind: "value"; value: string }
@@ -35,7 +31,7 @@ export type SettingRow = {
 export type SettingItem = {
   id: string;
   title: string;
-  /** Shown under the title on the landing and as the detail subtitle. */
+
   description: string;
   icon: IconKey;
   rows: SettingRow[];
@@ -44,16 +40,16 @@ export type SettingItem = {
 export type SettingGroup = {
   id: string;
   label: string;
-  /** One hue per group, so colour tells you where you are. */
+
   tone: Tone;
   items: SettingItem[];
 };
 
 export const ACCOUNT = {
-  name: "Meimei Tole tole",
-  email: "meimei@karsa.app",
-  role: "Pendamping utama",
-  initial: "M",
+  name: "Pendamping",
+  email: "",
+  role: "Pendamping",
+  initial: "P",
   status: "Aktif",
 };
 
@@ -142,14 +138,14 @@ export const SETTINGS: SettingGroup[] = [
   },
 ];
 
-/** Flat lookup for the selected item. */
+
 export const SETTING_ITEMS = SETTINGS.flatMap((group) =>
   group.items.map((item) => ({ ...item, groupId: group.id, groupLabel: group.label, tone: group.tone })),
 );
 
 export type ResolvedItem = (typeof SETTING_ITEMS)[number];
 
-/* ── Profile rail ─────────────────────────────────────────────────────────── */
+
 
 export const ACCOUNT_STATS: { label: string; value: string }[] = [
   { label: "Follower", value: "0" },
@@ -157,10 +153,7 @@ export const ACCOUNT_STATS: { label: string; value: string }[] = [
   { label: "Tim", value: "0" },
 ];
 
-/** The one warm card in the rail. It nudges the caregiver toward themselves,
- *  not toward the app — the whole page is about their account, so this is the
- *  right place to say the quiet thing. Phrased as an invitation: a caregiver
- *  who has skipped their own rest does not need to be told off about it. */
+
 export const SELF_CARE = {
   title: "Rawat dirimu juga",
   body: "Luangkan 15 menit hari ini untuk diri sendiri. Itu bagian dari merawat, bukan jeda darinya.",
@@ -168,11 +161,9 @@ export const SELF_CARE = {
   href: "/community",
 };
 
-/* ── Contributions ────────────────────────────────────────────────────────── */
 
-/** What the caregiver has actually put in. The note under each figure is the
- *  point: a bare count of 892 doses says nothing, "98% tepat waktu" is the
- *  sentence they can be proud of. */
+
+
 export type Contribution = {
   id: string;
   label: string;
@@ -212,15 +203,9 @@ export const CONTRIBUTIONS: Contribution[] = [
   },
 ];
 
-/* ── Quick settings ───────────────────────────────────────────────────────── */
 
-/** The few controls worth putting in front of the caregiver without making
- *  them open a section first: the two reminders a day actually runs on, and the
- *  switches that decide who can see Meimei's records.
- *
- *  References, not copies. Each points at a row that already exists further up,
- *  so the switch shown here and the one inside its section are the same switch
- *  — flip it in either place and both agree. */
+
+
 export const QUICK_SETTINGS: { itemId: string; rowId: string }[] = [
   { itemId: "care-prefs", rowId: "med-reminder" },
   { itemId: "notifications", rowId: "task" },
@@ -230,10 +215,9 @@ export const QUICK_SETTINGS: { itemId: string; rowId: string }[] = [
   { itemId: "security", rowId: "twofa" },
 ];
 
-/* ── Overview cards ───────────────────────────────────────────────────────── */
 
-/** What the right column holds when no section is open. Each action opens a
- *  real settings item, so the card is a shortcut rather than an advert. */
+
+
 export type OverviewCard = {
   id: string;
   title: string;
@@ -241,8 +225,7 @@ export type OverviewCard = {
   actions: { label: string; target: string; primary?: boolean }[];
 };
 
-/** Three, not four: editing the profile already has two pencils and a rail row
- *  pointing at it, and a card repeating that would be the fourth. */
+
 export const OVERVIEW: OverviewCard[] = [
   {
     id: "team",
@@ -273,10 +256,9 @@ export const OVERVIEW: OverviewCard[] = [
   },
 ];
 
-/* ── Form options ─────────────────────────────────────────────────────────── */
 
-/** What a caregiver can be to the person they look after. Ordered by how much
- *  of the day it takes, because that is what the list is really asking. */
+
+
 export const ROLE_OPTIONS = [
   "Pendamping utama",
   "Pendamping pendukung",
@@ -284,8 +266,7 @@ export const ROLE_OPTIONS = [
   "Perawat profesional",
 ];
 
-/** Seed values for the profile form. Separate from `ACCOUNT` so editing the
- *  form never mutates the identity the rail reads from. */
+
 export const PROFILE_FIELDS = {
   name: ACCOUNT.name,
   email: ACCOUNT.email,

@@ -15,8 +15,7 @@ export const TABS: { key: FeedTab; label: string; short: string }[] = [
   { key: "grupku", label: "Grup Saya", short: "Grup Saya" },
 ];
 
-/** Search, filter and compose — one row, in the order the sketch puts them.
- *  Below it, the tab bar that decides what kind of thing the feed shows. */
+
 export default function CommunityToolbar({
   query,
   onQuery,
@@ -34,8 +33,7 @@ export default function CommunityToolbar({
   onTab: (next: FeedTab) => void;
   sort: SortKey;
   onSort: (next: SortKey) => void;
-  /** How many items each tab would show, so a caregiver can see a tab is empty
-   *  before spending a click on it. */
+
   counts: Record<FeedTab, number>;
   onCompose: () => void;
   onComposeGroup: () => void;
@@ -45,8 +43,7 @@ export default function CommunityToolbar({
   const filterRef = useRef<HTMLDivElement>(null);
   const createRef = useRef<HTMLDivElement>(null);
 
-  /* A popover that only closes on its own button is a popover you have to
-     fight. Escape and an outside click both dismiss it. */
+
   useEffect(() => {
     if (!filterOpen) return;
 
@@ -87,7 +84,7 @@ export default function CommunityToolbar({
 
   return (
     <div className="mb-4 -mt-4">
-      {/* ── Search row ──────────────────────────────────────────────────── */}
+
       <div
         className="-mx-4 flex flex-row items-center gap-3 px-4 py-3 sm:-mx-6 sm:px-6 md:-mx-8 md:px-8 xl:-mx-12 xl:rounded-b-[24px] xl:px-12"
         style={{ backgroundColor: FOREST }}
@@ -112,8 +109,7 @@ export default function CommunityToolbar({
             value={query}
             onChange={(event) => onQuery(event.target.value)}
             placeholder="Cari diskusi, grup, atau topik…"
-            /* The browser draws its own clear button in a grey that disappears
-               on this field; ours sits where it can be seen. */
+
             className="h-11 w-full rounded-full bg-white pl-10 pr-10 text-[14.5px] text-neutral-800 outline-none ring-1 ring-transparent transition-shadow duration-200 placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-white/70 [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
@@ -128,7 +124,7 @@ export default function CommunityToolbar({
           )}
         </div>
 
-        {/* ── Filter ────────────────────────────────────────────────────── */}
+
         <div ref={filterRef} className="relative shrink-0">
           <button
             type="button"
@@ -243,9 +239,7 @@ export default function CommunityToolbar({
         </div>
       </div>
 
-      {/* ── Tabs ────────────────────────────────────────────────────────────
-          Scrollable rather than wrapped: four labels do not fit a phone, and a
-          tab bar that becomes two rows stops reading as one control. */}
+
       <div
         role="tablist"
         aria-label="Jenis konten"

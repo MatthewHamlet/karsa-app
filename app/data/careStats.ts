@@ -1,12 +1,8 @@
-/** The Care page's own data: the care group, the daily stat cards, the
- *  patient's activity log, and the standing instructions.
- *
- *  All dates are placeholders — this is a design pass, not a data layer. */
+
 
 export type Period = "daily" | "weekly" | "monthly";
 
-/** Fill levels are computed, never typed by hand — the wave has to agree with
- *  the figure printed next to it. */
+
 const pct = (current: number, target: number) => Math.round((current / target) * 100);
 
 export const PERIODS: { key: Period; label: string }[] = [
@@ -15,10 +11,10 @@ export const PERIODS: { key: Period; label: string }[] = [
   { key: "monthly", label: "Bulanan" },
 ];
 
-/** Every card owns a hue. `tile` sits behind the icon, `ink` is the accent. */
+
 export type StatTone = { bg: string; edge: string; tile: string; ink: string };
 
-/* ── Care group ───────────────────────────────────────────────────────────── */
+
 
 export const CARE_GROUP = {
   name: "Pendamping Meimei",
@@ -30,22 +26,21 @@ export const CARE_GROUP = {
   ],
 };
 
-/* ── Fixed stat cards ─────────────────────────────────────────────────────── */
+
 
 export type FixedStatKey = "fluid" | "meals" | "medication" | "mood" | "sleep";
 
 export type MealState = { label: string; done: boolean };
 
-/** Each card changes shape with the period — a day's meal checklist has no
- *  weekly equivalent, so it becomes a tally instead. */
+
 export type StatValue = {
-  /** The headline figure. */
+
   value: string;
-  /** The quieter line under it. */
+
   caption: string;
-  /** 0–100, for cards that show a fill. */
+
   progress?: number;
-  /** Daily meals only. */
+
   meals?: MealState[];
 };
 
@@ -111,7 +106,7 @@ export const FIXED_STATS: Record<
   },
 };
 
-/* ── Stats the caregiver can add ──────────────────────────────────────────── */
+
 
 export type MonitorKey =
   | "bloodPressure"
@@ -198,7 +193,7 @@ export const MONITOR_STATS: MonitorStat[] = [
   },
 ];
 
-/* ── Patient activities ───────────────────────────────────────────────────── */
+
 
 export type ActivityIcon = "medication" | "meal" | "fluid" | "sleep" | "vital";
 
@@ -209,7 +204,7 @@ export type PatientActivity = {
   time: string;
 };
 
-/** Keyed `year-month-day`, so the calendar in the modal can look a date up. */
+
 export const ACTIVITIES_BY_DATE: Record<string, PatientActivity[]> = {
   "2025-8-9": [
     { id: "a1", icon: "medication", text: "Meimei minum 500 mg Metformin", time: "06:40" },
@@ -233,14 +228,14 @@ export const ACTIVITIES_BY_DATE: Record<string, PatientActivity[]> = {
   ],
 };
 
-/** The month the activities modal opens on. */
+
 export const ACTIVITY_MONTH = { y: 2025, m: 8 };
 export const ACTIVITY_TODAY = { y: 2025, m: 8, d: 9 };
 
-/** The card on the page shows the most recent few. */
+
 export const RECENT_ACTIVITIES: PatientActivity[] = ACTIVITIES_BY_DATE["2025-8-9"];
 
-/* ── Important information ────────────────────────────────────────────────── */
+
 
 export const IMPORTANT_INFO: string[] = [
   "Obat diminum setelah makan, jangan saat perut kosong.",

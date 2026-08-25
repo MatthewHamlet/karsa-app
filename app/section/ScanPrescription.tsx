@@ -130,12 +130,7 @@ export default function ScanPrescriptionPage({
   }, [source, acceptImage]);
 
   return (
-    /* A phone gets a fixed-height column so the scanner can sit in the middle
-       of what is left between the Riwayat button and the drawer. The bottom
-       scanner fills it. The drawer and the slide-over that used to share this
-       screen are gone, so nothing is reserved at the bottom any more and the
-       card simply takes what is there. From `lg` none of this applies: the page
-       goes back to flowing and the history is a column, not a drawer. */
+
     <div className="flex min-h-[calc(100dvh-var(--bottom-nav))] w-full flex-col px-4 pb-6 pt-6 sm:px-6 md:px-8 md:pt-10 lg:block lg:min-h-0 lg:pb-10 xl:px-12 xl:pb-12 xl:pt-12">
       <PageHeader
         tone="amber"
@@ -149,10 +144,7 @@ export default function ScanPrescriptionPage({
       />
 
       <div className="grid min-h-0 flex-1 items-stretch gap-6 lg:flex-none lg:items-start lg:grid-cols-[minmax(0,1fr)_340px] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_380px] xl:gap-10">
-        {/* ── The one thing this page does ─────────────────────────────────
-            The whole panel is the button. A card with a small action inside it
-            makes the caregiver aim; this way the target is the size of the
-            screen. */}
+
         <div className="flex min-w-0 flex-col lg:block">
           <button
             type="button"
@@ -198,8 +190,7 @@ export default function ScanPrescriptionPage({
 
 
 
-          {/* Mobile has no room for the column beside the scanner, so the same
-              list is one tap away instead of missing. */}
+
           <button
             type="button"
             onClick={() => setHistoryOpen(true)}
@@ -224,9 +215,7 @@ export default function ScanPrescriptionPage({
           </button>
         </div>
 
-        {/* ── History, as a column ────────────────────────────────────────
-            From `lg` there is width for it to sit beside the scanner; below
-            that the same list is what the slide-over shows. */}
+
         <aside className="hidden min-w-0 lg:block">
           <h2 className="mb-3 font-nohemi text-[19px] font-bold tracking-tight text-neutral-800 xl:text-[22px]">
             Riwayat Scan
@@ -350,12 +339,7 @@ function HistorySheet({
   );
 }
 
-/** Everything transient the page has to say, in one fixed corner.
- *
- *  Out of the document flow on purpose. These used to be inline banners above
- *  and below the scan panel, so every save pushed the layout down and pulled it
- *  back up — the resize that made the page feel unfinished. A toast can appear
- *  and leave without the page underneath moving a pixel. */
+
 function Toast({
   reduce,
   saving,
@@ -415,9 +399,7 @@ function Toast({
   );
 }
 
-/** Where the photo comes from. Two rows, because a caregiver standing at the
- *  pharmacy counter and one clearing out their camera roll are doing the same
- *  task from different places. */
+
 function SourcePicker({
   open,
   onClose,

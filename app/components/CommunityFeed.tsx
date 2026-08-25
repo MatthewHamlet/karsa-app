@@ -14,18 +14,14 @@ import { POSTS_PER_PAGE } from "../lib/community/constants";
 import type {
   CommunityData,
   CommunityGroup,
+  CommunityPerson,
   CommunityPost,
 } from "../lib/community/queries";
 import { loadMorePosts, toggleGroup, toggleVote } from "../lib/community/actions";
 
-/** The database keeps `art` and `tone` as free text so a value added later
- *  cannot fail a constraint on deploy day — which means the component has to be
- *  the one that copes with an unknown one. Both fall back rather than throwing;
- *  a card with the default drawing is a card, a crash is not. */
+
 export const ART: GroupArtKind[] = ["nutrition", "elderly", "mind", "recovery"];
-/** A stable tone per tag word. Hashed rather than random, so "lansia" is the
- *  same colour on every card and on every reload — a chip that changes colour
- *  between renders reads as a different chip. */
+
 const TAG_TONES: Tone[] = ["green", "lavender", "peach", "blue", "cream"];
 export function toneForTag(word: string): Tone {
   let hash = 0;
@@ -39,9 +35,7 @@ export const artOf = (value: string): GroupArtKind =>
 export const toneOf = (value: string): Tone =>
   value in TONES ? (value as Tone) : "green";
 
-/** What a post is searchable by. Built here rather than stored: the same words
- *  are already on the row, and a second denormalised copy is one more thing to
- *  keep in step. */
+
 const postText = (post: CommunityPost) => [
   post.title,
   post.snippet,
@@ -58,8 +52,7 @@ const groupTextOf = (group: CommunityGroup) => [
 
 const PLUM = "#6f5a7d";
 
-/** How many items a tab would show. Computed from the same predicate the feed
- *  uses, so a badge can never promise a row the feed doesn't render. */
+
 export function tabCounts(query: string, data: CommunityData): Record<FeedTab, number> {
   const posts = data.posts.filter((d) => matches(query, postText(d))).length;
   const groups = data.groups.filter((g) => matches(query, groupTextOf(g))).length;
@@ -68,22 +61,20 @@ export function tabCounts(query: string, data: CommunityData): Record<FeedTab, n
   return { semua: posts + groups, postingan: posts, grup: groups, grupku: mine };
 }
 
-/* ── Post ─────────────────────────────────────────────────────────────────── */
 
-/** A thread, full width. Header, question, then a footer that carries the tags
- *  on the left and the counts on the right — the sketch's layout, and the one
- *  that lets a caregiver scan either column on its own. */
+
+
 function PostCard({
   post,
   onOpen,
+  onOpenProfile,
 }: {
   post: CommunityPost;
   onOpen: (post: CommunityPost) => void;
+  onOpenProfile: (profileId: string) => void;
 }) {
   const author = post.author;
-  /* Optimistic, and local to the card. The write is a round trip and the arrow
-     has to answer the press immediately; the next server render is what
-     corrects it if the write lost. */
+
   const [voted, setVoted] = useState(post.voted);
   const [votes, setVotes] = useState(post.upvotes);
 
@@ -97,13 +88,20 @@ function PostCard({
 
   return (
     <article className="relative rounded-[20px] bg-white p-5 shadow-[0_1px_2px_rgba(24,32,24,0.03),0_14px_30px_-26px_rgba(24,32,24,0.28)] ring-1 ring-karsa-line transition-shadow duration-200 hover:shadow-[0_1px_2px_rgba(24,32,24,0.04),0_20px_36px_-24px_rgba(24,32,24,0.38)] xl:p-6">
-      <div className="flex items-center gap-2.5">
-        <Avatar person={author} />
-        <p className="min-w-0 truncate text-[13.5px] font-semibold text-neutral-700">
-          {author.name}
-        </p>
-        {/* The dot carries the separation so the timestamp needs no label —
-            "·" between a name and a time already reads as "posted". */}
+
+      <div className="relative z-10 flex items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => onOpenProfile(author.id)}
+          aria-label={`Lihat profil ${author.name}`}
+          className="group/author flex min-w-0 items-center gap-2.5 rounded-full text-left outline-none focus-visible:ring-2 focus-visible:ring-karsa/40"
+        >
+          <Avatar person={author} />
+          <span className="min-w-0 truncate text-[13.5px] font-semibold text-neutral-700 transition-colors duration-150 group-hover/author:text-karsa-dark">
+            {author.name}
+          </span>
+        </button>
+
         <span aria-hidden className="text-[13px] text-neutral-300">
           ·
         </span>
@@ -125,10 +123,7 @@ function PostCard({
       </p>
 
       {post.imageUrl && (
-        /* Fixed aspect box with `object-cover`: photos arrive at every ratio,
-            and letting each set its own height makes the feed jump as images
-            decode. `sizes` matters — without it Next serves the largest source
-            to a phone. */
+
         <div className="relative mt-4 aspect-[16/10] w-full overflow-hidden rounded-2xl bg-karsa-canvas ring-1 ring-karsa-line">
           <Image
             src={post.imageUrl}
@@ -142,9 +137,7 @@ function PostCard({
 
       <div className="relative z-10 mt-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5">
-          {/* The tone is derived from the word rather than stored beside it:
-              a colour is a fact about the design, and asking somebody writing
-              a post to pick one would be asking them to do art direction. */}
+
           {post.tags.map((tag) => (
             <Tag key={tag} label={tag} tone={toneForTag(tag)} />
           ))}
@@ -183,11 +176,9 @@ function PostCard({
   );
 }
 
-/* ── Group ────────────────────────────────────────────────────────────────── */
 
-/** A group recommendation, deliberately not shaped like a post: it sits on its
- *  own hue instead of white, carries artwork instead of an avatar, and ends in
- *  a full-width button. Nothing about it invites a read — it asks a yes/no. */
+
+
 function GroupCard({
   group,
   onOpenChat,
@@ -262,24 +253,17 @@ function GroupCard({
   );
 }
 
-/* ── Feed ─────────────────────────────────────────────────────────────────── */
+
 
 const SORTERS: Record<SortKey, ((a: CommunityPost, b: CommunityPost) => number) | null> = {
-  /* The query already returns newest-first, so "relevan" and "terbaru" are the
-     same order until there is a relevance score to sort by. Kept as two entries
-     rather than collapsed, because they will diverge the moment there is one. */
+
   relevan: null,
   terbaru: null,
   ramai: (a, b) => b.replies - a.replies,
   didukung: (a, b) => b.upvotes - a.upvotes,
 };
 
-/** How often a group card is dealt into the run of posts.
- *
- *  The feed used to be a hand-written running order — post, post, group,
- *  post, session — which cannot survive real data: there is no editor deciding
- *  what the fourth card is. Woven at a fixed interval instead, so the rhythm of
- *  the original stays without anybody having to maintain a list. */
+
 const GROUP_EVERY = 3;
 
 export default function CommunityFeed({
@@ -289,6 +273,8 @@ export default function CommunityFeed({
   data,
   onOpenGroup,
   onOpenPost,
+  onOpenProfile,
+  people,
   scrollRoot,
 }: {
   query: string;
@@ -297,6 +283,9 @@ export default function CommunityFeed({
   data: CommunityData;
   onOpenGroup: (group: CommunityGroup) => void;
   onOpenPost: (post: CommunityPost) => void;
+  onOpenProfile: (profileId: string) => void;
+
+  people: CommunityPerson[];
   scrollRoot?: React.RefObject<HTMLDivElement | null>;
 }) {
   const [extra, setExtra] = useState<CommunityPost[]>([]);
@@ -354,14 +343,24 @@ export default function CommunityFeed({
   const mine = data.myGroups.filter((g) => matches(query, groupTextOf(g)));
 
   const sorter = SORTERS[sort];
-  const sortedPosts = sorter ? [...posts].sort(sorter) : posts;
+  const ordered = sorter ? [...posts].sort(sorter) : posts;
+
+
+  const followed = new Set(data.followedIds);
+  const sortedPosts =
+    followed.size > 0 && !query.trim()
+      ? [
+          ...ordered.filter((p) => followed.has(p.author.id)),
+          ...ordered.filter((p) => !followed.has(p.author.id)),
+        ]
+      : ordered;
 
   const rendered: React.ReactNode[] = [];
 
   if (tab === "postingan") {
     rendered.push(
       ...sortedPosts.map((post) => (
-        <PostCard key={post.id} post={post} onOpen={onOpenPost} />
+        <PostCard key={post.id} post={post} onOpen={onOpenPost} onOpenProfile={onOpenProfile} />
       )),
     );
   } else if (tab === "grup") {
@@ -377,14 +376,11 @@ export default function CommunityFeed({
       )),
     );
   } else {
-    /* "Semua": posts carry the thread, with a group dealt in every few and the
-       session once near the top. Any groups left over are appended, so nothing
-       is silently unreachable just because there were too few posts to weave
-       them into. */
+
     let groupCursor = 0;
 
     sortedPosts.forEach((post, i) => {
-      rendered.push(<PostCard key={post.id} post={post} onOpen={onOpenPost} />);
+      rendered.push(<PostCard key={post.id} post={post} onOpen={onOpenPost} onOpenProfile={onOpenProfile} />);
 
       if ((i + 1) % GROUP_EVERY === 0 && groupCursor < groups.length) {
         const group = groups[groupCursor];
@@ -401,7 +397,44 @@ export default function CommunityFeed({
     }
   }
 
+
+  const peopleBlock =
+    people.length > 0 && tab !== "grup" && tab !== "grupku" ? (
+      <section
+        key="people"
+        className="rounded-[20px] bg-white p-4 ring-1 ring-karsa-line xl:p-5"
+      >
+        <p className="mb-2.5 text-[11px] font-semibold uppercase leading-4 tracking-[0.16em] text-neutral-400">
+          Orang
+        </p>
+        <ul className="space-y-1">
+          {people.map((person) => (
+            <li key={person.id}>
+              <button
+                type="button"
+                onClick={() => onOpenProfile(person.id)}
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left outline-none transition-colors duration-150 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40"
+              >
+                <Avatar person={person} size="md" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold text-neutral-800">
+                    {person.name}
+                  </span>
+                  <span className="block truncate text-[12.5px] text-neutral-500">
+                    {person.role}
+                  </span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : null;
+
   if (rendered.length === 0) {
+
+    if (peopleBlock) return <div className="space-y-4 xl:space-y-5">{peopleBlock}</div>;
+
     return (
       <p className="rounded-[20px] bg-white/60 px-5 py-10 text-center text-[14px] leading-6 text-neutral-500 ring-1 ring-karsa-line">
         {query.trim() ? (
@@ -418,6 +451,7 @@ export default function CommunityFeed({
 
   return (
     <div className="space-y-4 xl:space-y-5">
+      {peopleBlock}
       {rendered}
 
       {tab !== "grup" && tab !== "grupku" && !exhausted && (

@@ -24,10 +24,7 @@ import {
 import { MOOD_ENTRIES } from "../data/mood";
 import type { CareData } from "../lib/care/view";
 
-/** The card shell. The icon is the headline — big, bare, in the stat's own
- *  colour — and the content spans the full width underneath it, which is what
- *  keeps these from going hollow. No printed title: the icon is the label, and
- *  `aria-label` carries the name for anyone who can't see it. */
+
 function StatCard({
   tone,
   art,
@@ -41,23 +38,18 @@ function StatCard({
   tall = false,
 }: {
   tone: StatTone;
-  /** The card's illustration — upper-left, above the statistic. */
+
   art: ReactNode;
   label: string;
   children: ReactNode;
-  /** Painted behind the card's content, sized against the card itself. */
+
   backdrop?: ReactNode;
   onRemove?: () => void;
   removeLabel?: string;
   className?: string;
-  /** Changing this swaps the body: the old one leaves, the card resizes, the
-   *  new one arrives. The card itself never unmounts, so the illustration and
-   *  the colour stay put and only the statistic moves. */
+
   swapKey?: string;
-  /** One fixed height for every card in a period view. A chart, a donut and a
-   *  month of days all want different amounts of room, and letting each take
-   *  what it wants is what broke the grid's rows — so they all get the same
-   *  and distribute inside it. A day's cards stay compact. */
+
   tall?: boolean;
 }) {
   const reduce = useReducedMotion();
@@ -77,13 +69,7 @@ function StatCard({
       <div className="relative z-10 shrink-0">{art}</div>
 
       <div className="relative z-10 mt-4 flex min-h-0 flex-1 flex-col">
-        {/* `popLayout`, deliberately not `wait`. Under `wait` the incoming body
-            is held back until the outgoing one finishes animating away — which
-            makes what the card *says* depend on an animation completing. Switch
-            period and background the tab and rAF stops: the old statistic stays
-            on screen under the new card's label, with no error anywhere. Here
-            the new body mounts at once and the old one is pulled out of layout
-            while it leaves, so the card resizes cleanly and never lies. */}
+
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.div
             key={swapKey ?? "static"}
@@ -92,9 +78,7 @@ function StatCard({
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8 }}
             transition={reduce ? { duration: 0 } : { duration: 0.16, ease: EASE }}
-            /* Fills the card so a body can distribute itself top-to-bottom;
-               `justify-end` keeps a day's short body sitting on the floor of
-               the card the way it always has. */
+
             className="flex min-h-0 flex-1 flex-col justify-end"
           >
             {children}
@@ -117,7 +101,7 @@ function StatCard({
   );
 }
 
-/** Headline figure, its caption, and a fill bar when there's a target. */
+
 function StatFigure({ data, tone }: { data: StatValue; tone: StatTone }) {
   return (
     <>
@@ -153,11 +137,7 @@ export default function CareStats({ data }: { data?: CareData }) {
   const available = MONITOR_STATS.filter((stat) => !added.includes(stat.key));
   const fade = reduce ? { duration: 0 } : { duration: 0.22, ease: EASE };
 
-  /* The figures come from the database; the titles, colours and descriptions
-     stay where they are. That split is deliberate — "Tekanan darah" and its
-     pink are facts about the design, not about the patient, and putting them in
-     a table would mean a migration to change a shade. Only the numbers, which
-     *are* facts about the patient, are read from it. */
+
   const fixed = (key: keyof typeof FIXED_STATS): StatValue =>
     data ? data.stats[period].fixed[key] : FIXED_STATS[key].byPeriod[period];
 
@@ -167,19 +147,8 @@ export default function CareStats({ data }: { data?: CareData }) {
   const fluid = fixed("fluid");
   const meals = fixed("meals");
 
-  /** Null on a day, and the whole period's detail otherwise. Narrowed once
-   *  here so every card below can just ask whether there is a trend to draw.
-   *
-   *  Real figures now come with real charts: `getTrendDetail` rolls the logs up
-   *  per day, so a signed-in caregiver gets both halves of the card from the
-   *  same source. `TRENDS` stays behind the design-mode path only.
-   *
-   *  A metric with nothing recorded is simply absent from the record, so every
-   *  card below asks for its own key rather than trusting this to be complete
-   *  — the headline figure is still shown, without a chart under it. */
-  /* The server sends every series without its formatter — a function cannot be
-     serialised across the boundary — so the lookup happens here and the cards
-     below receive exactly the shape they were designed against. */
+
+
   const trend = useMemo<Record<string, PeriodDetail> | null>(() => {
     if (period === "daily") return null;
     if (!data) return TRENDS[period];
@@ -209,7 +178,7 @@ export default function CareStats({ data }: { data?: CareData }) {
           </h2>
         </div>
 
-        {/* Period switch — the "Daily ∨" control from the sketch. */}
+
         <div className="relative">
           <button
             type="button"
@@ -274,12 +243,9 @@ export default function CareStats({ data }: { data?: CareData }) {
         </div>
       </header>
 
-      {/* The grid itself never re-keys. Switching period used to remount the
-          whole thing, which read as the page blinking; now each card keeps its
-          colour and its illustration and swaps only the statistic inside. */}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 xl:gap-5">
-        {/* Water keeps its liquid: the card is the glass, filled to the level
-            the figure states. No bar underneath — the fill is the bar. */}
+
         <StatCard
           swapKey={period}
           tall={Boolean(trend)}
@@ -287,17 +253,14 @@ export default function CareStats({ data }: { data?: CareData }) {
           art={<StatArt kind="fluid" tone={FIXED_TONES.fluid} />}
           label={`${FIXED_STATS.fluid.title}: ${fluid.value} ${fluid.caption}`}
           backdrop={
-            /* The glass fills only on a day. A week is seven glasses, and a
-               single level behind a chart of them would be a second, quieter
-               claim about the same numbers. */
+
             trend ? undefined : (
             <div
               aria-hidden
               className="pointer-events-none absolute inset-x-0 bottom-0 z-0 opacity-40"
               style={{ height: `${fluid.progress ?? 0}%` }}
             >
-              {/* One opacity on the wrapper: fading the crest and the body
-                  separately drew a line where the two layers met. */}
+
               <svg
                 viewBox="0 0 400 20"
                 preserveAspectRatio="none"
@@ -328,7 +291,7 @@ export default function CareStats({ data }: { data?: CareData }) {
           )}
         </StatCard>
 
-        {/* Meals are the patient's own record — shown, never edited here. */}
+
         <StatCard
           swapKey={period}
           tall={Boolean(trend)}
@@ -400,18 +363,14 @@ export default function CareStats({ data }: { data?: CareData }) {
           )}
         </StatCard>
 
-        {/* The face is this card's icon, so it stands in for the glyph — which
-            is the only reason this one used to be a hand-built article. It is a
-            StatCard like the rest now, so it swaps its body the same way. */}
+
         <StatCard
           swapKey={period}
           tall={Boolean(trend)}
           tone={FIXED_TONES.mood}
           art={
             <MoodFace
-              /* `okay` is the neutral face, and it is only ever reached when
-                 there is nothing logged at all — the card beside it says so in
-                 words, so the face is a placeholder rather than a claim. */
+
               mood={trend?.mood?.mood ? trend.mood.mood.dominant : (todayMood?.mood ?? "okay")}
               className="h-11 w-11 shrink-0 xl:h-12 xl:w-12"
             />
@@ -449,7 +408,7 @@ export default function CareStats({ data }: { data?: CareData }) {
           )}
         </StatCard>
 
-        {/* Added monitoring stats sit in the same grid as the fixed ones. */}
+
         <AnimatePresence initial={false}>
           {added.map((key) => {
             const stat = MONITOR_STATS.find((s) => s.key === key)!;
@@ -488,12 +447,11 @@ export default function CareStats({ data }: { data?: CareData }) {
           })}
         </AnimatePresence>
 
-        {/* The "more" button from the sketch. */}
+
         <button
           type="button"
           onClick={() => setPickerOpen(true)}
-          /* Matches whatever the cards are doing, so it sits on the same
-             baseline instead of leaving a short tile at the end of the row. */
+
           className={`group/add flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed border-karsa-line bg-white/40 p-5 text-center outline-none transition-colors duration-200 hover:border-karsa/40 hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
             trend ? "h-[292px] xl:h-[304px]" : "min-h-[176px]"
           }`}

@@ -5,24 +5,14 @@ import { MOOD_BY_KEY, type MoodKey } from "../data/mood";
 
 const PREVIEW = 62;
 
-/** One entry, already formatted. Deliberately not the query's row type: this
- *  card is rendered from real data on Home and from the placeholder list on the
- *  signed-out design pages, and both have to satisfy the same shape. */
+
 export type MoodGlance = {
   mood: MoodKey;
   when: string;
   note?: string | null;
 };
 
-/** The caregiver's glance at how the patient says they are today.
- *
- *  The face is the point, so it gets the middle and the room the button used to
- *  take; the way through to the rest is an arrow in the corner.
- *
- *  With nothing logged it says so and offers the way to fix that, rather than
- *  falling back to a neutral face — a card that draws "biasa saja" for somebody
- *  who has not said anything is inventing the one thing on this page nobody
- *  else can know. */
+
 export default function TodayMood({ entry }: { entry?: MoodGlance | null }) {
   if (!entry) {
     return (
@@ -31,6 +21,7 @@ export default function TodayMood({ entry }: { entry?: MoodGlance | null }) {
           Perasaan hari ini
         </p>
 
+
         <div className="flex flex-1 flex-col items-center justify-center py-4 text-center">
           <span
             aria-hidden
@@ -38,16 +29,12 @@ export default function TodayMood({ entry }: { entry?: MoodGlance | null }) {
           >
             <SmilePlus size={28} strokeWidth={2.1} />
           </span>
-          <p className="mt-3 max-w-[22ch] text-[14px] leading-5 text-neutral-500">
+          <p className="mt-3 max-w-[24ch] text-[14px] leading-5 text-neutral-500">
             Belum ada catatan perasaan hari ini.
           </p>
-          <Link
-            href="/care"
-            className="mt-4 inline-flex h-10 items-center gap-1.5 rounded-xl bg-white px-4 text-[13.5px] font-bold text-karsa-dark ring-1 ring-karsa-line outline-none transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
-          >
-            Catat perasaan
-            <ArrowRight size={14} strokeWidth={2.6} aria-hidden />
-          </Link>
+          <p className="mt-1 max-w-[26ch] text-[12.5px] leading-4 text-neutral-400">
+            Akan muncul di sini setelah dia mencatatnya sendiri.
+          </p>
         </div>
       </section>
     );

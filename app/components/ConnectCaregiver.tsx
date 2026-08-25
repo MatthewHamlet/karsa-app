@@ -4,21 +4,6 @@ import { useActionState, useEffect, useId, useRef, useState } from "react";
 import { Camera, Check, KeyRound, X } from "lucide-react";
 import { redeemPairingCode, type RedeemState } from "../lib/care/pairing";
 
-/** The patient's half of pairing: type the six characters, or point the camera
- *  at the caregiver's QR.
- *
- *  ── About the scanner ─────────────────────────────────────────────────────
- *  It uses `BarcodeDetector`, which is built into Chrome and Android's WebView
- *  and absent from Safari and Firefox. That is a deliberate choice over
- *  shipping a decoder: the JavaScript ones are a few hundred kilobytes of WASM
- *  to save six characters of typing, on a screen whose whole point is being
- *  usable by somebody who is not comfortable with phones.
- *
- *  So the camera button only appears where it will actually work, and the field
- *  beside it is the path that always works. A scanner that is offered and then
- *  fails is worse than one that was never offered. */
-
-/** Narrow shape for the API, which TypeScript's DOM library does not ship. */
 type Detector = {
   detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]>;
 };
@@ -29,8 +14,6 @@ function detectorCtor(): DetectorCtor | null {
   return (window as unknown as { BarcodeDetector?: DetectorCtor }).BarcodeDetector ?? null;
 }
 
-/** Pulls the code out of whatever the QR carried — the pair URL, or a bare
- *  code if somebody generated their own. */
 function codeFrom(raw: string): string | null {
   const direct = raw.trim().toUpperCase();
   if (/^KRS-[A-Z0-9]{6}$/.test(direct)) return direct;
@@ -40,15 +23,11 @@ function codeFrom(raw: string): string | null {
     const param = url.searchParams.get("code");
     if (param) return param.trim().toUpperCase();
   } catch {
-    /* Not a URL. Fall through — the field will reject it and say so. */
   }
   return null;
 }
 
 export default function ConnectCaregiver({
-  /** Prefilled when the patient arrived by scanning the QR, which carries the
-   *  code in the link — so the common path is "press Hubungkan", not "retype
-   *  what you just scanned". */
   initialCode = "",
   autoFocus = false,
 }: {
@@ -68,13 +47,8 @@ export default function ConnectCaregiver({
     error: null,
   });
 
-  /* Checked after mount, never during render: the API's presence is a fact
-     about the browser, and reading it while the server is producing HTML would
-     make the two renders disagree. */
   useEffect(() => setCanScan(Boolean(detectorCtor())), []);
 
-  /** Everything the camera holds, released. Called on stop, on success, and on
-   *  unmount — a camera left running is a light left on on somebody's phone. */
   const stopCamera = () => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -94,8 +68,6 @@ export default function ConnectCaregiver({
     setScanning(true);
 
     try {
-      /* `environment` is the rear camera. Without it a phone opens the selfie
-         camera and the person ends up filming themselves. */
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "environment" },
       });
@@ -108,9 +80,6 @@ export default function ConnectCaregiver({
 
       const detector = new Ctor({ formats: ["qr_code"] });
 
-      /* Polled rather than run every animation frame: a QR does not move, four
-         reads a second finds it just as fast, and it leaves the phone's battery
-         and the rest of the page alone. */
       const tick = window.setInterval(async () => {
         if (!streamRef.current || !videoRef.current) {
           window.clearInterval(tick);
@@ -125,7 +94,6 @@ export default function ConnectCaregiver({
             stopCamera();
           }
         } catch {
-          /* A frame that cannot be decoded is the normal case, not an error. */
         }
       }, 250);
     } catch {
@@ -172,8 +140,6 @@ export default function ConnectCaregiver({
 
       {scanning && (
         <div className="relative mt-5 overflow-hidden rounded-2xl bg-neutral-900">
-          {/* `playsInline` is what stops iOS taking the video full screen the
-              moment it plays, which would hide the whole form behind it. */}
           <video
             ref={videoRef}
             muted

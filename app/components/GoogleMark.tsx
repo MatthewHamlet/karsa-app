@@ -1,8 +1,3 @@
-/** Google's four-colour G.
- *
- *  Lucide has no Google mark — `Chrome` is a different product's logo and would
- *  be wrong on a "continue with Google" button. This is the official wordless
- *  mark, which Google's own branding guidance expects on a sign-in button. */
 export default function GoogleMark({ className = "" }: { className?: string }) {
   return (
     <svg viewBox="0 0 48 48" aria-hidden className={className}>

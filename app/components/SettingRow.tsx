@@ -3,11 +3,6 @@
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 
-/** One line in a settings list.
- *
- *  Renders as a button when the row itself is the target, and as a plain div
- *  when the control at the end owns the interaction — wrapping a toggle in a
- *  button would nest one interactive element inside another. */
 export default function SettingRow({
   icon,
   title,
@@ -21,7 +16,6 @@ export default function SettingRow({
   title: string;
   description?: string;
   value?: string;
-  /** Replaces the chevron — a toggle, usually. */
   trailing?: ReactNode;
   interactive?: boolean;
   onClick?: () => void;

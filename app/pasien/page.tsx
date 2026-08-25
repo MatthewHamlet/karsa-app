@@ -11,24 +11,15 @@ export const metadata: Metadata = {
     "Ruang Karsa untuk pasien: tugas harian, energi sehat, dan pesan dari pendamping.",
 };
 
-/** Reads the session, so it cannot be cached across visitors. */
 export const dynamic = "force-dynamic";
 
-/** The patient app, kept on its own path. Everything under `/pasien` opts out
- *  of the caregiver rail and bottom bar — see the guard in `Sidebar`. */
 export default async function PatientHome() {
-  /* No keys, or signed out: the placeholder screen, so the design is still
-     workable without an account. */
   if (!isSupabaseConfigured() || !(await getSessionProfile())) {
     return <PatientDesktopDashboard />;
   }
 
   const home = await getPatientHome();
 
-  /* Signed in, but no patient record attached to this account. Almost always a
-     caregiver who typed the URL, occasionally somebody who signed up as a
-     patient before anyone invited them. Either way the room would be empty and
-     every tap would write nowhere, so it says which it is instead. */
   if (!home) return <NoRecord />;
 
   return <PatientDesktopDashboard home={home} />;

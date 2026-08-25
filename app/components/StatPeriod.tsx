@@ -11,35 +11,24 @@ import { MONTH } from "../data/careTrends";
 import type { ComplianceDay, Comparison, DayStatus, PeriodDetail } from "../data/careTrends";
 import type { StatTone } from "../data/careStats";
 
-/** Warm terracotta for a missed day. Deliberately not the rose the app keeps
- *  for leaving and deleting — a skipped dose is worth noticing, not alarming
- *  about, and a caregiver reading this has usually had a reason. */
-const MISSED = "#c9714f";
-/** The day that got some of it done. It needs its own colour: folded into
- *  either neighbour, a caregiver who managed two doses of three reads the grid
- *  as a day they failed, or a day they didn't. */
-const PARTIAL = "#d9a441";
 
-/* ── Monthly day strip ────────────────────────────────────────────────────── */
+function fillOf(status: DayStatus, tone: StatTone): string {
+  if (status === "done") return tone.ink;
+
+  if (status === "partial") return `${tone.ink}8c`;
+
+  return tone.tile;
+}
+
+
 
 type Cell = { key: string; color: string; tip: ReactNode; sr: string };
 
-/** One size for every month grid in the dashboard, whatever sits above it.
- *  Three rows of 29px is what the compliance cards had room for; the mood card
- *  now matches them rather than filling its own leftovers. */
+
 const ROWS = 3;
 const ROW_PX = 29;
 
-/** A month of days as a block of colour that fills whatever room is left.
- *
- *  Three rows of ten, and both dimensions stretch: the card's height is fixed
- *  now, so the grid can take the space instead of guarding against it. Fixed
- *  14px tiles left a 34px ribbon adrift in a 120px hole — the same emptiness
- *  the bar charts next door don't have, which is the whole comparison.
- *
- *  Ten columns is also what removes the sideways scroll: thirty days fit, so
- *  there is nothing left to scroll to. And no weekday headers — a column here
- *  is not a weekday, and labelling it as one would be the grid lying. */
+
 function DayStrip({ cells, label }: { cells: Cell[]; label: string }) {
   const [hover, setHover] = useState<number | null>(null);
   const columns = Math.ceil(cells.length / ROWS);
@@ -47,12 +36,7 @@ function DayStrip({ cells, label }: { cells: Cell[]; label: string }) {
   return (
     <ul
       aria-label={label}
-      /* `mt-auto`, not `flex-1`: the grid sits on the floor of the card at a
-         size it does not negotiate. Left to stretch, it took whatever the text
-         above it didn't want — so the mood card, which says less, grew tiles a
-         third taller than the two beside it. The slack goes above the grid
-         instead, where it reads as breathing room rather than as three cards
-         disagreeing about how big a day is. */
+
       className="mt-auto grid shrink-0 gap-1.5 pt-3"
       style={{
         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
@@ -60,9 +44,7 @@ function DayStrip({ cells, label }: { cells: Cell[]; label: string }) {
       }}
     >
       {cells.map((cell, i) => {
-        /* The ends of a row push their label inward: the card clips its own
-           overflow, so a centred tooltip on the first tile is the one that
-           disappears. */
+
         const column = i % columns;
         const align = column < 2 ? "start" : column > columns - 3 ? "end" : "center";
 
@@ -87,7 +69,7 @@ function DayStrip({ cells, label }: { cells: Cell[]; label: string }) {
   );
 }
 
-/* ── Small parts ──────────────────────────────────────────────────────────── */
+
 
 function AverageBadge({ label, tone }: { label: string; tone: StatTone }) {
   return (
@@ -101,10 +83,7 @@ function AverageBadge({ label, tone }: { label: string; tone: StatTone }) {
   );
 }
 
-/** The arrow only says which way the number moved. Whether that is good news
- *  depends on the metric — a kilo gained and a point of blood pressure gained
- *  are not the same news — and this card has no business deciding that, so it
- *  stays neutral in colour and lets the caregiver read it. */
+
 function ComparisonBadge({ comparison }: { comparison: Comparison }) {
   const Icon =
     comparison.direction === "up"
@@ -127,8 +106,7 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   missed: "terlewat",
 };
 
-/** A day per dot. Seven get their initials underneath; thirty do not — at that
- *  count the labels turn into a wall and the shape is the whole point. */
+
 function StatusDots({
   days,
   tone,
@@ -137,21 +115,19 @@ function StatusDots({
 }: {
   days: ComplianceDay[];
   tone: StatTone;
-  /** "dosis", "porsi makan" — what the two numbers in the tooltip count. */
+
   unit: string;
-  /** The month the day numbers belong to. Real data knows its own month; the
-   *  mock does not, so it keeps the constant. */
+
   monthShort?: string;
 }) {
   const [hover, setHover] = useState<number | null>(null);
 
-  const fill = (status: DayStatus) =>
-    status === "done" ? tone.ink : status === "missed" ? MISSED : PARTIAL;
+  const fill = (status: DayStatus) => fillOf(status, tone);
 
   const detail = (day: ComplianceDay) =>
     `${day.done}/${day.target} ${unit} · ${STATUS_LABEL[day.status]}`;
 
-  /* A month is a calendar; a week is already one row and reads fine as one. */
+
   if (days.length > 7) {
     return (
       <DayStrip
@@ -189,7 +165,7 @@ function StatusDots({
             </Tip>
           )}
 
-          {/* The reading in words, for anyone not reading the colour. */}
+
           <span className="sr-only">
             {day.label}: {detail(day)}
           </span>
@@ -211,7 +187,7 @@ function StatusDots({
   );
 }
 
-/* ── Bodies ───────────────────────────────────────────────────────────────── */
+
 
 function ChartBody({
   detail,
@@ -225,8 +201,7 @@ function ChartBody({
   const series = detail.series!;
   const { points } = series;
 
-  /* Seven labels fit under the chart; thirty do not, so a month shows only the
-     ends and the middle — enough to place a reading in time. */
+
   const ticks =
     points.length <= 7
       ? points.map((p) => p.label)
@@ -283,15 +258,14 @@ function ComplianceBody({
 }: {
   detail: PeriodDetail;
   tone: StatTone;
-  /** "dosis", "porsi" — what is being counted. */
+
   unit: string;
   monthShort?: string;
 }) {
   const { done, target, days } = detail.compliance!;
   const pct = Math.round((done / target) * 100);
 
-  /* Stats keep their natural height and the grid takes everything left over,
-     so the slack ends up inside the drawing rather than as a hole above it. */
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-4">
@@ -341,10 +315,7 @@ function MoodBody({ detail, monthShort = MONTH.short }: { detail: PeriodDetail; 
       </div>
 
       {dense ? (
-        /* A month of faces is unreadable at this size, so the month becomes a
-           calendar of colour — the same information, read as a shape. On this
-           card the grid is the point rather than a footnote: it is the only
-           place a caregiver can see a bad week sitting next to a good one. */
+
         <DayStrip
           label={`Suasana hati harian bulan ${monthShort}`}
           cells={days.map((day) => ({
@@ -396,9 +367,7 @@ function MoodBody({ detail, monthShort = MONTH.short }: { detail: PeriodDetail; 
   );
 }
 
-/** One card's body for a week or a month. Which shape it takes is the metric's
- *  own business — a temperature wants a curve, a dose wants a tally, and a
- *  feeling wants neither. */
+
 export default function StatPeriodBody({
   detail,
   tone,

@@ -4,23 +4,7 @@ import { useId, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { OTP_LENGTH } from "../lib/otp";
 
-/** The one-time code entry, shared by the signup confirmation and the password
- *  reset.
- *
- *  One input, not a row of single-digit boxes. The boxes look slicker and are
- *  worse at everything that matters: pasting a code from a mail app fills only
- *  the first box in most browsers, screen readers announce a row of unlabelled
- *  fields, and backspacing across them is its own small maze. One field with
- *  wide tracking reads the same and behaves properly.
- *
- *  `inputMode="numeric"` brings up the number pad on a phone, and
- *  `autoComplete="one-time-code"` lets iOS and Android offer the code straight
- *  from the SMS/email notification.
- *
- *  `length` is a prop because Supabase's code length is a project setting
- *  (Authentication → Providers → Email → Email OTP Length), adjustable from 6
- *  to 10. This was hardcoded to 6 and the project sends 8, so the field
- *  silently truncated the last two digits and every code came back "salah". */
+
 export default function CodeForm({
   email,
   action,
@@ -57,8 +41,7 @@ export default function CodeForm({
         required
         disabled={pending}
         maxLength={length}
-        /* Digits only, and stripped as they are typed rather than rejected on
-           submit — a code copied from an email often arrives with a stray space. */
+
         value={code}
         onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, length))}
         placeholder={"0".repeat(length)}

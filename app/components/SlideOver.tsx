@@ -5,14 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { X } from "lucide-react";
 import { lockScroll } from "../lib/scrollLock";
 
-/** A panel that comes in from the right edge.
- *
- *  Used where a desktop side column has nowhere to go on a phone. Stacking it
- *  under the page works but buries a month grid under three screens of feed —
- *  a caregiver checking Thursday shouldn't have to scroll past today to do it.
- *
- *  Not `Modal`: that one is a centred dialog, and this has to keep the full
- *  height a calendar needs. */
+
 export default function SlideOver({
   open,
   onClose,
@@ -39,8 +32,7 @@ export default function SlideOver({
     };
     document.addEventListener("keydown", onKey);
 
-    /* The page behind must not scroll while a full-height sheet is over it —
-       otherwise flicking the sheet's edge scrolls the feed underneath. */
+
     const unlock = lockScroll();
 
     return () => {

@@ -1,16 +1,8 @@
-/** Mock data for the home dashboard.
- *
- *  Timestamps are stored as plain field objects rather than `Date`s on purpose:
- *  a real `Date` would be formatted in the server's timezone during SSR and in
- *  the browser's on hydration, which mismatches. Everything here is pure
- *  arithmetic on the fields, so both renders agree.
- *
- *  `TODAY` stands in for "now" until real data is wired up — swap it for the
- *  live clock and the labels below follow automatically. */
+
 
 export type Stamp = { y: number; m: number; d: number; hh: number; mm: number };
 
-export const TODAY = { y: 2024, m: 8, d: 3 } as const; // 3 September 2024
+export const TODAY = { y: 2024, m: 8, d: 3 } as const;
 export const NOW_TIME = "08:42";
 
 export const MONTHS = [
@@ -23,7 +15,7 @@ export const MONTHS_SHORT = [
   "Jul", "Agu", "Sep", "Okt", "Nov", "Des",
 ];
 
-/** Monday-first, matching the sketch. */
+
 export const WEEKDAYS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -33,17 +25,15 @@ export const timeOf = (s: Stamp) => `${pad(s.hh)}:${pad(s.mm)}`;
 export const isToday = (s: Stamp) =>
   s.y === TODAY.y && s.m === TODAY.m && s.d === TODAY.d;
 
-/** Activities only carry a clock. The date is added once a day has passed,
- *  so today's feed stays uncluttered. */
+
 export function whenOf(s: Stamp) {
   return isToday(s) ? timeOf(s) : `${s.d} ${MONTHS_SHORT[s.m]} · ${timeOf(s)}`;
 }
 
-/** Key used to look schedules up by calendar day. */
+
 export const dayKey = (y: number, m: number, d: number) => `${y}-${m}-${d}`;
 
-/* ── Tasks ──────────────────────────────────────────────────────────────────
-   Recurring, every-day things: meals, walks, medication, self check-ups. */
+
 
 export type Task = {
   id: string;
@@ -60,9 +50,7 @@ export const TASKS: Task[] = [
   { id: "night-med", label: "Obat malam", hint: "20:00", done: false },
 ];
 
-/* ── Activity ───────────────────────────────────────────────────────────────
-   Things that already happened — a completed task, or something logged in
-   the app. Newest first. */
+
 
 export type Activity = {
   id: string;
@@ -110,8 +98,7 @@ export const ACTIVITIES: Activity[] = [
   },
 ];
 
-/* ── Summary ────────────────────────────────────────────────────────────────
-   AI recap of yesterday's activity. */
+
 
 export const SUMMARY = {
   label: "Kemarin",
@@ -123,7 +110,7 @@ export const SUMMARY = {
   ],
 };
 
-/* ── Schedule ───────────────────────────────────────────────────────────── */
+
 
 export type ScheduleKind = "appointment" | "meds" | "therapy" | "checkup";
 
@@ -151,22 +138,16 @@ export const SCHEDULE: Record<string, ScheduleEvent[]> = {
   ],
 };
 
-/* ── Care recipients ──────────────────────────────────────────────────────── */
 
-/** Who the dashboard is about. A caregiver often looks after more than one
- *  person, and every figure on this page belongs to exactly one of them — so
- *  the switcher sits at the top of the column the figures are in, not buried
- *  in settings.
- *
- *  `relation` is how the caregiver refers to them, not a clinical role: the
- *  word that tells them at a glance whose day they are reading. */
+
+
 export type Patient = {
   id: string;
   name: string;
   relation: string;
   initial: string;
   color: string;
-  /** The short line under the name in the open list. */
+
   note: string;
 };
 

@@ -10,12 +10,8 @@ export default function CarePage({
   data,
 }: {
   params: Record<string, string | string[] | undefined>;
-  /** Absent when nobody is signed in — the shell then renders from the
-   *  placeholder data so the design pages still work. */
   data?: CareData;
 }) {
-  /* A "Diskusikan" link lands here: it opens the chat tab with the care item
-     already attached to the composer. */
   const ref = first(params.ref);
   const label = first(params.label);
   const detail = first(params.detail);
@@ -27,11 +23,7 @@ export default function CarePage({
   const tab: CareTab = context || first(params.tab) === "obrolan" ? "chat" : "stats";
 
   return (
-    /* The bottom rest matches the top's, so a page ends on the same breath it
-       opened with. Anything more reads as the page having run out rather than
-       finished. CareShell's chat tab cancels this same pair. */
     <div className="w-full px-4 pb-10 pt-6 sm:px-6 md:px-8 md:pt-10 xl:px-12 xl:pb-12 xl:pt-12">
-      {/* No separate colour band: the clay is the hub's own background. */}
       <CareShell initialTab={tab} context={context} data={data} />
     </div>
   );

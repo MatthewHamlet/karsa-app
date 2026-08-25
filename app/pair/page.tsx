@@ -13,16 +13,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-/** Where the QR lands.
- *
- *  Kept as its own route rather than a query on the care-team page, because it
- *  is opened by somebody who may never have used this app: they scanned a code
- *  their daughter showed them. So it is one screen with one field on it, and
- *  the code is already in the field.
- *
- *  Signed out, the login carries `next` all the way through — including the
- *  code — so scanning, signing in, and connecting is one unbroken path rather
- *  than "now find that code again". */
 export default async function Pair({ searchParams }: PageProps<"/pair">) {
   const raw = (await searchParams).code;
   const code = (Array.isArray(raw) ? raw[0] : raw) ?? "";

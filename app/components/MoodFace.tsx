@@ -1,10 +1,5 @@
 import { MOOD_BY_KEY, type MoodKey } from "../data/mood";
 
-/** The five faces, drawn rather than borrowed from an icon set — a line icon
- *  can't be cute, and these carry the whole feature's personality.
- *
- *  Each is the same 48×48 circle with the same eye positions, so they read as
- *  one family; only the eyes and mouth change. */
 export default function MoodFace({
   mood,
   size = 48,
@@ -26,13 +21,11 @@ export default function MoodFace({
       className={`shrink-0 ${className}`}
     >
       <circle cx="24" cy="24" r="24" fill={color} />
-      {/* A soft highlight so the face reads as a rounded object. */}
       <ellipse cx="24" cy="15" rx="20" ry="13" fill="#ffffff" opacity="0.16" />
 
       <g fill="none" stroke={ink} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
         {mood === "great" && (
           <>
-            {/* Happy closed eyes — the arcs curve up. */}
             <path d="M13.5 21.5q3.5-4 7 0" />
             <path d="M27.5 21.5q3.5-4 7 0" />
             <path d="M16 29q8 7 16 0" strokeWidth="2.8" />
@@ -65,7 +58,6 @@ export default function MoodFace({
 
         {mood === "verylow" && (
           <>
-            {/* Scrunched-shut eyes rather than crosses — sad, not comical. */}
             <path d="M13.5 22.5q3.5 4 7 0" />
             <path d="M27.5 22.5q3.5 4 7 0" />
             <path d="M18 32q6-5.5 12 0" />
@@ -73,7 +65,6 @@ export default function MoodFace({
         )}
       </g>
 
-      {/* Cheeks — the detail that makes them friendly. */}
       <ellipse cx="11.5" cy="27.5" rx="3.6" ry="2.4" fill={ink} opacity="0.16" />
       <ellipse cx="36.5" cy="27.5" rx="3.6" ry="2.4" fill={ink} opacity="0.16" />
     </svg>

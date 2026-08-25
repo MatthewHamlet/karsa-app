@@ -13,31 +13,20 @@ import {
   type SignUpState,
 } from "../login/actions";
 
-/** Making an account.
- *
- *  The role picker is here rather than buried in settings because it decides
- *  which of the two products someone lands in — a pendamping and a pasien see
- *  different apps — and asking afterwards means guessing wrong first.
- *
- *  The value goes up as user metadata and the `handle_new_user` trigger copies
- *  it into `public.profiles`. It is checked again in the action and a third time
- *  by a `check` constraint on the column, because this is a Server Action: the
- *  POST is reachable by anyone and the radio buttons prove nothing. */
+
 export default function RegisterPage() {
   const [visible, setVisible] = useState(false);
   const [signUpState, action, pending] = useActionState<SignUpState, FormData>(signUp, {
     error: null,
     check_email: false,
   });
-  /* Seeded from the signup result rather than kept in its own state: the resend
-     needs the address, and re-deriving it from a field the user has since left
-     would break the moment they navigated back. */
+
   const [resendState, resendAction, resending] = useActionState<SignUpState, FormData>(
     resendConfirmation,
     signUpState,
   );
 
-  /* Once a resend has been attempted its answer is the current one. */
+
   const state: SignUpState = resendState.resent || resendState.error ? resendState : signUpState;
 
   const [codeState, codeAction, verifying] = useActionState<OtpState, FormData>(verifySignupCode, {
@@ -53,8 +42,7 @@ export default function RegisterPage() {
   const field =
     "h-14 w-full rounded-2xl border-2 border-karsa-line bg-white text-[16px] text-neutral-900 outline-none transition-colors duration-200 placeholder:text-neutral-400 focus:border-karsa disabled:opacity-70";
 
-  /* The account exists but cannot be used yet. Showing the form again here would
-     invite a second signup that fails as "already registered". */
+
   if (state.check_email) {
     return (
       <AuthShell quiet>
@@ -107,10 +95,7 @@ export default function RegisterPage() {
             </p>
           )}
 
-          {/* The link is single-use and easily lost — a spam filter, or a mail
-              scanner that prefetched it and spent the token before anyone
-              clicked. Without this the only way forward was another account on
-              another address. */}
+
           {state.email && (
             <form action={resendAction}>
               <input type="hidden" name="email" value={state.email} />
@@ -222,8 +207,7 @@ export default function RegisterPage() {
               { value: "pendamping", label: "Pendamping", hint: "Merawat orang lain" },
               { value: "pasien", label: "Pasien", hint: "Merawat diri sendiri" },
             ].map((option, i) => (
-              /* The whole tile is the label, so the tap target is the card and
-                 not a 20px circle beside it. */
+
               <label
                 key={option.value}
                 className="cursor-pointer rounded-2xl border-2 border-karsa-line bg-white p-3 transition-colors duration-200 hover:border-karsa/40 has-[:checked]:border-karsa has-[:checked]:bg-karsa-soft"

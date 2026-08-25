@@ -15,16 +15,9 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-/** Phone navigation. A drawer costs a tap to open before it can be read; a bar
- *  keeps every destination one thumb-reach away and always visible, which is
- *  what a caregiver checking something between tasks actually needs.
- *
- *  The rail still owns the desktop — this replaces the hamburger, not the rail. */
 
-/* Four destinations plus "Lainnya" is what fits a 375px bar at a legible label
-   size. Komunitas moved behind "Lainnya" when Scan arrived: scanning a
-   prescription is something you do standing in a clinic with one hand, and
-   reading the forum is not. */
+
+
 const ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/", icon: Home, label: "Beranda" },
   { link: "/care", icon: HeartPulse, label: "Perawatan" },
@@ -32,10 +25,7 @@ const ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/mascot", icon: PawPrint, label: "Arsa" },
 ];
 
-/** The patient app's own bar. Five equal destinations, no raised disc and no
- *  "Lainnya": there is nothing here urgent enough to promote and little enough
- *  to hide. Kept in this file rather than a second component so both bars share
- *  one idea of what a tab looks like. */
+
 const PATIENT_ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/pasien", icon: Home, label: "Beranda" },
   { link: "/pasien/jurnal", icon: NotebookPen, label: "Jurnal" },
@@ -45,8 +35,7 @@ const PATIENT_ITEMS: { link: string; icon: LucideIcon; label: string }[] = [
   { link: "/pasien/profil", icon: UserRound, label: "Profil" },
 ];
 
-/** `/care` must not light up for `/careers`, and `/` must not light up for
- *  everything — so the root is matched exactly and the rest by segment. */
+
 const isActive = (pathname: string, link: string) =>
   link === "/" ? pathname === "/" : pathname === link || pathname.startsWith(`${link}/`);
 
@@ -61,9 +50,7 @@ export default function BottomNav({
 }) {
   const reduce = useReducedMotion();
 
-  /* The patient app is a different product on the same domain. It gets the same
-     tab language and its own destinations — and a floating bar, because it is
-     the only screen here a person sits in rather than passes through. */
+
   if (pathname.startsWith("/pasien")) {
     return (
       <nav
@@ -120,9 +107,7 @@ export default function BottomNav({
   return (
     <nav
       aria-label="Navigasi utama"
-      /* `pb-[env(safe-area-inset-bottom)]` keeps the labels off the home
-         indicator on a notched phone; the bar's own background runs under it
-         so there is no strip of page showing through. */
+
       className="fixed inset-x-0 bottom-0 z-40 border-t border-karsa-line bg-karsa-cream/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
     >
       <ul className="grid grid-cols-5">
@@ -131,12 +116,7 @@ export default function BottomNav({
           const active = isActive(pathname, item.link) && !moreOpen;
 
           return (
-            /* Scan is not a fifth equal destination. It is the one thing done
-               standing up, one-handed, in front of a pharmacist — so it leaves
-               the row, sits in a filled disc that rises above the bar, and is
-               the only coloured thing down here. The ring is the page's own
-               canvas, which is what makes the disc read as punched through the
-               bar rather than floating over it. */
+
             item.link === "/scan" ? (
               <li key={item.link} className="relative">
                 <Link
@@ -169,8 +149,7 @@ export default function BottomNav({
                 aria-current={active ? "page" : undefined}
                 className="group/tab relative flex h-[72px] flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
               >
-                {/* The pill sits behind the icon rather than under the label:
-                    a bar this short has no room for an underline that reads. */}
+
                 {active && (
                   <motion.span
                     layoutId="bottom-nav-pill"
@@ -202,8 +181,7 @@ export default function BottomNav({
           );
         })}
 
-        {/* Everything that isn't a destination — the profile and settings —
-            behind one tab, the way the reference does it. */}
+
         <li>
           <button
             type="button"

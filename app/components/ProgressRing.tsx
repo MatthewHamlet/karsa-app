@@ -1,5 +1,4 @@
-/** Circular progress, sized by its wrapper rather than a pixel prop, so it can
- *  be the card's main statistic on a wide screen and still fit a phone. */
+
 export default function ProgressRing({
   value,
   label,
@@ -8,14 +7,14 @@ export default function ProgressRing({
   track,
   caption,
 }: {
-  /** 0–100. */
+
   value: number;
   label?: string;
   className?: string;
-  /** Overrides the default karsa green — a stat card rings in its own hue. */
+
   color?: string;
   track?: string;
-  /** Replaces the percentage in the middle. */
+
   caption?: string;
 }) {
   const R = 44;

@@ -6,8 +6,6 @@ import { Eye, EyeOff, KeyRound } from "lucide-react";
 import AuthShell from "./AuthShell";
 import { updatePassword, type AuthState } from "../login/actions";
 
-/** Where the reset email lands, once the callback has turned its token into a
- *  session. `quiet`: nobody arriving here wants to be beamed at. */
 export default function NewPasswordPage() {
   const [visible, setVisible] = useState(false);
   const [state, action, pending] = useActionState<AuthState, FormData>(updatePassword, {

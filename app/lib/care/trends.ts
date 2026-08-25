@@ -8,8 +8,7 @@ import type { MoodKey } from "../../data/mood";
 
 export type TrendPeriod = "weekly" | "monthly";
 
-/** What actually crosses to the client: the series without its formatter, plus
- *  the key to look one up with. */
+
 export type SerialSeries = Omit<Series, "format"> & { formatKey: FormatKey };
 export type SerialDetail = Omit<PeriodDetail, "series"> & { series?: SerialSeries };
 
@@ -30,10 +29,7 @@ const asDuration = (minutes: number) => {
 
 type Day = { key: string; label: string; start: Date; end: Date };
 
-/** The period's days, oldest first, as Jakarta calendar days.
- *
- *  Labels differ by period for the same reason the mock's did: seven columns
- *  can carry weekday names, thirty can only carry dates. */
+
 function daysOf(period: TrendPeriod): Day[] {
   const today = jakartaToday();
   const count = DAYS[period];
@@ -119,9 +115,7 @@ function complianceFrom(days: Day[], doneByDay: Map<string, number>, perDay: num
   };
 }
 
-/** Half against half. The mock compared against the period before; a real
- *  window would need a second query for every metric, and the drift inside the
- *  window answers the same question — is this getting better or worse. */
+
 function compareHalves(
   days: Day[],
   valueByDay: Map<string, number>,
@@ -206,7 +200,7 @@ export const getTrendDetail = cache(
 
     const out: Record<string, SerialDetail> = {};
 
-    /* ── Cairan dan tidur: satu angka per hari, digambar sebagai batang ── */
+
     const rows = readings.data ?? [];
 
     const sumByDay = (kind: string) => {
@@ -244,7 +238,7 @@ export const getTrendDetail = cache(
       out.sleep = { chart: "bar", series: sleepSeries, comparison: compareHalves(days, sleep, "mnt tidur") };
     }
 
-    /* ── Makan dan obat: heatmap kepatuhan ── */
+
     const mealByDay = new Map<string, number>();
     for (const m of meals.data ?? []) {
       const k = String(m.done_on);
@@ -271,7 +265,7 @@ export const getTrendDetail = cache(
       comparison: compareHalves(days, medByDay, "dosis"),
     };
 
-    /* ── Perasaan: satu mood per hari, yang terakhir dicatat menang ── */
+
     const moodByDay = new Map<string, MoodKey>();
     for (const m of (moods.data ?? []).slice().sort((a, b) =>
       String(a.recorded_at).localeCompare(String(b.recorded_at)),
@@ -299,7 +293,7 @@ export const getTrendDetail = cache(
       };
     }
 
-    /* ── Pengukuran: garis, dan tekanan darah dua garis ── */
+
     for (const [key, meta] of Object.entries(READING_META)) {
       const primary = meanByDay(meta.kind);
       const secondary = meta.chart === "dualLine" ? meanByDay(meta.kind, true) : undefined;
@@ -316,7 +310,7 @@ export const getTrendDetail = cache(
   },
 );
 
-/** The month the grid labels belong to — real now, not the mock's "Sep". */
+
 export function monthShortOf(): string {
   return MONTHS_SHORT[jakartaToday().m];
 }

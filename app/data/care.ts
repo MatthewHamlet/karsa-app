@@ -1,15 +1,8 @@
-/** The patient's care profile: who Meimei is, how she should be cared for,
- *  and who is responsible for that care.
- *
- *  Deliberately separate from `dashboard.ts` — that file holds today's running
- *  state (tasks, activity, schedule), this one holds the standing plan. */
+
 
 import { NOW_TIME } from "./dashboard";
 
-/* ── Contextual chat ────────────────────────────────────────────────────────
-   Anything on this page can be carried into the caregivers' chat as an
-   attachment, so a conversation always starts from a specific piece of care
-   rather than a blank message box. */
+
 
 export type CareContextType =
   | "medication"
@@ -25,8 +18,7 @@ export type CareContext = {
   detail?: string;
 };
 
-/** Opens the care team's conversation with this item attached. The chat lives
- *  inside the Perawatan page now, so this is a tab there rather than a route. */
+
 export function chatHref(context: CareContext) {
   const params = new URLSearchParams({
     tab: "obrolan",
@@ -37,7 +29,7 @@ export function chatHref(context: CareContext) {
   return `/care?${params.toString()}`;
 }
 
-/** Opens the conversation with a caregiver, no care item attached. */
+
 export function caregiverChatHref(caregiver: { id: string; name: string }) {
   return `/care?tab=obrolan&to=${caregiver.id}&name=${encodeURIComponent(caregiver.name)}`;
 }
@@ -50,7 +42,7 @@ export const CONTEXT_LABEL: Record<CareContextType, string> = {
   record: "Rekam kesehatan",
 };
 
-/* ── Patient ───────────────────────────────────────────────────────────── */
+
 
 export const PATIENT = {
   name: "Meimei",
@@ -59,9 +51,7 @@ export const PATIENT = {
   updatedAt: `Terakhir diperbarui hari ini, ${NOW_TIME}`,
 };
 
-/* ── Care needs ────────────────────────────────────────────────────────────
-   The four standing areas of care. `highlight` is the one line worth seeing
-   without opening anything; `items` is the detail behind it. */
+
 
 export type CareArea = "medication" | "nutrition" | "activity" | "rest";
 
@@ -69,7 +59,7 @@ export type CareItem = {
   id: string;
   label: string;
   detail: string;
-  /** Present on things worth discussing on their own. */
+
   context?: CareContext;
 };
 
@@ -77,7 +67,7 @@ export type CareNeed = {
   id: CareArea;
   title: string;
   status: string;
-  /** The one fact worth reading without opening the card. */
+
   highlight: { primary: string; secondary: string };
   items: CareItem[];
   context: CareContext;
@@ -167,7 +157,7 @@ export const CARE_NEEDS: CareNeed[] = [
   },
 ];
 
-/* ── Important information ─────────────────────────────────────────────── */
+
 
 export type Instruction = { id: string; text: string };
 
@@ -177,7 +167,7 @@ export const INSTRUCTIONS: Instruction[] = [
   { id: "i3", text: "Hubungi tim perawatan bila ada kondisi tidak biasa." },
 ];
 
-/* ── Care team ─────────────────────────────────────────────────────────── */
+
 
 export type Caregiver = {
   id: string;
@@ -199,8 +189,7 @@ export const CARE_TEAM: Caregiver[] = [
   },
 ];
 
-/* ── Care plan history ─────────────────────────────────────────────────────
-   Changes to the standing plan only — not the day-to-day activity feed. */
+
 
 export type PlanChange = {
   id: string;
@@ -255,5 +244,5 @@ export const PLAN_HISTORY: PlanChange[] = [
   },
 ];
 
-/** How many plan changes to show before the reader asks for the rest. */
+
 export const PLAN_HISTORY_PREVIEW = 3;

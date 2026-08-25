@@ -21,24 +21,22 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import List, { EASE, RAIL_SPRING } from "../components/List";
 import BottomNav from "../components/BottomNav";
+import UserAvatar from "../components/UserAvatar";
 import { ACCOUNT } from "../data/settings";
 import { ROLE_LABEL, type SessionProfile } from "../lib/roles";
 import { signOut } from "../login/actions";
 import { PATIENT } from "../data/patient";
 
-/** Collapsed width is not arbitrary: rail padding (14) + item padding (14)
- *  + half the icon cell (14) = 42, so every icon centreline lands exactly on
- *  RAIL_CLOSED / 2 and nothing shifts sideways when the rail collapses. */
+
 const RAIL_OPEN = 288;
 const RAIL_CLOSED = 84;
 const DRAWER_WIDTH = 296;
 
-/** Logo is a wide lockup; collapsed we crop to just the mark. */
+
 const LOGO_OPEN = 84;
 const LOGO_CLOSED = 34;
 
-/** `badge` is optional — nothing carries one right now, but the rail still
- *  supports it. */
+
 type NavItem = { link: string; icon: LucideIcon; text: string; badge?: number };
 
 const NAV: NavItem[] = [
@@ -49,17 +47,7 @@ const NAV: NavItem[] = [
   { link: "/mascot", icon: PawPrint, text: "Arsa" },
 ];
 
-/** The same rail, pointed somewhere else.
- *
- *  `/pasien` is a different product for a different person, and most of the
- *  caregiver's destinations are meaningless there — a patient has no compliance
- *  page about themselves. What stays identical is the rail itself: the logo, the
- *  collapse handle, the pill, the row heights. Only the list of places changes,
- *  so someone who has seen one app can use the other.
- *
- *  Scan is on both lists. It is the one caregiver tool that reads the same from
- *  either side — the person holding the paper at the pharmacy counter is often
- *  the patient. */
+
 const PATIENT_NAV: NavItem[] = [
   { link: "/pasien", icon: Home, text: "Beranda" },
   { link: "/pasien/jurnal", icon: NotebookPen, text: "Jurnal" },
@@ -76,10 +64,9 @@ type RailProps = {
   onSelect: (link: string) => void;
   onToggle?: () => void;
   onClose?: () => void;
-  /** Whether we are inside the patient app. Swaps the destinations and whose
-   *  name is at the foot — not the rail's design. */
+
   patientApp?: boolean;
-  /** `null` when signed out, or when Supabase is not configured yet. */
+
   profile?: SessionProfile | null;
 };
 
@@ -87,9 +74,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
   const reduce = useReducedMotion();
   const items = patientApp ? PATIENT_NAV : NAV;
   const settingsLink = patientApp ? "/pasien/pengaturan" : "/settings";
-  /* The real account when there is one; the placeholder only survives as a
-     fallback so the design pages still render for someone working without
-     credentials. */
+
   const fallback = patientApp
     ? { name: PATIENT.greeting, role: "Pasien", initial: PATIENT.initial }
     : { name: ACCOUNT.name, role: ACCOUNT.role, initial: ACCOUNT.initial };
@@ -97,13 +82,15 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
     name: profile?.fullName ?? fallback.name,
     role: profile ? ROLE_LABEL[profile.role] : fallback.role,
     initial: profile?.initial ?? fallback.initial,
+
+    avatarUrl: profile?.avatarUrl ?? undefined,
   };
   const size = reduce ? { duration: 0 } : RAIL_SPRING;
   const fade = reduce ? { duration: 0 } : { duration: 0.2, ease: EASE };
 
   return (
     <div className="relative flex h-full flex-col bg-karsa-cream">
-      {/* Brand */}
+
       <div className="flex h-[72px] shrink-0 items-center pl-[25px] pr-3.5">
         <motion.div
           initial={{ width: isOpen ? LOGO_OPEN : LOGO_CLOSED }}
@@ -134,12 +121,9 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
 
       <div className="mx-3.5 h-px bg-karsa-line" />
 
-      {/* The profile used to sit here, under the logo. It is at the foot of
-          the rail now, directly above Pengaturan — see `RailProfile`. The top
-          is the logo and the collapse handle, nothing else. */}
 
-      {/* Section label — fades out when collapsed but keeps its slot,
-          so the nav below never jumps. */}
+
+
       <div className="px-7 pb-2.5 pt-6">
         <motion.p
           animate={{ opacity: isOpen ? 1 : 0 }}
@@ -172,10 +156,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
 
       <div className="mx-3.5 h-px bg-karsa-line" />
 
-      {/* The account, at the foot of the rail where an account belongs — and
-          directly above Pengaturan, because "who am I" and "change how this
-          works for me" are the same errand. It used to sit in the top-right of
-          the dashboard, over a column of somebody else's numbers. */}
+
       <div className="px-3.5 pb-1 pt-3.5">
         <RailProfile isOpen={isOpen} {...me} />
       </div>
@@ -192,12 +173,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
         />
       </ul>
 
-      {/* Only when there is a session to end. A "Keluar" row shown to somebody
-          who was never signed in is a button that does nothing.
 
-          A form posting to a Server Action, not an onClick: signing out is a
-          mutation, the cookies are `httpOnly` and can only be cleared server
-          side, and this keeps working with JavaScript disabled. */}
       {profile && (
         <form action={signOut} className="px-3.5 pb-3.5 pt-1.5">
           <button
@@ -221,7 +197,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
         </form>
       )}
 
-      {/* Collapse handle, straddling the rail's edge. */}
+
       {onToggle && (
         <motion.button
           onClick={onToggle}
@@ -232,7 +208,7 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
           transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 600, damping: 22 }}
           className="group/toggle absolute -right-4 top-[20px] z-50 hidden h-8 w-8 place-items-center rounded-full bg-white text-neutral-400 shadow-[0_2px_10px_-2px_rgba(24,32,24,0.22)] outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa hover:text-white hover:ring-karsa focus-visible:ring-2 focus-visible:ring-karsa md:grid"
         >
-          {/* Soft halo that blooms on hover. */}
+
           <span className="absolute inset-0 -z-10 scale-90 rounded-full bg-karsa/25 opacity-0 blur-[6px] transition-all duration-300 group-hover/toggle:scale-150 group-hover/toggle:opacity-100" />
 
           <motion.span
@@ -258,18 +234,19 @@ function Rail({ isOpen, railId, active, onSelect, onToggle, onClose, patientApp,
   );
 }
 
-/** Who is signed in. Decorative: it is a label, not a destination — the row
- *  under it is where account settings live. */
+
 function RailProfile({
   isOpen,
   name,
   role,
   initial,
+  avatarUrl,
 }: {
   isOpen: boolean;
   name: string;
   role: string;
   initial: string;
+  avatarUrl?: string;
 }) {
   const reduce = useReducedMotion();
 
@@ -285,9 +262,7 @@ function RailProfile({
     <div className="group/me relative flex h-12 items-center rounded-xl px-3.5">
       <span className="relative z-10 grid w-7 shrink-0 place-items-center">
         <span className="relative">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-karsa text-[13px] font-bold text-white">
-            {initial}
-          </span>
+          <UserAvatar url={avatarUrl} initial={initial} className="h-8 w-8 text-[13px]" />
           <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 ring-2 ring-karsa-cream" />
         </span>
       </span>
@@ -333,43 +308,17 @@ export default function Sidebar({
   const [seenPath, setSeenPath] = useState(pathname);
   const reduce = useReducedMotion();
   const patientApp = pathname.startsWith("/pasien");
-  /** Only the patient's home is a fixed-height dashboard. Its inner sections do
-   *  their own scrolling, so `main` is pinned to the viewport there — but that
-   *  pinning cannot apply to the rest of the patient app: a flowing page inside
-   *  a height-capped `main` simply has its bottom cut off, with no scrollbar to
-   *  reach it. */
+
   const patientHome = pathname === "/pasien";
-  /** Routes that are outside the app rather than inside it — no rail, no bottom
-   *  bar, nothing to navigate to yet. The shell is mounted by the root layout,
-   *  so the only place to say so is here.
-   *
-   *  The whole `/login` subtree, not just `/login` itself. Matching only the
-   *  exact path meant `/login/daftar` rendered inside the caregiver navigation:
-   *  a signed-out visitor who pressed "Daftar sekarang" landed on a 404 wearing
-   *  the app's sidebar and bottom bar. */
-  /*  `/mulai` and `/pair` join it for the opposite reason. Those two are
-   *  full-screen by design — the onboarding screen is the only page a caregiver
-   *  with nobody to care for may open, and a rail full of links that all bounce
-   *  straight back to it is a navigation that lies. `/pair` is opened by
-   *  somebody who scanned a QR and may have no idea what this app is; one
-   *  screen with one field is the whole point of it. */
+
+
   const bareShell =
     pathname === "/login" ||
     pathname.startsWith("/login/") ||
     pathname === "/mulai" ||
     pathname === "/pair";
 
-  /* The rail lives in the layout and survives navigation, so the highlight has
-     to follow the route. Keyed on pathname only: in-page hash links leave it
-     alone, which lets the local click state stand.
 
-     Adjusted during render rather than in an effect. A click sets `active`
-     optimistically so the pill moves before the route does; the route then
-     confirms it. Doing that in an effect means React commits the stale
-     highlight, paints it, and only then corrects — one visible frame of the
-     pill in the wrong place, plus the cascading-render lint. Comparing against
-     the last pathname we handled is the documented way to derive state from a
-     changing input. */
   if (pathname !== seenPath) {
     setSeenPath(pathname);
     setActive(pathname);
@@ -403,29 +352,25 @@ export default function Sidebar({
     setMobileOpen(false);
   };
 
-  /* After the hooks, never before them — an early return above `useEffect`
-     would change the hook count between routes. */
+
   if (bareShell) return <>{children}</>;
 
   return (
     <>
       <section id="sb">
-        {/* Phone navigation is a bar at the bottom, not a drawer behind a
-            hamburger. The drawer survives as the "Lainnya" tab, which is where
-            the profile and settings live. */}
+
         <BottomNav
           pathname={pathname}
           moreOpen={mobileOpen}
           onMore={() => setMobileOpen((open) => !open)}
         />
 
-        {/* Desktop rail */}
+
         <motion.aside
           initial={{ width: isOpen ? RAIL_OPEN : RAIL_CLOSED }}
           animate={{ width: isOpen ? RAIL_OPEN : RAIL_CLOSED }}
           transition={size}
-          /* Above page chrome: the collapse handle straddles the rail's edge,
-             so anything pinned in the content column would otherwise cover it. */
+
           className="fixed inset-y-0 left-0 z-50 hidden border-r border-karsa-line md:block"
         >
           <Rail
@@ -439,7 +384,7 @@ export default function Sidebar({
           />
         </motion.aside>
 
-        {/* Mobile drawer */}
+
         <AnimatePresence>
           {mobileOpen && (
             <>
@@ -479,22 +424,8 @@ export default function Sidebar({
         </AnimatePresence>
       </section>
 
-      {/* Content area. The rail itself is fixed, so this spacer — and not a
-          margin — is what keeps the page clear of it, and it animates with
-          the same spring. On mobile the rail overlays, so there's no spacer. */}
-      {/* The patient's *home* is locked to the viewport from `lg` up: one
-          screen, no page scrollbar, and only the task list scrolls inside
-          itself. It is done here rather than inside the page because `h-full`
-          needs a definite height to inherit, and `min-h-screen` is not one — a
-          page asking for "the height of the window" would otherwise get "auto".
-          Below `lg` it stays a normal scrolling column: seven tasks and a room
-          do not fit on a phone, and forcing them to would mean shrinking the
-          text for the one audience that cannot spare it.
 
-          Scoped to the home route, not the whole patient app. `overflow-hidden`
-          on a fixed-height wrapper clips any page taller than the window with
-          no scrollbar to recover it — which is exactly what happened to the
-          shared Komunitas page the moment it was mounted under `/pasien`. */}
+
       <div
         className={`flex min-h-screen bg-karsa-canvas ${
           patientHome ? "lg:h-screen lg:overflow-hidden" : ""
@@ -507,9 +438,7 @@ export default function Sidebar({
           transition={size}
           className="hidden shrink-0 md:block"
         />
-        {/* `--bottom-nav` is the bar's height (0 from `md` up — see globals).
-            Pages that fill the viewport subtract it; everything else just needs
-            its last row to clear the bar. */}
+
         <main
           data-rail={isOpen ? "open" : "closed"}
           className={`min-w-0 flex-1 pb-[var(--bottom-nav)] ${

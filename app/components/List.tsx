@@ -4,10 +4,10 @@ import { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 
-/** Shared motion language for the sidebar. */
+
 export const EASE = [0.32, 0.72, 0, 1] as const;
 
-/** Used for anything that changes the rail's size — snappy, no overshoot. */
+
 export const RAIL_SPRING = {
   type: "spring",
   stiffness: 420,
@@ -15,7 +15,7 @@ export const RAIL_SPRING = {
   mass: 0.9,
 } as const;
 
-/** Used for the shared-layout pill so it glides between items. */
+
 export const PILL_SPRING = {
   type: "spring",
   stiffness: 520,
@@ -28,8 +28,7 @@ type ListProps = {
   text: string;
   link: string;
   isOpen: boolean;
-  /** Namespaces the shared-layout pill so the desktop rail and the mobile
-   *  drawer (both mounted at once) don't fight over the same layoutId. */
+
   railId: string;
   isActive?: boolean;
   badge?: number;
@@ -54,8 +53,8 @@ export default function List({
     : {
         width: { duration: 0.28, ease: EASE },
         x: { duration: 0.28, ease: EASE },
-        // Labels leave quickly and arrive a beat late, so they never fight
-        // the rail width for space.
+
+
         opacity: { duration: isOpen ? 0.18 : 0.1, delay: isOpen ? 0.08 : 0 },
       };
 
@@ -71,7 +70,7 @@ export default function List({
             : "text-neutral-600 hover:text-neutral-900"
         }`}
       >
-        {/* Active pill — one element shared across items, so it slides. */}
+
         {isActive && (
           <motion.span
             layoutId={`${railId}-pill`}
@@ -80,12 +79,12 @@ export default function List({
           />
         )}
 
-        {/* Hover wash, only for inactive rows. */}
+
         {!isActive && (
           <span className="absolute inset-0 rounded-xl bg-neutral-900/0 transition-colors duration-200 group-hover/item:bg-neutral-900/[0.045]" />
         )}
 
-        {/* Active accent, parked on the rail's left edge. */}
+
         {isActive && (
           <motion.span
             layoutId={`${railId}-accent`}
@@ -133,7 +132,7 @@ export default function List({
           </motion.span>
         ) : null}
 
-        {/* Tooltip — only meaningful while the labels are hidden. */}
+
         {!isOpen && (
           <span
             role="tooltip"

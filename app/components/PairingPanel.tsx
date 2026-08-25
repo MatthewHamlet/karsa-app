@@ -5,34 +5,11 @@ import { QRCodeSVG } from "qrcode.react";
 import { Check, Copy, QrCode, RefreshCw } from "lucide-react";
 import { createPairingCode, type PairCode } from "../lib/care/pairing";
 
-/** The caregiver's half of pairing: one code, shown two ways.
- *
- *  Rendered inline on `/care/tambah-pasien` and inside `PairingModal`
- *  elsewhere, which is why the dialog chrome is not in here.
- *
- *  No email anywhere in this flow, and that is the point: the caregiver gets a
- *  code and hands it over by whatever means they already use with this person —
- *  showing them the screen, a QR across the kitchen table, or WhatsApp. An
- *  invitation that depends on an SMTP server is one that fails silently for
- *  every family whose mail goes to spam.
- *
- *  The code is minted when this mounts, so a caregiver who never opens the
- *  screen never generates one. */
-
-/** Where the QR points. The patient's phone opens this, signs in if it has to,
- *  and lands on the redeem screen with the code already filled in.
- *
- *  Built from the current origin rather than hardcoded to `karsa.id`: a QR
- *  generated on localhost that sends the scanner to a production domain cannot
- *  be tested, and one generated on a staging deploy would send real users to
- *  the wrong build. In the browser this is always the host the caregiver is
- *  actually looking at. */
 function pairUrl(code: string): string {
   const origin = typeof window === "undefined" ? "https://karsa.id" : window.location.origin;
   return `${origin}/pair?code=${encodeURIComponent(code)}`;
 }
 
-/** How long the code has left, in words rather than a timestamp. */
 function remaining(expiresAt: string): string {
   const ms = new Date(expiresAt).getTime() - Date.now();
   if (ms <= 0) return "sudah kedaluwarsa";
@@ -47,8 +24,6 @@ export default function PairingPanel() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
-  /* Re-rendered once a minute so "berlaku 3 jam lagi" does not quietly become a
-     lie while the screen sits open. */
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -83,9 +58,6 @@ export default function PairingPanel() {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      /* Clipboard is refused outside a secure context and in some in-app
-         browsers. The code is on screen in 34px type either way, so this is a
-         convenience failing, not the feature. */
       setError("Tidak bisa menyalin otomatis. Salin manual dari layar ya.");
     }
   };
@@ -115,9 +87,6 @@ export default function PairingPanel() {
 
   return (
     <div className="flex flex-col items-center">
-      {/* The code itself is the headline. Big, spaced, and widely tracked so
-          somebody can read it aloud down a phone line without being asked to
-          repeat it. */}
       <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neutral-400">
         Kode undangan
       </p>
@@ -126,8 +95,6 @@ export default function PairingPanel() {
       </p>
       <p className="mt-2 text-[13px] text-neutral-500">{remaining(code.expiresAt)}</p>
 
-      {/* White ground behind the QR, always. A tinted or dark background under
-          a QR is the classic way to make one no scanner reads. */}
       <div className="mt-6 rounded-2xl bg-white p-4 ring-1 ring-karsa-line">
         <QRCodeSVG
           value={pairUrl(code.code)}
@@ -149,7 +116,6 @@ export default function PairingPanel() {
           rel="noopener noreferrer"
           className="flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl bg-[#25D366] text-[15px] font-bold text-white outline-none transition-opacity duration-200 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2"
         >
-          {/* WhatsApp's glyph is not in Lucide, so it is drawn here. */}
           <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="currentColor" aria-hidden>
             <path d="M17.47 14.38c-.29-.15-1.7-.84-1.97-.93-.26-.1-.45-.15-.64.14-.19.29-.73.93-.9 1.12-.16.19-.33.21-.62.07-.29-.15-1.22-.45-2.33-1.44-.86-.77-1.44-1.71-1.61-2-.17-.29-.02-.45.13-.6.13-.13.29-.34.44-.51.15-.17.19-.29.29-.48.1-.19.05-.36-.02-.51-.07-.14-.64-1.55-.88-2.12-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.5.07-.76.36-.26.29-1 .98-1 2.38s1.02 2.76 1.17 2.95c.14.19 2.01 3.06 4.86 4.29.68.29 1.21.47 1.62.6.68.22 1.3.19 1.79.11.55-.08 1.7-.69 1.94-1.36.24-.67.24-1.24.17-1.36-.07-.12-.26-.19-.55-.34z" />
             <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.86 9.86 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.02h-.01a8.2 8.2 0 0 1-4.18-1.15l-.3-.18-3.12.82.83-3.04-.2-.31a8.19 8.19 0 0 1-1.26-4.38c0-4.54 3.7-8.23 8.24-8.23 2.2 0 4.27.86 5.83 2.41a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.23-8.24 8.23z" />

@@ -9,16 +9,13 @@ import {
   getGroupMembers,
   getGroupMessages,
   getPostComments,
+  getProfileCard,
+  searchPeople,
 } from "./queries";
+import { getInvitablePatients } from "../care/queries";
 import { POSTS_PER_PAGE } from "./constants";
 
-/** Writes for Komunitas.
- *
- *  Every one of these is a POST endpoint anybody who can load the site can
- *  call, so none of them trusts its arguments. The owner column is always sent
- *  as the caller's own id *and* checked by an RLS policy that requires it to
- *  equal `auth.uid()` — sending it is what makes the row correct, the policy is
- *  what makes it impossible to send anything else. */
+
 
 export type CommunityResult = { error: string | null; ok?: boolean };
 
@@ -34,7 +31,7 @@ function readable(message: string): string {
     : "Gagal menyimpan. Coba lagi sebentar lagi.";
 }
 
-/** Splits "lansia, obat" or a newline-separated list into clean terms. */
+
 function terms(raw: string): string[] {
   return [
     ...new Set(
@@ -64,10 +61,7 @@ export async function createPost(
   if (title.length > 160) return { error: "Judulnya terlalu panjang." };
   if (body.length > 8000) return { error: "Ceritanya terlalu panjang." };
 
-  /* The URL arrives from the browser, so it is a request rather than a fact.
-     Only our own Supabase storage host is accepted — without this the field is
-     an open invitation to hotlink an arbitrary image, which is how a feed ends
-     up rendering something nobody here uploaded and cannot take down. */
+
   if (imageUrl && !imageUrl.startsWith(`${SUPABASE_URL}/storage/v1/object/public/community/`)) {
     return { error: "Gambarnya tidak dikenali. Unggah ulang ya." };
   }
@@ -80,9 +74,7 @@ export async function createPost(
     body,
     tags,
     image_url: imageUrl || null,
-    /* The search box reads `keywords`, and asking somebody to fill in two
-       nearly identical fields is how you get one of them left empty. The tags
-       they typed are the keywords. */
+
     keywords: tags,
   });
 
@@ -93,12 +85,7 @@ export async function createPost(
   return { error: null, ok: true };
 }
 
-/** Upvote, or take it back.
- *
- *  A toggle rather than an insert: the control is a button that shows its own
- *  state, and one that cannot be un-pressed turns a mis-tap into a permanent
- *  endorsement. The primary key on `(post_id, profile_id)` is what makes the
- *  read-then-write safe — a double submit can only ever land one row. */
+
 export async function toggleVote(
   _prev: CommunityResult,
   formData: FormData,
@@ -367,4 +354,22 @@ export async function toggleFollow(
   revalidatePath("/community");
   revalidatePath("/pasien/komunitas");
   return { error: null, ok: true };
+}
+
+
+
+
+export async function findPeople(query: string) {
+  return searchPeople(query);
+}
+
+
+export async function loadProfileCard(profileId: string) {
+  const [profile, me] = await Promise.all([getProfileCard(profileId), getSessionProfile()]);
+  if (!profile) return null;
+
+
+  const myPatients = me ? await getInvitablePatients(profileId) : [];
+
+  return { profile, myPatients, meId: me?.id ?? null };
 }

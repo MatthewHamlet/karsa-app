@@ -5,26 +5,7 @@ import { HeartHandshake, UserRound } from "lucide-react";
 import AuthShell from "./AuthShell";
 import { chooseRole, type AuthState } from "../login/actions";
 
-/** The question Google never asks.
- *
- *  The email signup form has a role picker on it, so an account made that way
- *  arrives already answered. Google hands back a name and an address and
- *  nothing else, and `handle_new_user` falls through to caregiver — which is a
- *  safe default but not an answer. This screen is where the answer is given,
- *  once, immediately after the callback.
- *
- *  ── Why it is a whole screen and not a dropdown in settings ───────────────
- *  This choice decides which of two products the person sees for the rest of
- *  their time here. Getting it wrong is not a preference to be corrected later;
- *  it is landing an elderly patient in a caregiver's compliance dashboard on
- *  their first ever visit. So it gets the full screen, two large targets, and
- *  no default selection — nothing is pre-picked, because a pre-picked answer to
- *  a question this consequential is just the old silent default wearing a
- *  radio button.
- *
- *  The wording avoids "caregiver" and "patient" as job titles. Somebody looking
- *  after their mother does not think of themselves as a caregiver; they think
- *  "I'm the one helping her". The sentences are written that way. */
+
 type Choice = "caregiver" | "patient";
 
 const OPTIONS: {
@@ -52,8 +33,7 @@ export default function ChooseRole({
   next,
 }: {
   name?: string;
-  /** Where they were headed before the question interrupted them. Empty means
-   *  "wherever this role's home is", which `chooseRole` decides. */
+
   next?: string;
 }) {
   const [picked, setPicked] = useState<Choice | null>(null);
@@ -62,10 +42,7 @@ export default function ChooseRole({
   });
 
   return (
-    /* The same frame as the login and register screens: meadow behind, the pair
-       of Karsas and the quote holding the left half, the form on the right.
-       This screen sits between those two in the flow, so building it its own
-       centred card made it read as a different app for one step. */
+
     <AuthShell>
           <header>
             <h1 className="text-3xl font-bold tracking-tight text-neutral-900 sm:text-4xl">
@@ -76,8 +53,7 @@ export default function ChooseRole({
             </p>
           </header>
 
-          {/* Above the choice it is about, so a screen reader meets it before
-              the options rather than after the button. */}
+
           {state.error && (
             <p
               role="alert"
@@ -88,10 +64,7 @@ export default function ChooseRole({
           )}
 
           <form action={submit} className="mt-7">
-            {/* The value travels in a hidden field rather than on the button,
-                so the choice and the submit are two separate acts. Tapping a
-                card that submitted immediately would give somebody no moment to
-                read the second option before the app moved on. */}
+
             <input type="hidden" name="role" value={picked ?? ""} />
             <input type="hidden" name="next" value={next ?? ""} />
 
@@ -142,16 +115,10 @@ export default function ChooseRole({
             </button>
           </form>
 
-          {/* Deliberately not "you can change this later in Settings". The
-              settings screen has a "Peran" field, but it is a different thing —
-              a seniority label on mock data — and pointing at it would be a
-              promise the app does not keep. Changing this properly means
-              revisiting `/login/peran?ganti=1`, which is a link nothing offers
-              yet; until something does, the honest line is the one that just
-              helps them pick correctly now. */}
+
           <p className="mt-7 text-center text-[14px] leading-5 text-neutral-600">
-            Pilihan ini menentukan tampilan Karsa untukmu. Pilih yang paling
-            sesuai ya.
+            Pilihan ini menentukan tampilan Karsa untukmu. Kalau ternyata salah,
+            kamu bisa mengubahnya nanti lewat Pengaturan.
           </p>
     </AuthShell>
   );

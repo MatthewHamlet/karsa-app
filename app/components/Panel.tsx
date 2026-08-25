@@ -3,8 +3,6 @@ import { ReactNode } from "react";
 const CARD =
   "rounded-[20px] p-6 shadow-[0_1px_2px_rgba(24,32,24,0.03),0_14px_30px_-26px_rgba(24,32,24,0.28)] ring-1 sm:p-7 xl:p-8";
 
-/** Each block carries its own tint so the sections read apart; `plain` drops
- *  the card entirely for the few that sit straight on the canvas. */
 const TONE = {
   white: "bg-white ring-karsa-line",
   sand: "bg-tint-sand ring-edge-sand",

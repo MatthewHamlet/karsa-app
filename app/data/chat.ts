@@ -1,8 +1,4 @@
-/** The care team's conversation, as it lives inside the Perawatan page.
- *
- *  System entries are not chat at all — they're the patient's own activity log
- *  dropped into the thread, so a conversation about a dose sits next to the
- *  record of it. */
+
 
 import { CARE_GROUP } from "./careStats";
 
@@ -12,7 +8,7 @@ export const SENDERS = Object.fromEntries(
   CARE_GROUP.members.map((member) => [member.id, member]),
 ) as Record<string, Sender>;
 
-/** Whoever is signed in. Their messages sit on the right. */
+
 export const ME = "matthew";
 
 export type ChatMessage =
@@ -22,9 +18,9 @@ export type ChatMessage =
       id: string;
       from: string;
       time: string;
-      /** Seconds, shown as m:ss. */
+
       length: number;
-      /** Bar heights, 0–1 — a drawn waveform, not a real one. */
+
       wave: number[];
     }
   | {

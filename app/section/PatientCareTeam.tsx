@@ -6,17 +6,7 @@ import { respondToInvitation, revokeRelationship, type CareResult } from "../lib
 import type { CareTeamMember } from "../lib/care/types";
 import ConnectCaregiver from "../components/ConnectCaregiver";
 
-/** The patient's side of the relationship: who is asking, who already has
- *  access, and the code that lets them ask in the first place.
- *
- *  This screen is the consent mechanism. A caregiver's invitation grants
- *  nothing until it is accepted here — the database refuses the care data
- *  behind a `pending` row regardless of what any interface shows. That is worth
- *  stating plainly on the page too, because "menunggu persetujuan" only means
- *  something if the patient understands that saying no actually stops it.
- *
- *  Revoking is offered next to every active caregiver rather than buried in a
- *  settings page. Withdrawing consent should never be harder than giving it. */
+
 export default function PatientCareTeam({
   team,
   shareCode,
@@ -28,8 +18,7 @@ export default function PatientCareTeam({
   const active = team.filter((m) => m.status === "active");
 
   return (
-    /* Wider than the old `max-w-2xl`: from `lg` this is two columns, and a
-       two-column layout inside a 42rem column is two narrow columns. */
+
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
       <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
         Pendamping saya
@@ -38,33 +27,19 @@ export default function PatientCareTeam({
         Siapa saja yang boleh melihat data perawatanmu. Kamu yang menentukan.
       </p>
 
-      {/* Two halves, and the split is by *kind of act* rather than by size.
-          Left is everything that adds somebody — the code you type, the code
-          you hand out. Right is everybody who already has access, and the
-          invitations waiting on an answer.
 
-          `items-start` so the columns do not stretch each other: with one long
-          and one short, equal-height tracks would leave a tall empty card
-          beside a full one. Stacks below `lg`, left column first, because
-          connecting is what a patient opens this page to do. */}
       <div className="mt-6 grid items-start gap-6 lg:grid-cols-2 lg:gap-8">
-        {/* ── Left ─────────────────────────────────────────────────────── */}
+
         <div className="min-w-0 space-y-6">
-          {/* Two directions exist for connecting and they are not equivalent:
-              this one starts from a code the caregiver already generated, so
-              the patient does nothing but type six characters. The share code
-              under it is the older path, where the caregiver goes looking. For
-              somebody being helped by their family, being handed a code is far
-              more likely than being asked to read one out. */}
+
           <ConnectCaregiver />
 
           {shareCode && <ShareCode code={shareCode} />}
         </div>
 
-        {/* ── Right ────────────────────────────────────────────────────── */}
+
         <div className="min-w-0 space-y-8">
-          {/* Invitations first: they are the only thing on this page that needs
-              an answer from you. */}
+
           {pending.length > 0 && (
             <section>
               <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-neutral-400">
@@ -131,8 +106,7 @@ function InvitationCard({ member }: { member: CareTeamMember }) {
         </p>
       )}
 
-      {/* Two forms, not one with a toggle: each button posts its own decision,
-          so there is no way to click "Terima" and submit "reject". */}
+
       <div className="mt-3 flex gap-2.5">
         <form action={action} className="flex-1">
           <input type="hidden" name="relationship_id" value={member.relationshipId} />
@@ -225,9 +199,7 @@ function ShareCode({ code }: { code: string }) {
         <button
           type="button"
           onClick={() => {
-            /* `writeText` rejects on an insecure origin and when the tab is not
-               focused. Nothing here is worth an exception — the code is on
-               screen and can be read out loud regardless. */
+
             navigator.clipboard?.writeText(code).then(
               () => {
                 setCopied(true);

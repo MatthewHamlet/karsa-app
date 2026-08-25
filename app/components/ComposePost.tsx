@@ -7,21 +7,11 @@ import { createClient } from "../lib/supabase/client";
 import { createPost, type CommunityResult } from "../lib/community/actions";
 import type { CommunityGroup } from "../lib/community/queries";
 
-/** Matches the bucket's own limits (migration 0012). Checked here as a courtesy
- *  — so somebody picking a 20MB photo is told before waiting for an upload —
- *  and again by Storage, which is the check that actually holds. */
+
 const MAX_BYTES = 5 * 1024 * 1024;
 const ACCEPT = "image/jpeg,image/png,image/webp,image/gif";
 
-/** Writing something for the community.
- *
- *  A plain `<form action={…}>` around a server action: it works before
- *  hydration, the browser validates the fields, and there is no client-side
- *  copy of the write to keep in step with the one on the server.
- *
- *  Three fields and no more. The thing being asked for is a question somebody
- *  is stuck on at eleven at night, and every extra field is another reason to
- *  close the dialog instead of pressing send. */
+
 const FIELD =
   "w-full rounded-2xl border-2 border-karsa-line bg-white px-4 text-[15px] text-neutral-900 outline-none transition-colors duration-200 placeholder:text-neutral-400 focus:border-karsa disabled:opacity-70";
 const LABEL = "block text-[13px] font-semibold text-neutral-600";
@@ -33,8 +23,7 @@ export default function ComposePost({
 }: {
   open: boolean;
   onClose: () => void;
-  /** Only the ones this person has joined — posting into a group you are not
-   *  in is a way to reach an audience that never asked for you. */
+
   groups: CommunityGroup[];
 }) {
   const [state, action, busy] = useActionState<CommunityResult, FormData>(createPost, {
@@ -42,12 +31,7 @@ export default function ComposePost({
   });
   const uid = useId();
 
-  /* The picture is uploaded straight from the browser to Storage, and only its
-     URL is posted to the server action. Routing the bytes through the action
-     instead would push a 5MB body through a Server Action — which has its own
-     size ceiling, holds a server worker for the length of a phone upload, and
-     buys nothing, because Storage is the thing that has to receive it either
-     way. */
+
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState("");
@@ -55,8 +39,7 @@ export default function ComposePost({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  /* Object URLs are a manual allocation: without the revoke the blob is pinned
-     in memory for the life of the tab, once per photo previewed. */
+
   useEffect(() => {
     if (!file) {
       setPreview(null);
@@ -67,8 +50,7 @@ export default function ComposePost({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  /* Uploads as soon as a file is chosen rather than on submit, so the wait
-     happens while they are still writing instead of after they press send. */
+
   useEffect(() => {
     if (!file) {
       setImageUrl("");
@@ -90,9 +72,7 @@ export default function ComposePost({
         return;
       }
 
-      /* The first path segment must be the uploader's own id — the storage
-         policy checks exactly that, so a path shaped any other way is refused
-         rather than silently landing somewhere shared. */
+
       const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().slice(0, 5);
       const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
 
@@ -135,15 +115,11 @@ export default function ComposePost({
     if (fileRef.current) fileRef.current.value = "";
   };
 
-  /* Closing on success rather than showing a confirmation: the post appears at
-     the top of the feed behind the dialog, which says it landed better than a
-     sentence claiming it did. */
+
   useEffect(() => {
     if (!state.ok) return;
     clearImage();
     onClose();
-    /* `clearImage` is stable enough for this — it only touches setters and a
-       ref — and listing it would re-run the effect on every render. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.ok, onClose]);
 
@@ -206,13 +182,13 @@ export default function ComposePost({
           </p>
         </div>
 
-        {/* ── Picture ─────────────────────────────────────────────────── */}
+
         <div>
           <span className={LABEL}>
             Gambar <span className="font-normal text-neutral-400">(opsional)</span>
           </span>
 
-          {/* The URL, not the file, is what the action receives. */}
+
           <input type="hidden" name="image_url" value={imageUrl} />
 
           <input
@@ -226,10 +202,8 @@ export default function ComposePost({
 
           {preview ? (
             <div className="relative mt-1.5 overflow-hidden rounded-2xl ring-2 ring-karsa-line">
-              {/* A blob URL has no dimensions Next can know ahead of time and
-                  no loader to run it through, so this one stays a plain `img`.
-                  The posted version goes through `next/image` on the card. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+
+
               <img
                 src={preview}
                 alt="Pratinjau gambar"
@@ -309,9 +283,7 @@ export default function ComposePost({
           </button>
           <button
             type="submit"
-            /* Blocked while the picture is still going up: submitting now
-               would post the text with an empty `image_url` and quietly drop
-               the photo they chose. */
+
             disabled={busy || uploading}
             className="h-12 flex-[2] rounded-2xl bg-karsa text-[15px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa focus-visible:ring-offset-2 disabled:opacity-60"
           >

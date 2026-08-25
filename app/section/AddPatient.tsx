@@ -6,34 +6,12 @@ import { ArrowLeft, Check, KeyRound, QrCode } from "lucide-react";
 import PairingPanel from "../components/PairingPanel";
 import { invitePatient, type CareResult } from "../lib/care/actions";
 
-/** Connecting to the person you look after.
- *
- *  Two options and no form. There used to be a third — type their name, their
- *  date of birth, and get a profile for somebody who had never heard of Karsa —
- *  and it is gone: a record created that way belongs to nobody, consents to
- *  nothing, and the person it describes has no way to see or correct what is
- *  written about them. Every link now starts from a code that one of the two
- *  people involved chose to hand over.
- *
- *  The two that remain are the same handshake from either end:
- *
- *    · **Share** — you generate a code and a QR, and they enter it. This is the
- *      common direction, because the caregiver is the one driving and the
- *      person being cared for should have to do as little as possible.
- *    · **Enter** — they already gave you a code, and you type it in. Their
- *      account then shows the request and they approve it.
- *
- *  Share is the default for that reason. */
 type Mode = "share" | "enter";
 
 const FIELD =
   "h-14 w-full rounded-2xl border-2 border-karsa-line bg-white px-4 text-[16px] text-neutral-900 outline-none transition-colors duration-200 placeholder:text-neutral-400 focus:border-karsa disabled:opacity-70";
 
 export default function AddPatient({ initialMode = "share" }: { initialMode?: Mode }) {
-  /* Which door the caregiver came through. The onboarding screen links straight
-     to one of the two — landing them on the first and making them press the
-     tile they already pressed is the kind of small friction that reads as the
-     app not listening. */
   const [mode, setMode] = useState<Mode>(initialMode);
 
   const [state, inviteAction, inviting] = useActionState<CareResult, FormData>(invitePatient, {
@@ -83,8 +61,6 @@ export default function AddPatient({ initialMode = "share" }: { initialMode?: Mo
         Hubungkan lewat kode undangan atau kode QR.
       </p>
 
-      {/* The whole tile is the label, so the tap target is the card rather than
-          a small circle beside it. */}
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
         {(
           [

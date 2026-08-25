@@ -1,5 +1,6 @@
 import { BadgeCheck } from "lucide-react";
 import { TONES, type Tone } from "./tones";
+import UserAvatar from "./UserAvatar";
 import type { Person } from "../data/community";
 
 const AVATAR = {
@@ -7,9 +8,7 @@ const AVATAR = {
   md: { box: "h-10 w-10 text-[14px]", check: 15, ring: "ring-[2.5px]" },
 } as const;
 
-/** A member, as a lettered disc. The community has no photographs — everyone
- *  here is a stranger to the caregiver until they aren't, and a letter in
- *  their own colour identifies them without pretending otherwise. */
+
 export function Avatar({
   person,
   size = "sm",
@@ -21,12 +20,12 @@ export function Avatar({
 
   return (
     <span className="relative inline-grid shrink-0">
-      <span
-        className={`grid place-items-center rounded-full font-bold text-white ${s.box}`}
-        style={{ backgroundColor: person.color }}
-      >
-        {person.initial}
-      </span>
+      <UserAvatar
+        url={person.avatarUrl}
+        initial={person.initial}
+        color={person.color}
+        className={s.box}
+      />
       {person.verified && (
         <span
           title="Terverifikasi Karsa"
@@ -39,8 +38,7 @@ export function Avatar({
   );
 }
 
-/** A category pill. Pale fill, accent ink — the same two-tone rule the icon
- *  tiles follow, so a tag and its category read as the same thing. */
+
 export function Tag({ label, tone }: { label: string; tone: Tone }) {
   const t = TONES[tone];
 
@@ -53,8 +51,7 @@ export function Tag({ label, tone }: { label: string; tone: Tone }) {
   );
 }
 
-/** The heading over a section that sits straight on the canvas, with its
- *  "lihat semua" on the far side. */
+
 export function SectionHead({
   title,
   href = "#",

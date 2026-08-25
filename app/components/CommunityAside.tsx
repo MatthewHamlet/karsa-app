@@ -16,13 +16,10 @@ import GroupArt from "./GroupArt";
 import { artOf, toneOf } from "./CommunityFeed";
 import { toggleFollow } from "../lib/community/actions";
 
-/** The one loud colour on the page. Plum rather than another green: it has to
- *  read as a different kind of thing from the forest header above it, and it
- *  is the only card here asking for a decision. */
+
 const PLUM = "#6f5a7d";
 
-/** The header's texture, at card scale — same three overlapping discs, so the
- *  banner reads as family with the page's own header. */
+
 const Shapes = () => (
   <svg
     aria-hidden
@@ -99,9 +96,7 @@ function MyGroups({
   );
 }
 
-/** Filter chips, not decoration. Each one writes its term into the page's
- *  search box, so pressing a chip and typing the same word do the same thing —
- *  and the caregiver can see, and edit, what the page is filtered by. */
+
 function TopicCloud({
   onTopic,
   active,
@@ -132,9 +127,7 @@ function TopicCloud({
               key={tag.label}
               type="button"
               aria-pressed={on}
-              /* Pressing the chip that is already on clears the filter — the
-                 only other way back is emptying the search field, and a chip
-                 that can turn on but not off is a trap. */
+
               onClick={() => onTopic(on ? "" : tag.term)}
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12.5px] font-semibold outline-none ring-1 transition-transform duration-200 hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-karsa/40 ${
                 on ? "bg-karsa text-white ring-karsa" : `${t.card} ${t.ring} ${t.ink}`
@@ -164,9 +157,7 @@ function PeopleToFollow({ people }: { people: CommunityPerson[] }) {
 
   return (
     <Panel title="Orang untuk Diikuti">
-      {/* Nobody else has an account yet. Said plainly and in the middle of the
-          card, rather than by hiding the panel — this is a new app, and "belum
-          ada" is a true statement about today, not a missing feature. */}
+
       {people.length === 0 && (
         <p className="py-6 text-center text-[13.5px] leading-5 text-neutral-500">
           Belum tersedia.
@@ -212,8 +203,7 @@ function PeopleToFollow({ people }: { people: CommunityPerson[] }) {
   );
 }
 
-/** The right-hand column: what's coming up, what people are talking about, and
- *  who to listen to — in that order, because only the first one expires. */
+
 export default function CommunityAside({
   onTopic,
   active = "",
@@ -227,13 +217,7 @@ export default function CommunityAside({
 }) {
   return (
     <aside className="space-y-6 xl:space-y-8">
-      {/* All three always render, empty or not.
-          Dropping a card when it has nothing in it was the wrong call: this
-          column is the page's furniture, and furniture that appears and
-          disappears makes the layout feel broken rather than tidy. It also
-          hides the fact that the feature exists at all — a caregiver on a quiet
-          day would never learn Karsa runs live sessions. Each one says what it
-          is waiting for instead. */}
+
       <MyGroups groups={data.myGroups} onOpen={onOpenGroup} />
       <TopicCloud onTopic={onTopic} active={active} topics={data.topics} />
       <PeopleToFollow people={data.people} />

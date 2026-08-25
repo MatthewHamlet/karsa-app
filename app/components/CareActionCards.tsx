@@ -13,9 +13,6 @@ const ICON: Record<ActionCardKind, typeof Pill> = {
   note: SquarePen,
 };
 
-/** The cards the mascot puts forward after an answer. They arrive in sequence
- *  rather than all at once — the stagger is what makes the mascot look like it
- *  is handing them over one at a time, and it lands under its pointing pose. */
 export default function CareActionCards({ cards }: { cards: ActionCard[] }) {
   const reduce = useReducedMotion();
   const [done, setDone] = useState<string[]>([]);

@@ -1,8 +1,6 @@
 import { useId } from "react";
 
-/** Line art on a 24×24 grid, so every glyph can be placed with one transform
- *  and they all carry the same weight. Stroked, never filled — a filled shape
- *  at this opacity turns into a smudge, an outline stays a drawing. */
+
 const GLYPH = {
   heart: "M12 20.7 3.9 12.6a5 5 0 0 1 7.1-7.1l1 1 1-1a5 5 0 1 1 7.1 7.1Z",
   cross: "M9.6 3.6h4.8v5.2h5.2v4.8h-5.2v5.2H9.6v-5.2H4.4V8.8h5.2Z",
@@ -13,11 +11,7 @@ const GLYPH = {
   thermometer: "M14 14.4V3.6a2.4 2.4 0 0 0-4.8 0v10.8a4.3 4.3 0 1 0 4.8 0Z",
 } as const;
 
-/** Where each glyph sits inside one tile: [x, y, rotation, scale, glyph].
- *  Placed by eye rather than on a grid — an even spread reads as wallpaper, a
- *  regular one reads as a table. Nothing crosses the tile edge, because a
- *  pattern clips there and a half-drawn heart is the one thing the eye finds
- *  immediately in a repeat. */
+
 const SCATTER: [number, number, number, number, keyof typeof GLYPH][] = [
   [18, 28, -12, 1, "heart"],
   [96, 12, 24, 0.85, "pill"],
@@ -36,17 +30,10 @@ const SCATTER: [number, number, number, number, keyof typeof GLYPH][] = [
   [236, 276, -18, 0.9, "leaf"],
 ];
 
-/** Big on purpose. The tile is the unit that repeats, so the wider it is the
- *  further apart the repeats fall — which matters more the more visible the
- *  pattern gets, since anything the eye can see it can also line up. */
+
 const TILE = 320;
 
-/** A scattered health-icon wallpaper.
- *
- *  Absolutely positioned, so the host needs `relative` and the content on top
- *  needs to be positioned too. Takes its colour from `currentColor`: set the
- *  text colour on the host and the pattern follows, which is what keeps it
- *  inside whatever palette the surface already has. */
+
 export default function HealthPattern({
   className = "",
   opacity = 0.13,

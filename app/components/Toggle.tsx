@@ -2,7 +2,6 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 
-/** A switch, not a checkbox: `role="switch"` so it announces on/off. */
 export default function Toggle({
   checked,
   onChange,

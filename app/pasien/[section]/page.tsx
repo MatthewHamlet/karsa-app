@@ -6,19 +6,12 @@ export const metadata: Metadata = {
   title: "Karsa · Pasien",
 };
 
-/* Jurnal, Komunitas, Maskot, Scan and Pengaturan have their own routes now —
-   static segments win over this one, so listing them here would only be a title
-   nobody can reach. Profil is what is left unbuilt. */
+
 const TITLES: Record<string, string> = {
   profil: "Profil",
 };
 
-/** Everywhere the patient's bottom bar can go that is not Home yet.
- *
- *  One route rather than four files of filler, and it says plainly that the
- *  screen is unbuilt. The alternative was a bar whose tabs 404, which teaches
- *  the person that pressing things breaks the app — the worst lesson this
- *  particular audience could take from it. */
+
 export default async function PatientSection({ params }: PageProps<"/pasien/[section]">) {
   const { section } = await params;
   const title = TITLES[section] ?? "Halaman";

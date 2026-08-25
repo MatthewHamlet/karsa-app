@@ -8,15 +8,18 @@ import ComposePost from "../components/ComposePost";
 import GroupChat from "../components/GroupChat";
 import ComposeGroup from "../components/ComposeGroup";
 import PostDetail from "../components/PostDetail";
-import type { CommunityGroup, CommunityPost } from "../lib/community/queries";
+import ProfileCardModal from "../components/ProfileCardModal";
+import { findPeople } from "../lib/community/actions";
+import type {
+  CommunityGroup,
+  CommunityPerson,
+  CommunityPost,
+} from "../lib/community/queries";
 import type { SortKey } from "../data/community";
 import type { CommunityData } from "../lib/community/queries";
 
 export default function CommunityPage({ data }: { data: CommunityData }) {
-  /* One query for the whole page. The search field and the topic chips write to
-     it and the feed reads from it, which is what keeps a chip honest: pressing
-     #Demensia puts the word in the box you can see and edit, rather than
-     applying a filter with no visible cause. */
+
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<FeedTab>("semua");
   const [sort, setSort] = useState<SortKey>("relevan");
@@ -24,8 +27,40 @@ export default function CommunityPage({ data }: { data: CommunityData }) {
   const [chatGroup, setChatGroup] = useState<CommunityGroup | null>(null);
   const [makingGroup, setMakingGroup] = useState(false);
   const [openPost, setOpenPost] = useState<CommunityPost | null>(null);
+  const [openProfile, setOpenProfile] = useState<string | null>(null);
+
+  const [found, setFound] = useState<{ term: string; rows: CommunityPerson[] }>({
+    term: "",
+    rows: [],
+  });
 
   const counts = useMemo(() => tabCounts(query, data), [query, data]);
+
+
+  const term = query.trim();
+
+  useEffect(() => {
+    if (term.length < 2) return;
+
+    let stale = false;
+    const timer = window.setTimeout(() => {
+      findPeople(term)
+        .then((rows) => {
+          if (!stale) setFound({ term, rows });
+        })
+        .catch(() => {
+          if (!stale) setFound({ term, rows: [] });
+        });
+    }, 250);
+
+    return () => {
+      stale = true;
+      window.clearTimeout(timer);
+    };
+  }, [term]);
+
+
+  const people = term.length >= 2 && found.term === term ? found.rows : [];
 
   const feedScrollRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +92,8 @@ export default function CommunityPage({ data }: { data: CommunityData }) {
             data={data}
             onOpenGroup={setChatGroup}
             onOpenPost={setOpenPost}
+            onOpenProfile={setOpenProfile}
+            people={people}
             scrollRoot={feedScrollRef}
           />
         </div>
@@ -72,6 +109,8 @@ export default function CommunityPage({ data }: { data: CommunityData }) {
       </div>
 
         <PostDetail post={openPost} meId={data.meId} onClose={() => setOpenPost(null)} />
+
+        <ProfileCardModal profileId={openProfile} onClose={() => setOpenProfile(null)} />
 
         <GroupChat group={chatGroup} meId={data.meId} onClose={() => setChatGroup(null)} />
 

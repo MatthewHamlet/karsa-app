@@ -9,9 +9,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-/** The same community, reached from the patient app. One room, not two — the
- *  point of it is that caregivers and the people they look after are not kept
- *  in separate buildings. */
 export default async function PatientCommunity() {
   return <CommunityPage data={await getCommunityData()} />;
 }

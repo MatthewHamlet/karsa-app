@@ -1,45 +1,30 @@
-/** The patient's own day, as the patient sees it.
- *
- *  Deliberately separate from `dashboard.ts`. That file is the caregiver's view
- *  of the same person — targets, compliance percentages, things to check up on.
- *  This one is the person themselves: a handful of things to do, what each is
- *  worth, and one message from someone who cares. The two will disagree over
- *  time and that is correct; they are answering different questions.
- *
- *  Placeholders throughout — this is a design pass, not a data layer. */
+
 
 export type PatientTask = {
   id: string;
   emoji: string;
   title: string;
-  /** When, or where — the one line that removes the "wait, which one?" */
+
   detail: string;
-  /** Energy the task is worth. Small numbers, so the bar moves visibly. */
+
   points: number;
   done: boolean;
 };
 
 export const PATIENT = {
-  name: "Meimei",
-  /** How the app addresses them. Warmer than a name on its own, and what a
-   *  grandchild would actually say. */
-  greeting: "Oma Meimei",
-  initial: "M",
+  name: "Pasien",
+  greeting: "Pasien",
+  initial: "P",
 };
 
-/** One message, from the caregiver, shown as it was written. Not a
- *  notification and not editable here — the patient receives it. */
+
 export const AFFIRMATION = {
   from: "Sinta",
   relation: "Cucu",
   text: "You matter. Semangat hari ini ya Oma! ❤️",
 };
 
-/** Full energy for a day, and exactly what the list below adds up to.
- *
- *  Seven items rather than four, because four is not a day — it is a demo. A
- *  real day has the small things in it too, and a list long enough to scroll is
- *  also what stops the screen ending halfway down. */
+
 export const ENERGY_TARGET = 50;
 
 export const PATIENT_TASKS: PatientTask[] = [
@@ -101,10 +86,3 @@ export const PATIENT_TASKS: PatientTask[] = [
   },
 ];
 
-/** What Karsa says when the patient presses the big button. Picked by how the
- *  day is going, so the reply is never cheerful at somebody having a bad one. */
-export const MASCOT_LINES = {
-  high: "Hari ini lancar sekali, Oma. Aku senang menemani.",
-  mid: "Pelan-pelan saja. Satu hal dulu, aku tunggu di sini.",
-  low: "Tidak apa-apa kalau hari ini berat. Aku tetap di sini.",
-};

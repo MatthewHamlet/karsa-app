@@ -8,17 +8,7 @@ import { getSessionProfile } from "../profile";
 import { jakartaDateString } from "./time";
 import { getJournalMonth } from "./queries";
 
-/** Mutations for the caregiver–patient relationship system.
- *
- *  Every one of these is a POST endpoint reachable by anyone who can load the
- *  site. So nothing here trusts its arguments: an id arriving from the browser
- *  is treated as a request, not a fact, and the database decides. RLS is what
- *  makes that safe — a relationship id belonging to a stranger simply matches
- *  no row, and the update affects nothing.
- *
- *  That is also why none of these look up "am I allowed" in JavaScript first.
- *  A check in this file can be bypassed by calling the action directly; a
- *  policy in Postgres cannot. */
+
 
 export type CareResult = { error: string | null; ok?: boolean };
 
@@ -37,15 +27,7 @@ function readable(message: string): string {
     : "Gagal menyimpan. Coba lagi sebentar lagi.";
 }
 
-/** Writes down someone who has no Karsa account yet.
- *
- *  Creates the patient row and the caregiver's own relationship to it in one
- *  go. The relationship starts `active` here, which is the one case where that
- *  is allowed: there is nobody to ask. The moment the patient claims the
- *  profile, the ordinary consent rules take over — see migration 0003.
- *
- *  No placeholder auth user is created. A fake account is an account somebody
- *  can be locked out of, with a password nobody set. */
+
 export async function createPatientProfile(
   _prev: CareResult,
   formData: FormData,
@@ -69,8 +51,7 @@ export async function createPatientProfile(
       display_name: displayName,
       date_of_birth: dobRaw || null,
       created_by: me.id,
-      /* Both forced rather than defaulted, because the insert policy checks
-         them — an unclaimed profile is the only kind a caregiver may create. */
+
       user_id: null,
       status: "pending_activation",
     })
@@ -91,9 +72,7 @@ export async function createPatientProfile(
   });
 
   if (relError) {
-    /* The patient row is left behind rather than deleted. Deleting it would be
-       a second write that can also fail, and an orphaned unclaimed profile is
-       harmless — only its creator can see it, and they can try again. */
+
     return { error: readable(relError.message) };
   }
 
@@ -101,14 +80,7 @@ export async function createPatientProfile(
   return { error: null, ok: true };
 }
 
-/** Asks an existing Karsa patient for access, using the code they shared.
- *
- *  The code, not an email. Looking a patient up by address would let anyone
- *  test whether a given person has an account here, and fire invitations at
- *  people they merely suspect are on Karsa. A code has to be handed over.
- *
- *  Starts `pending` and grants nothing: the caregiver sees the name in their
- *  list with "menunggu persetujuan" beside it and no data behind it. */
+
 export async function invitePatient(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -125,8 +97,7 @@ export async function invitePatient(_prev: CareResult, formData: FormData): Prom
   if (lookupError) return { error: readable(lookupError.message) };
 
   const match = Array.isArray(found) ? found[0] : found;
-  /* Same answer for "no such code" as for a malformed one. Distinguishing them
-     would turn this into a way to test codes one at a time. */
+
   if (!match?.patient_id) return { error: "Kode itu tidak cocok dengan pasien mana pun." };
   if (match.already_linked) return { error: "Kamu sudah terhubung dengan pasien ini." };
 
@@ -147,9 +118,7 @@ export async function invitePatient(_prev: CareResult, formData: FormData): Prom
   return { error: null, ok: true };
 }
 
-/** The patient's answer. Only they can run this to any effect — the update
- *  policy for setting `active` matches on `is_my_patient`, so a caregiver
- *  calling it against their own row updates nothing. */
+
 export async function respondToInvitation(
   _prev: CareResult,
   formData: FormData,
@@ -174,23 +143,18 @@ export async function respondToInvitation(
         : { status: "rejected", accepted_at: null },
     )
     .eq("id", relationshipId)
-    /* Only an undecided invitation can be answered. Without this, re-posting an
-       old form could flip a relationship that was revoked months ago back on. */
     .eq("status", "pending")
     .select("id");
 
   if (error) return { error: readable(error.message) };
-  /* Zero rows means RLS refused it or it was not pending — indistinguishable
-     from here, and deliberately so: telling the caller which would confirm that
-     somebody else's invitation exists. */
+
   if (!data?.length) return { error: "Undangan itu sudah tidak berlaku." };
 
   revalidatePath("/", "layout");
   return { error: null, ok: true };
 }
 
-/** Ends an existing relationship. Either side may do this: the patient
- *  withdrawing consent, or the caregiver stepping away. */
+
 export async function revokeRelationship(
   _prev: CareResult,
   formData: FormData,
@@ -216,11 +180,7 @@ export async function revokeRelationship(
   return { error: null, ok: true };
 }
 
-/** Claims a patient profile a caregiver created before this person signed up.
- *
- *  Goes through the SQL function rather than a direct update: the two writes
- *  must not half-happen, and "is this row still unclaimed" has to be checked in
- *  the same statement that claims it, or two people racing could both win. */
+
 export async function toggleTask(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -233,7 +193,7 @@ export async function toggleTask(_prev: CareResult, formData: FormData): Promise
 
   const supabase = await createClient();
 
-  // Sudah dicentang? toggle jadi hapus; kalau belum, insert.
+
   const { data: existing } = await supabase
     .from("task_completions")
     .select("id")
@@ -256,13 +216,7 @@ export async function toggleTask(_prev: CareResult, formData: FormData): Promise
   return { error: null, ok: true };
 }
 
-/** One manual measurement: a blood pressure, a glass of water, last night's
- *  sleep. The stat cards on Perawatan are all averages and sums over this one
- *  table, so this is the write behind most of that page.
- *
- *  `kind` is checked against the same list the column's constraint holds. The
- *  duplication is worth it only because the constraint's failure message is
- *  unreadable — the constraint is still the thing that decides. */
+
 export async function logHealthReading(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -280,10 +234,7 @@ export async function logHealthReading(_prev: CareResult, formData: FormData): P
   if (secondary !== null && !Number.isFinite(secondary)) {
     return { error: "Angka keduanya belum benar." };
   }
-  /* Blood pressure is the only compound reading, and a systolic without a
-     diastolic would be stored as a bare number that the feed then prints as
-     one. Caught here because the column allows it — `value_secondary` is
-     nullable for the seven kinds that have no second number. */
+
   if (kind === "blood_pressure" && secondary === null) {
     return { error: "Tekanan darah butuh dua angka: sistolik dan diastolik." };
   }
@@ -322,38 +273,15 @@ export async function activatePatientProfile(
   return { error: null, ok: true };
 }
 
-/** One month of the journal, for the calendar's arrows.
- *
- *  A plain server action rather than a form one — it takes arguments and
- *  returns data instead of a `{ error }`. Paging the calendar is a read, and
- *  routing it through the URL would close the modal on every press.
- *
- *  RLS is what scopes it: `mood_entries`, `health_readings` and
- *  `task_completions` all answer `is_my_patient or can_care_for`, so a
- *  `patientId` belonging to a stranger comes back as an empty month rather
- *  than somebody else's. */
+
 export async function loadJournalMonth(patientId: string, year: number, month: number) {
-  /* Normalised here so the caller can hand over month `-1` or `12` and get
-     December or January without doing calendar arithmetic in the browser. */
+
   const y = year + Math.floor(month / 12);
   const m = ((month % 12) + 12) % 12;
   return getJournalMonth(patientId, y, m);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   Logging the day
-   ═══════════════════════════════════════════════════════════════════════════
 
-   The writes behind the cards on Home and Perawatan. None of them checks
-   whether the caller may touch this patient — the insert policies on all of
-   these tables ask `is_my_patient or can_care_for`, so a `patient_id` belonging
-   to a stranger matches no policy and the insert is refused. A check here as
-   well would be a second, weaker copy of that rule, and the day the two drift
-   apart the one in JavaScript is the one that will be wrong.
-
-   What they do check is the input: an enum arriving from a form is a string
-   until something narrows it, and Postgres's `check` constraint fails with a
-   message meant for a developer, not for the person who pressed the button. */
 
 const MEALS = ["sarapan", "makan_siang", "makan_malam"] as const;
 const MOODS = ["great", "good", "okay", "low", "verylow"] as const;
@@ -366,11 +294,7 @@ const EVENT_KINDS = ["appointment", "meds", "therapy", "checkup"] as const;
 const oneOf = <T extends readonly string[]>(list: T, value: string): value is T[number] =>
   (list as readonly string[]).includes(value);
 
-/** How the patient is feeling, from either side of the relationship.
- *
- *  Insert-only, never an update: a mood is a reading taken at a moment, and
- *  overwriting this morning's "sedih" with this evening's "senang" would erase
- *  the very thing the trend is drawn from. Two entries in a day is correct. */
+
 export async function logMood(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -405,13 +329,7 @@ export async function logMood(_prev: CareResult, formData: FormData): Promise<Ca
   return { error: null, ok: true };
 }
 
-/** Ticks or un-ticks one of today's three meals.
- *
- *  A toggle rather than an insert, for the same reason `toggleTask` is one: the
- *  control is a checkbox, and a checkbox that cannot be un-ticked turns a
- *  mis-tap into a permanent wrong record of whether somebody ate. The unique
- *  constraint on `(patient_id, meal, done_on)` is what makes the read-then-write
- *  safe — a double submit can only ever land one row. */
+
 export async function toggleMeal(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -445,11 +363,7 @@ export async function toggleMeal(_prev: CareResult, formData: FormData): Promise
   return { error: null, ok: true };
 }
 
-/** Records one dose of one medication, for one slot of today.
- *
- *  `scheduled_time` is part of the unique key, so "the 08:00 one" and "the
- *  20:00 one" are separate records of the same medicine on the same day —
- *  which is the entire question the card is asking. */
+
 export async function logMedication(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -486,7 +400,7 @@ export async function logMedication(_prev: CareResult, formData: FormData): Prom
   return { error: null, ok: true };
 }
 
-/** Adds a medication to the standing plan. */
+
 export async function addMedication(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -496,9 +410,7 @@ export async function addMedication(_prev: CareResult, formData: FormData): Prom
   const name = String(formData.get("name") ?? "").trim();
   const dose = String(formData.get("dose") ?? "").trim();
   const rule = String(formData.get("rule") ?? "").trim();
-  /* "08:00, 20:00" from one field. Splitting here rather than asking for a
-     repeatable input keeps the form to four boxes, which is what somebody
-     copying a label off a box can actually fill in. */
+
   const times = String(formData.get("times") ?? "")
     .split(/[,\n]/)
     .map((t) => t.trim())
@@ -518,13 +430,7 @@ export async function addMedication(_prev: CareResult, formData: FormData): Prom
   return { error: null, ok: true };
 }
 
-/** Puts an appointment on the calendar.
- *
- *  The form collects a date and two clock times; they are assembled into
- *  instants at `+07:00` here rather than in the browser. A `datetime-local`
- *  value carries no zone, so letting the browser interpret it would file a
- *  caregiver's 09:00 appointment at 09:00 *their* time — which is a different
- *  moment the second anyone opens the app from another country. */
+
 export async function addScheduleEvent(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -533,8 +439,8 @@ export async function addScheduleEvent(_prev: CareResult, formData: FormData): P
   const patientId = String(formData.get("patient_id") ?? "").trim();
   const title = String(formData.get("title") ?? "").trim();
   const kind = String(formData.get("kind") ?? "appointment").trim();
-  const date = String(formData.get("date") ?? "").trim();      // YYYY-MM-DD
-  const start = String(formData.get("start") ?? "").trim();    // HH:MM
+  const date = String(formData.get("date") ?? "").trim();
+  const start = String(formData.get("start") ?? "").trim();
   const end = String(formData.get("end") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
 
@@ -582,7 +488,7 @@ export async function deleteScheduleEvent(
   return { error: null, ok: true };
 }
 
-/** One line of the standing care instructions. */
+
 export async function addCareNote(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -595,9 +501,7 @@ export async function addCareNote(_prev: CareResult, formData: FormData): Promis
   if (body.length > 500) return { error: "Catatannya terlalu panjang." };
 
   const supabase = await createClient();
-  /* Appended, not inserted at a position: `sort_order` only has to be
-     monotonic, and counting the existing rows to find the next one is a race
-     two caregivers can lose together. The timestamp breaks any tie. */
+
   const { error } = await supabase
     .from("care_notes")
     .insert({ patient_id: patientId, body, sort_order: 100, created_by: me.id });
@@ -608,18 +512,7 @@ export async function addCareNote(_prev: CareResult, formData: FormData): Promis
   return { error: null, ok: true };
 }
 
-/** Saves the whole list of standing instructions in one go.
- *
- *  The editor is a reorderable list where every row can be retyped, moved or
- *  removed before anything is committed — so the write has to be the list, not
- *  a stream of per-row edits. It arrives as JSON in one field for the same
- *  reason: a `FormData` of parallel `body[]` and `id[]` arrays can be desynced
- *  by one dropped entry, and then the wrong note is overwritten.
- *
- *  Existing rows are updated rather than replaced. Deleting the lot and
- *  re-inserting would be four lines shorter and would reset `created_by` and
- *  `created_at` on every note each time somebody fixed a typo — which is
- *  exactly the history the "Riwayat" panel is showing. */
+
 export async function saveCareNotes(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -644,10 +537,7 @@ export async function saveCareNotes(_prev: CareResult, formData: FormData): Prom
 
   const supabase = await createClient();
 
-  /* What is on screen is the whole truth, so anything not in it was deleted.
-     Scoped by `patient_id` as well as by id: without it, a crafted id would
-     ask the database to delete a note belonging to someone else — RLS would
-     refuse it, but the query should not be asking in the first place. */
+
   const keep = lines.map((l) => l.id).filter((id): id is string => Boolean(id));
   const removal = supabase.from("care_notes").delete().eq("patient_id", patientId);
   const { error: deleteError } = await (keep.length
@@ -655,9 +545,7 @@ export async function saveCareNotes(_prev: CareResult, formData: FormData): Prom
     : removal);
   if (deleteError) return { error: readable(deleteError.message) };
 
-  /* Sequential rather than `Promise.all`: these are a handful of rows, and a
-     partial failure that leaves the list half-reordered is harder to explain
-     than one that stops at the first problem. */
+
   for (const [index, line] of lines.entries()) {
     const { error } = line.id
       ? await supabase
@@ -696,12 +584,7 @@ export async function deleteCareNote(_prev: CareResult, formData: FormData): Pro
   return { error: null, ok: true };
 }
 
-/** Says something to the rest of the care team.
- *
- *  `author_id` is sent as the caller's own id, and the insert policy checks
- *  that it matches `auth.uid()`. Both, not either: sending it is what makes the
- *  row correct, and the policy is what makes it impossible to send anything
- *  else. */
+
 export async function sendCareMessage(_prev: CareResult, formData: FormData): Promise<CareResult> {
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
   const me = await getSessionProfile();
@@ -733,7 +616,7 @@ export async function sendCareMessage(_prev: CareResult, formData: FormData): Pr
   return { error: null, ok: true };
 }
 
-/** The targets the stat cards divide by, and the free-text profile note. */
+
 export async function updatePatientCare(
   _prev: CareResult,
   formData: FormData,
@@ -749,9 +632,7 @@ export async function updatePatientCare(
   const sleep = Number(formData.get("sleep_target_min"));
   const notes = String(formData.get("notes") ?? "").trim();
 
-  /* Bounds rather than "is it a number": a target of 0 divides by zero in the
-     progress ring, and 99999 ml is a typo that would make every day look like
-     a failure. */
+
   if (!Number.isFinite(fluid) || fluid < 500 || fluid > 6000) {
     return { error: "Target cairan harus antara 500 dan 6.000 ml." };
   }
@@ -772,6 +653,188 @@ export async function updatePatientCare(
 
   if (error) return { error: readable(error.message) };
   if (!data?.length) return { error: "Kamu tidak punya akses untuk mengubah itu." };
+
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+
+
+
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const TASK_DUPLICATE =
+  "Tugas dengan nama dan jam yang sama sudah ada. Ubah namanya, jamnya, atau tugaskan yang sudah ada ke orang lain.";
+
+
+function readTaskFields(formData: FormData):
+  | { error: string }
+  | { error: null; fields: { label: string; at_time: string | null; note: string | null; assignee_id: string | null } } {
+  const label = String(formData.get("label") ?? "").trim();
+  const atTime = String(formData.get("at_time") ?? "").trim();
+  const note = String(formData.get("note") ?? "").trim();
+  const assignee = String(formData.get("assignee_id") ?? "").trim();
+
+  if (!label) return { error: "Nama tugasnya masih kosong." };
+  if (label.length > 80) return { error: "Nama tugasnya terlalu panjang." };
+  if (note.length > 300) return { error: "Catatannya terlalu panjang." };
+  if (atTime && !TIME_RE.test(atTime)) return { error: "Jamnya belum benar. Contoh: 07:00." };
+
+  return {
+    error: null,
+    fields: {
+      label,
+      at_time: atTime || null,
+      note: note || null,
+      assignee_id: assignee || null,
+    },
+  };
+}
+
+
+export async function createDailyTask(_prev: CareResult, formData: FormData): Promise<CareResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const patientId = String(formData.get("patient_id") ?? "").trim();
+  if (!patientId) return { error: "Pasien tidak ditemukan." };
+
+  const read = readTaskFields(formData);
+  if (read.error !== null) return { error: read.error };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("daily_tasks").insert({
+    patient_id: patientId,
+    created_by: me.id,
+    ...read.fields,
+  });
+
+  if (error) {
+
+    if (error.message.includes("daily_tasks_unique_per_slot")) return { error: TASK_DUPLICATE };
+    return { error: readable(error.message) };
+  }
+
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+
+export async function updateDailyTask(_prev: CareResult, formData: FormData): Promise<CareResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const taskId = String(formData.get("task_id") ?? "").trim();
+  if (!taskId) return { error: "Tugasnya tidak ditemukan." };
+
+  const read = readTaskFields(formData);
+  if (read.error !== null) return { error: read.error };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("daily_tasks")
+    .update(read.fields)
+    .eq("id", taskId)
+    .select("id");
+
+  if (error) {
+    if (error.message.includes("daily_tasks_unique_per_slot")) return { error: TASK_DUPLICATE };
+    return { error: readable(error.message) };
+  }
+
+  if (!data?.length) return { error: "Kamu tidak punya akses untuk mengubah itu." };
+
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+
+export async function deleteDailyTask(_prev: CareResult, formData: FormData): Promise<CareResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const taskId = String(formData.get("task_id") ?? "").trim();
+  if (!taskId) return { error: "Tugasnya tidak ditemukan." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("daily_tasks")
+    .update({ active: false })
+    .eq("id", taskId)
+    .select("id");
+
+  if (error) return { error: readable(error.message) };
+  if (!data?.length) return { error: "Kamu tidak punya akses untuk menghapus itu." };
+
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+
+
+
+export async function inviteToCareTeam(_prev: CareResult, formData: FormData): Promise<CareResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const patientId = String(formData.get("patient_id") ?? "").trim();
+  const inviteeId = String(formData.get("invitee_id") ?? "").trim();
+
+  if (!patientId) return { error: "Pilih dulu pasien yang mau didampingi bersama." };
+  if (!inviteeId) return { error: "Orangnya tidak ditemukan." };
+  if (inviteeId === me.id) return { error: "Itu kamu sendiri." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("care_team_invites").insert({
+    patient_id: patientId,
+    invitee_id: inviteeId,
+    invited_by: me.id,
+  });
+
+  if (error) {
+    if (error.message.includes("care_team_invites_one_pending")) {
+      return { error: "Dia sudah diundang dan belum menjawab." };
+    }
+    return { error: readable(error.message) };
+  }
+
+  revalidatePath("/", "layout");
+  return { error: null, ok: true };
+}
+
+
+export async function respondToCareInvite(
+  _prev: CareResult,
+  formData: FormData,
+): Promise<CareResult> {
+  if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE };
+  const me = await getSessionProfile();
+  if (!me) return { error: NOT_SIGNED_IN };
+
+  const inviteId = String(formData.get("invite_id") ?? "").trim();
+  const accept = String(formData.get("accept") ?? "") === "true";
+  if (!inviteId) return { error: "Undangannya tidak ditemukan." };
+
+  const supabase = await createClient();
+
+  if (accept) {
+    const { error } = await supabase.rpc("accept_care_invite", { p_invite: inviteId });
+    if (error) return { error: readable(error.message) };
+  } else {
+    const { data, error } = await supabase
+      .from("care_team_invites")
+      .update({ status: "declined", responded_at: new Date().toISOString() })
+      .eq("id", inviteId)
+      .eq("status", "pending")
+      .select("id");
+
+    if (error) return { error: readable(error.message) };
+    if (!data?.length) return { error: "Undangannya sudah dijawab." };
+  }
 
   revalidatePath("/", "layout");
   return { error: null, ok: true };

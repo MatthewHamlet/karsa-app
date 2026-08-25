@@ -7,14 +7,10 @@ import { EASE } from "./List";
 type TaskItemProps = {
   label: string;
   hint?: string;
-  /** True while the row is striking through, just before it leaves. */
   done: boolean;
   onToggle: () => void;
 };
 
-/** A single pending task. Ticking it strikes the label through and then the
- *  row leaves the list — the exit is animated by the `AnimatePresence` that
- *  wraps these, which is why the root is a `motion.li`. */
 export default function TaskItem({ label, hint, done, onToggle }: TaskItemProps) {
   const reduce = useReducedMotion();
   const tick = reduce
@@ -35,8 +31,6 @@ export default function TaskItem({ label, hint, done, onToggle }: TaskItemProps)
         className="group/task flex w-full items-center gap-3.5 px-1 py-3 text-left outline-none transition-colors duration-200 hover:bg-white/70 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
       >
         <motion.span
-          // Literal hexes rather than the theme vars: Framer interpolates
-          // colours itself and needs a real value on both ends.
           animate={{
             backgroundColor: done ? "#56785d" : "rgba(255,255,255,0)",
             borderColor: done ? "#56785d" : "#cfc8b8",
@@ -62,7 +56,6 @@ export default function TaskItem({ label, hint, done, onToggle }: TaskItemProps)
             }`}
           >
             {label}
-            {/* Strike-through that draws itself instead of snapping on. */}
             <motion.span
               initial={false}
               animate={{ scaleX: done ? 1 : 0 }}

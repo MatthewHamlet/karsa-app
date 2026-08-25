@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "../supabase/server";
-import { NOT_CONFIGURED_MESSAGE, isSupabaseConfigured } from "../supabase/config";
+import { NOT_CONFIGURED_MESSAGE, SUPABASE_URL, isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
 
 export type SettingsResult = { error: string | null; ok?: boolean };
@@ -48,12 +48,22 @@ export async function updateProfile(
 
   const fullName = trimmed(formData, "full_name");
   const headline = trimmed(formData, "headline");
+  const avatarUrl = trimmed(formData, "avatar_url");
 
   if (!fullName) return { error: "Nama tidak boleh kosong." };
   if (fullName.length > 80) return { error: "Namanya terlalu panjang." };
   if (headline.length > 120) return { error: "Deskripsinya terlalu panjang." };
 
-  return patch({ full_name: fullName, headline: headline || null });
+
+  if (avatarUrl && !avatarUrl.startsWith(`${SUPABASE_URL}/storage/v1/object/public/avatars/`)) {
+    return { error: "Foto profilnya tidak dikenali. Coba pilih ulang." };
+  }
+
+  return patch({
+    full_name: fullName,
+    headline: headline || null,
+    avatar_url: avatarUrl || null,
+  });
 }
 
 export async function updatePersonalInfo(

@@ -15,8 +15,7 @@ const ATTEMPTS = [
 const HISTORY_LIMIT = 20;
 const MAX_INPUT = 2000;
 
-/* Gemini 3 spends output tokens thinking before it writes. At 800 a long
-   context left nothing for the answer and the reply came back empty. */
+
 const MAX_OUTPUT = 2000;
 
 function fail(message: string, status: number) {
@@ -32,7 +31,7 @@ export async function POST(request: Request) {
   const me = await getSessionProfile();
   if (!me) return fail("Belum masuk.", 401);
 
-  let body: { message?: unknown; threadId?: unknown };
+  let body: { message?: unknown; threadId?: unknown; brief?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -42,6 +41,9 @@ export async function POST(request: Request) {
   const message = typeof body.message === "string" ? body.message.trim() : "";
   if (!message) return fail("Pesan kosong.", 400);
   if (message.length > MAX_INPUT) return fail("Pesan terlalu panjang.", 400);
+
+
+  const brief = body.brief === true;
 
   const supabase = await createClient();
   const asked = typeof body.threadId === "string" ? body.threadId : null;
@@ -102,7 +104,11 @@ export async function POST(request: Request) {
         model: attempt.model,
         contents,
         config: {
-          systemInstruction: context.system,
+          systemInstruction: brief
+            ? `${context.system}
+
+PENTING: jawab sangat singkat, maksimal 2 kalimat pendek. Jawabanmu tampil di gelembung kecil di atas kepala maskot, bukan di layar obrolan.`
+            : context.system,
           temperature: 0.7,
           maxOutputTokens: MAX_OUTPUT,
           ...(attempt.minimal

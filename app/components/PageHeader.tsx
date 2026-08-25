@@ -4,8 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
-/** Every page owns a colour: a full-bleed field across the top with a deep
- *  curve on its bottom edge, running behind the page's own padding. */
+
 const TONE = {
   sand: {
     wash: "#dcc7a8",
@@ -46,19 +45,13 @@ const TONE = {
 
 export type HeaderTone = keyof typeof TONE;
 
-/** Cancels the page's own padding so the colour reaches the edges, then puts
- *  the padding back inside. Assumes the page root uses the standard
- *  `px-4 sm:px-6 md:px-8 xl:px-12` / `pt-6 md:pt-10 xl:pt-12`.
- *
- *  The phone figure used to be `pt-20` — 80px of clearance for the floating
- *  hamburger that used to sit at the top-left. Navigation moved to a bar at
- *  the bottom, so that space was holding nothing up. */
+
 const BLEED =
   "-mx-4 -mt-6 px-4 pt-6 sm:-mx-6 sm:px-6 md:-mx-8 md:-mt-10 md:px-8 md:pt-10 xl:-mx-12 xl:px-12 xl:-mt-12 xl:pt-12";
 
 const CURVE = "rounded-b-[32px] sm:rounded-b-[44px]";
 
-/** Texture, not pattern — soft shapes clipped by the curve. */
+
 function Shapes() {
   return (
     <svg
@@ -89,21 +82,20 @@ export default function PageHeader({
   eyebrow?: string;
   title: string;
   subtitle?: string;
-  /** A link back, or a handler — whichever the page needs. */
+
   backHref?: string;
   onBack?: () => void;
   backLabel?: string;
   action?: ReactNode;
-  /** Sits under the subtitle, inside the colour. For the things that belong to
-   *  the page rather than to a card below it — a search field, a filter row. */
+
   children?: ReactNode;
 }) {
   const t = TONE[tone];
   const backClasses = `grid h-10 w-10 shrink-0 place-items-center rounded-full outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 ${t.back}`;
 
   return (
-    // In normal flow on purpose. A negative z-index would slip behind the
-    // canvas background painted by an ancestor, and the colour would vanish.
+
+
     <header
       className={`relative mb-6 overflow-hidden pb-7 sm:mb-8 sm:pb-10 xl:mb-10 xl:pb-12 ${BLEED} ${CURVE}`}
       style={{ backgroundColor: t.wash }}

@@ -7,17 +7,6 @@ import AuthShell from "./AuthShell";
 import CodeForm from "../components/CodeForm";
 import { sendRecoveryCode, verifyRecoveryCode, type OtpState } from "../login/actions";
 
-/** Two steps on one page: ask for the address, then take the code that arrives.
- *
- *  Kept on one page rather than two routes because the second step needs the
- *  address from the first, and carrying it through a URL would put it in
- *  browser history and server logs for no benefit.
- *
- *  `quiet`: two delighted robots is the wrong greeting for someone locked out.
- *
- *  The confirmation says "kalau terdaftar" rather than "terkirim", and the
- *  action answers identically either way. A form that distinguishes the two is
- *  a free tool for working out who has an account here. */
 export default function ForgotPasswordPage() {
   const [sendState, sendAction, sending] = useActionState<OtpState, FormData>(sendRecoveryCode, {
     error: null,
@@ -31,7 +20,6 @@ export default function ForgotPasswordPage() {
   const uid = useId();
   const idField = `${uid}-id`;
 
-  /* ── Step two ── */
   if (sendState.sent) {
     return (
       <AuthShell quiet>
@@ -59,7 +47,6 @@ export default function ForgotPasswordPage() {
             pendingLabel="MEMERIKSA…"
           />
 
-          {/* Re-posts the first form, so a lost code costs one tap. */}
           <form action={sendAction}>
             <input type="hidden" name="email" value={sendState.email} />
             <button
@@ -84,7 +71,6 @@ export default function ForgotPasswordPage() {
     );
   }
 
-  /* ── Step one ── */
   return (
     <AuthShell quiet>
       <header>

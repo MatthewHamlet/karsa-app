@@ -1,28 +1,6 @@
-/** The cartoon meadow behind the login screen: soft blue sky, a round sun,
- *  puffy clouds, and three bands of green hill.
- *
- *  ── Why this is three layers instead of one SVG ──────────────────────────
- *  The same drawing has to fill two boxes of opposite proportion: a tall half
- *  screen on a desktop (about 720×900) and a wide shallow header on a phone
- *  (about 375×200). A single viewBox fitted with `slice` cannot serve both —
- *  it crops whichever axis does not match, and at those two aspects it would
- *  either cut the sun off the top or the hills off the bottom.
- *
- *  So each part is fitted the way that part tolerates:
- *
- *    · the sky is a plain background colour, which cannot crop at all;
- *    · the sun and clouds keep their natural aspect and hang from the top, so
- *      they are always whole and the sky simply continues beneath them;
- *    · the hills are stretched (`preserveAspectRatio="none"`) and pinned to the
- *      bottom. Stretching is normally a mistake, but these are wavy silhouettes
- *      with no circles and no text in them — there is nothing in a rolling hill
- *      that reveals a change of ratio;
- *    · the flowers and bushes, which *would* reveal it, sit in their own
- *      unstretched layer and only appear from `lg`, where there is room for
- *      them to read as anything other than specks. */
 
-/** One puffy cloud. Three overlapping discs on a rounded bar — a single ellipse
- *  reads as a balloon. */
+
+
 function Cloud({ x, y, s = 1, o = 0.94 }: { x: number; y: number; s?: number; o?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`} fill="#ffffff" opacity={o}>
@@ -34,7 +12,7 @@ function Cloud({ x, y, s = 1, o = 0.94 }: { x: number; y: number; s?: number; o?
   );
 }
 
-/** A clump of shrubs on the front hill. */
+
 function Bush({ x, y, s = 1, fill = "#4f9a58" }: { x: number; y: number; s?: number; fill?: string }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`} fill={fill}>
@@ -45,7 +23,7 @@ function Bush({ x, y, s = 1, fill = "#4f9a58" }: { x: number; y: number; s?: num
   );
 }
 
-/** A five-petal daisy. */
+
 function Flower({ x, y, s = 1 }: { x: number; y: number; s?: number }) {
   return (
     <g transform={`translate(${x} ${y}) scale(${s})`}>
@@ -65,13 +43,9 @@ export default function LoginScene({ className = "" }: { className?: string }) {
       aria-hidden
       className={`pointer-events-none absolute inset-0 overflow-hidden bg-[#bfe4f5] ${className}`}
     >
-      {/* The sky is a gradient, not a flat fill: it has to arrive at something
-          close to the app's own canvas by the time it reaches the hills, or the
-          join between this screen and the one behind it shows. */}
+
       <div className="absolute inset-0 bg-gradient-to-b from-[#bfe4f5] via-[#dcf0f7] to-[#f0f7e8]" />
-      {/* ── Sun and clouds ──────────────────────────────────────────────
-          Natural aspect, hung from the top. Taller than a phone header, so the
-          lower clouds are simply cropped there while the sun always shows. */}
+
       <svg
         viewBox="0 0 400 260"
         preserveAspectRatio="xMidYMin meet"
@@ -84,8 +58,7 @@ export default function LoginScene({ className = "" }: { className?: string }) {
           </radialGradient>
         </defs>
 
-        {/* Sun, top right — away from where the quote sits. Sand rather than
-            yellow: this palette has no primary colours in it anywhere. */}
+
         <circle cx="334" cy="56" r="62" fill="url(#ls-glow)" />
         <g stroke="#f6c453" strokeWidth="7" strokeLinecap="round">
           <path d="M334 4 v-0.5 M334 4 v10" />
@@ -105,24 +78,19 @@ export default function LoginScene({ className = "" }: { className?: string }) {
         <Cloud x={330} y={202} s={0.85} o={0.8} />
       </svg>
 
-      {/* ── Hills ───────────────────────────────────────────────────────
-          Stretched on purpose — see the note at the top of this file. */}
+
       <svg
         viewBox="0 0 400 120"
         preserveAspectRatio="none"
         className="absolute inset-x-0 bottom-0 h-[32%] w-full lg:h-[44%]"
       >
-        {/* Three tints stepped down towards `--color-karsa` (#56785d) rather
-            than the stock greens this started with — those read as a games
-            console next to the rest of the product. */}
+
         <path d="M0 44 C 60 18, 130 22, 190 40 C 250 58, 320 26, 400 40 L400 120 L0 120 Z" fill="#9ccf92" />
         <path d="M0 66 C 70 44, 140 62, 210 62 C 280 62, 340 78, 400 62 L400 120 L0 120 Z" fill="#84c37c" />
         <path d="M0 92 C 90 74, 160 96, 250 90 C 320 85, 360 98, 400 90 L400 120 L0 120 Z" fill="#6fb86a" />
       </svg>
 
-      {/* ── Things growing on the front hill ────────────────────────────
-          Unstretched, bottom-anchored, and desktop only: on a 200px phone
-          header these would be four-pixel dots. */}
+
       <svg
         viewBox="0 0 400 200"
         preserveAspectRatio="xMidYMax slice"

@@ -9,9 +9,6 @@ import {
 } from "lucide-react";
 import type { ScheduleEntry } from "../lib/care/queries";
 
-/** Each kind gets its own wash so the list reads at a glance. The edge is a
- *  border rather than a ring: a ring paints outside the box and the scrolling
- *  list around these cards clips it. */
 const KIND = {
   appointment: {
     icon: Stethoscope,

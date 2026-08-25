@@ -1,9 +1,4 @@
-/** The app's accent palette, keyed by colour rather than by feature so any
- *  page can reach for it. Colour carries meaning — a category owns a hue and
- *  keeps it across icon, card and accent — so these stay pale and cohesive.
- *
- *  `card`/`ring` dress a container, `tile`/`ink` an icon, `inset` a panel
- *  nested inside a tinted card. */
+
 export const TONES = {
   green: {
     card: "bg-act-50",
@@ -40,7 +35,7 @@ export const TONES = {
     ink: "text-info-600",
     inset: "ring-info-edge/70",
   },
-  /** Reserved for leaving/destroying — the only warm red on the page. */
+
   rose: {
     card: "bg-rose-50",
     ring: "ring-rose-100",
@@ -59,8 +54,7 @@ export const TONES = {
 
 export type Tone = keyof typeof TONES;
 
-/** The same palette again, as raw values: SVG art needs a `fill`, not a class.
- *  Mirrors the custom properties in globals.css — change one, change both. */
+
 export const TONE_HEX = {
   green: { tile: "#dbecdf", ink: "#45734e" },
   lavender: { tile: "#e7e1f8", ink: "#6a58ae" },
@@ -71,7 +65,7 @@ export const TONE_HEX = {
   neutral: { tile: "#eef2ec", ink: "#3f5c46" },
 } as const satisfies Record<Tone, { tile: string; ink: string }>;
 
-/** Which hue each area of care owns. */
+
 export const CARE_TONE = {
   medication: "lavender",
   nutrition: "peach",

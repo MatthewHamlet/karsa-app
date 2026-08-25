@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { EASE, PILL_SPRING } from "./List";
 import { MONTHS, dayKey, jakartaToday } from "../lib/care/time";
 
-/** Monday-first, matching the sketch. */
+
 const WEEKDAYS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
 export type Selection = { y: number; m: number; d: number };
@@ -14,20 +14,14 @@ export type Selection = { y: number; m: number; d: number };
 type CalendarProps = {
   selected: Selection;
   onSelect: (value: Selection) => void;
-  /** Which day gets the "today" disc. Passed in rather than read from the
-   *  browser clock: the page around this grid is server-rendered in Jakarta
-   *  time, and a calendar that disagreed with it by a day would be the only
-   *  thing on the page telling a different date. */
+
   today?: Selection;
-  /** Keys — `dayKey(y, m, d)` — of days with something scheduled. A set rather
-   *  than the events themselves: this grid only ever asks "is anything on",
-   *  and handing it the full list would re-render 42 cells whenever any one
-   *  event changed. */
+
   marked?: Set<string>;
   className?: string;
 };
 
-/** Monday-first offset for the 1st of the month. */
+
 function leadingBlanks(y: number, m: number) {
   return (new Date(y, m, 1).getDay() + 6) % 7;
 }
@@ -55,8 +49,7 @@ export default function Calendar({
     });
   };
 
-  /** Always six full rows: the neighbouring months fill the gaps, so the grid
-   *  keeps the same height whatever month you're on and never leaves a hole. */
+
   const lead = leadingBlanks(view.y, view.m);
   const total = daysIn(view.y, view.m);
   const prev = view.m === 0 ? { y: view.y - 1, m: 11 } : { y: view.y, m: view.m - 1 };
@@ -100,8 +93,7 @@ export default function Calendar({
         ))}
       </div>
 
-      {/* Natural height: the month grid must never be squeezed and clipped —
-          spare vertical space belongs to the day's schedule below it. */}
+
       <div className="relative shrink-0 overflow-hidden">
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
@@ -140,8 +132,8 @@ export default function Calendar({
                   aria-current={isToday ? "date" : undefined}
                   aria-pressed={isSelected}
                   data-day-cell
-                  // Square cells that grow with the column instead of a fixed
-                  // pixel size, so the grid fills whatever width it's given.
+
+
                   className={`group/day relative mx-auto grid aspect-square w-full max-w-[min(58px,5.1vh)] place-items-center rounded-full text-[15px] font-semibold outline-none transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-karsa/40 xl:text-base ${
                     isSelected
                       ? "text-white"
@@ -157,22 +149,15 @@ export default function Calendar({
                       className="absolute inset-0 rounded-full bg-karsa shadow-[0_4px_10px_-4px_rgba(86,120,93,0.8)]"
                     />
                   )}
-                  {/* Today is a quiet grey disc, not a green outline. Green is
-                      what the calendar uses to say "this is the day you are
-                      looking at" — spending it on "this is the day it happens
-                      to be" made two different claims in one colour, and the
-                      ring competed with the selected pill for attention it
-                      does not need. */}
+
                   {!isSelected && isToday && (
                     <span className="absolute inset-0 rounded-full bg-neutral-900/[0.07] transition-colors duration-200 group-hover/day:bg-neutral-900/[0.11]" />
                   )}
 
-                  {/* Dead centre in the pill — `leading-none` so the glyph box
-                      is the glyph, not the inherited line height. */}
+
                   <span className="relative z-10 leading-none tabular-nums">{day}</span>
 
-                  {/* The dot only flags days you haven't opened — once a day is
-                      selected the pill says it, so the dot would be noise. */}
+
                   {hasEvents && !isSelected && (
                     <span className="absolute bottom-[3px] left-1/2 z-10 h-1 w-1 -translate-x-1/2 rounded-full bg-karsa-sand" />
                   )}

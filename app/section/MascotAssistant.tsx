@@ -97,8 +97,7 @@ export default function MascotAssistant({
       let full = "";
       let started = false;
 
-      /* The bubble is created by the first chunk, not before it: an empty
-         bubble sitting under the thinking dots reads as a failed answer. */
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -155,15 +154,9 @@ export default function MascotAssistant({
         onHistory={() => setHistoryOpen(true)}
       />
 
-      {/* ── Stage ────────────────────────────────────────────────────────
-          One column on a phone. The tab switcher that used to sit here paid a
-          row of chrome for a second panel, and the only thing on that panel a
-          caregiver needed — the action cards — now arrives in the thread under
-          the answer that produced it. Nothing left to switch to. */}
+
       <div className="grid min-h-0 flex-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        {/* The thread's room. The wallpaper is scattered rather than tiled-
-            looking on purpose: this is the one screen a caregiver sits inside
-            for a while, and a bare canvas made it read like a form. */}
+
         <div className="relative flex min-h-0 flex-col">
           <HealthPattern className="text-karsa-dark" opacity={0.14} />
 
@@ -182,10 +175,7 @@ export default function MascotAssistant({
           )}
         </div>
 
-        {/* Karsa keeps a presence beside the thread from `lg` — where there is
-            width going spare — and nowhere else. The state-driven tint used to
-            live on this element's background; the room fills the panel now, so
-            it moved inside as a wash over the scene. */}
+
         <aside
           aria-label="Arsa"
           className="hidden min-h-0 flex-col border-karsa-line lg:flex lg:border-l"
@@ -212,9 +202,7 @@ export default function MascotAssistant({
   );
 }
 
-/** The mascot answers from the patient's own record. Without one there is
- *  nothing to personalise against, and a general chatbot on a care page is
- *  worse than an honest empty state. */
+
 function NotReady() {
   return (
     <div className="relative grid flex-1 place-items-center px-6 text-center">
@@ -231,11 +219,7 @@ function NotReady() {
   );
 }
 
-/** Past sessions, newest first, grouped by the day they happened on.
- *
- *  Each entry shows the caregiver's own opening line rather than a generated
- *  title — you recognise a conversation by what you asked, not by what it was
- *  filed as. Picking one loads the whole thread back into the page. */
+
 function HistoryModal({
   open,
   onClose,
@@ -429,8 +413,7 @@ function HistoryModal({
   );
 }
 
-/** Who this is about, and the two facts that change what is safe to suggest.
- *  Kept to one line so it can stay on screen the whole session. */
+
 function PatientBanner({
   patientName,
   patientAge,
@@ -464,10 +447,7 @@ function PatientBanner({
   }, [alertsOpen]);
 
   return (
-    /* One line, always. The alerts used to sit out here as two full pills and
-       wrapped to a second row on a phone, which cost the thread a chunk of the
-       screen to say something that doesn't change all day. They live behind the
-       count now — present, and one tap from being read in full. */
+
     <header className="relative z-30 shrink-0 border-b border-karsa-line bg-white/70 px-4 py-2 backdrop-blur-sm sm:px-6 xl:px-8">
       <div className="flex items-center gap-2.5">
         <div className="min-w-0 flex-1">
@@ -523,9 +503,7 @@ function PatientBanner({
           </div>
         )}
 
-        {/* Was a "Terhubung" status pill. A connection light is only worth the
-            corner when it is off, and this one never is — so the space goes to
-            the thing a caregiver actually reaches for: what Karsa said before. */}
+
         <button
           type="button"
           onClick={onHistory}

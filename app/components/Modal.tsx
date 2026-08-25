@@ -6,11 +6,7 @@ import { X } from "lucide-react";
 import { EASE } from "./List";
 import { lockScroll } from "../lib/scrollLock";
 
-/** The one dialog every "lihat semua" on this page opens.
- *
- *  Escape closes it, the backdrop closes it, focus moves into the panel on
- *  open and returns to whatever opened it on close, and the page behind stops
- *  scrolling while it's up. */
+
 export default function Modal({
   open,
   onClose,
@@ -44,7 +40,7 @@ export default function Modal({
     };
     document.addEventListener("keydown", onKey);
 
-    // Next frame, so the panel exists before we reach for it.
+
     const focus = requestAnimationFrame(() => panelRef.current?.focus());
 
     return () => {

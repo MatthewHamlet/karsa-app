@@ -5,21 +5,11 @@ import { getSessionProfile } from "../profile";
 import { POSTS_PER_PAGE } from "./constants";
 import { clockOf, MONTHS_SHORT, calendarDayOf } from "../care/time";
 
-/** Reads for Komunitas.
- *
- *  Unlike everything in `lib/care`, none of this is scoped to a patient — the
- *  community is the one part of Karsa where strangers read each other, and the
- *  RLS behind it says "any signed-in account" (migration 0010). What keeps that
- *  safe is that none of these tables touch a patient record at all.
- *
- *  Every list here returns `[]` rather than throwing. The page has to render for
- *  somebody who has just signed up into a community with nothing in it yet. */
+
 
 const initialOf = (name: string) => name.trim().charAt(0).toUpperCase() || "?";
 
-/** A stable colour per person, hashed from their id — the same function the
- *  care side uses for patient avatars, duplicated here rather than imported
- *  because that one lives in a client component directory. */
+
 const AVATAR_COLOURS = ["#56785d", "#8a76bd", "#c08b5e", "#4f8a8b", "#a4676b", "#6f7f9e"];
 function colourFor(id: string): string {
   let hash = 0;
@@ -30,12 +20,14 @@ function colourFor(id: string): string {
 export type CommunityPerson = {
   id: string;
   name: string;
-  /** Their standing here — "Dokter geriatri", "Pendamping · 3 tahun". */
+
   role: string;
   initial: string;
   color: string;
-  /** Clinicians Karsa has checked. Never self-serve; see the column comment. */
+
   verified: boolean;
+
+  avatarUrl: string | null;
 };
 
 function personOf(row: {
@@ -44,6 +36,7 @@ function personOf(row: {
   headline: string | null;
   verified: boolean | null;
   role?: string | null;
+  avatar_url?: string | null;
 }): CommunityPerson {
   const name = row.full_name?.trim() || "Pengguna Karsa";
   return {
@@ -53,15 +46,11 @@ function personOf(row: {
     initial: initialOf(name),
     color: colourFor(row.id),
     verified: Boolean(row.verified),
+    avatarUrl: row.avatar_url ?? null,
   };
 }
 
-/** "5 jam yang lalu".
- *
- *  Computed on the server and shipped as a finished string, like every other
- *  timestamp in this app — a relative time formatted in the browser renders
- *  differently than it did during SSR and React calls that a mismatch. The cost
- *  is that it ages until the next request, which for a feed is fine. */
+
 function ageLabel(iso: string): string {
   const seconds = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (seconds < 60) return "baru saja";
@@ -84,12 +73,12 @@ export type CommunityPost = {
   age: string;
   replies: number;
   upvotes: number;
-  /** Whether the signed-in reader has already upvoted it. */
+
   voted: boolean;
   keywords: string[];
   tags: string[];
   groupId: string | null;
-  /** Public URL of the post picture, or null for a text-only post. */
+
   imageUrl: string | null;
 };
 
@@ -111,7 +100,7 @@ export type CommunitySession = {
   title: string;
   blurb: string;
   host: string;
-  /** "Sabtu, 22 Agu" and "19.00 WIB", pre-formatted in Jakarta time. */
+
   date: string;
   time: string;
   joined: boolean;
@@ -119,7 +108,7 @@ export type CommunitySession = {
 
 export type CommunityTopic = { label: string; term: string; threads: number };
 
-/** Everybody referenced by a set of ids, in one round trip. */
+
 async function peopleFor(ids: (string | null)[]): Promise<Map<string, CommunityPerson>> {
   const unique = [...new Set(ids.filter((id): id is string => Boolean(id)))];
   if (unique.length === 0) return new Map();
@@ -127,16 +116,13 @@ async function peopleFor(ids: (string | null)[]): Promise<Map<string, CommunityP
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, headline, verified, role")
+    .select("id, full_name, headline, verified, role, avatar_url")
     .in("id", unique);
 
   return new Map((data ?? []).map((row) => [row.id as string, personOf(row)]));
 }
 
-/** The feed, newest first.
- *
- *  Reads `community_feed`, the view that carries the reply and vote counts —
- *  otherwise every card on the page would be two more queries. */
+
 export { POSTS_PER_PAGE };
 
 export const getCommunityPosts = cache(
@@ -170,8 +156,7 @@ export const getCommunityPosts = cache(
         people.get(row.author_id as string) ??
         personOf({ id: row.author_id as string, full_name: null, headline: null, verified: false }),
       title: row.title as string,
-      /* Clamped here as well as in CSS: the card shows two lines, and shipping
-         a 4KB post body to render two lines of it is a lot of wire for nothing. */
+
       snippet: body.length > 240 ? `${body.slice(0, 240).trimEnd()}…` : body,
       body,
       age: ageLabel(row.created_at as string),
@@ -198,8 +183,7 @@ export const getCommunityGroups = cache(async (): Promise<CommunityGroup[]> => {
       .from("community_groups")
       .select("id, name, blurb, art, tone, keywords, created_by")
       .order("created_at", { ascending: true }),
-    /* Counted in JS from one flat read rather than a count per group: the
-       member table is small and this is one round trip instead of N. */
+
     supabase.from("community_group_members").select("group_id"),
     me
       ? supabase.from("community_group_members").select("group_id").eq("profile_id", me.id)
@@ -229,7 +213,7 @@ export const getCommunityGroups = cache(async (): Promise<CommunityGroup[]> => {
   }));
 });
 
-/** The next session that has not started yet, or null. */
+
 export const getNextSession = cache(async (): Promise<CommunitySession | null> => {
   if (!isSupabaseConfigured()) return null;
 
@@ -269,20 +253,13 @@ export const getNextSession = cache(async (): Promise<CommunitySession | null> =
     blurb: (data.blurb as string) ?? "",
     host: (data.host_name as string) ?? "",
     date: `${weekday}, ${day.d} ${MONTHS_SHORT[day.m]}`,
-    /* WIB is UTC+7, which is the timezone `clockOf` formats in — so the label
-       is accurate rather than decorative. */
+
     time: `${clockOf(starts).replace(":", ".")} WIB`,
     joined,
   };
 });
 
-/** The topic chips, counted from what people actually wrote.
- *
- *  Tallied in JavaScript over the recent posts rather than kept as a counter
- *  column: a counter needs a trigger on every insert, update and delete to stay
- *  honest, and "which topics are busy right now" is a question about recent
- *  posts anyway — a lifetime total would keep a topic at the top of the list a
- *  year after anyone last wrote about it. */
+
 export const getCommunityTopics = cache(async (limit = 9): Promise<CommunityTopic[]> => {
   if (!isSupabaseConfigured()) return [];
 
@@ -296,8 +273,7 @@ export const getCommunityTopics = cache(async (limit = 9): Promise<CommunityTopi
   const tally = new Map<string, number>();
   for (const row of data ?? []) {
     const words = [...((row.keywords as string[]) ?? []), ...((row.tags as string[]) ?? [])];
-    /* One count per post per topic — a post that lists "lansia" twice is still
-       one thread about lansia. */
+
     for (const word of new Set(words.map((w) => w.trim()).filter(Boolean))) {
       tally.set(word, (tally.get(word) ?? 0) + 1);
     }
@@ -308,14 +284,13 @@ export const getCommunityTopics = cache(async (limit = 9): Promise<CommunityTopi
     .slice(0, limit)
     .map(([term, threads]) => ({
       term,
-      /* `#TipsNutrisi` from `tips nutrisi`. */
+
       label: `#${term.replace(/\s+(.)/g, (_, c: string) => c.toUpperCase()).replace(/^./, (c) => c.toUpperCase())}`,
       threads,
     }));
 });
 
-/** People worth following: verified clinicians first, then the most recently
- *  active posters, minus anybody already followed and minus the reader. */
+
 export const getSuggestedPeople = cache(async (limit = 4): Promise<CommunityPerson[]> => {
   if (!isSupabaseConfigured()) return [];
 
@@ -325,7 +300,7 @@ export const getSuggestedPeople = cache(async (limit = 4): Promise<CommunityPers
   const [{ data: profiles }, { data: following }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, headline, verified, role")
+      .select("id, full_name, headline, verified, role, avatar_url")
       .order("verified", { ascending: false })
       .limit(40),
     me
@@ -337,8 +312,6 @@ export const getSuggestedPeople = cache(async (limit = 4): Promise<CommunityPers
 
   return (profiles ?? [])
     .filter((row) => row.id !== me?.id && !followed.has(row.id as string))
-    /* Somebody with no name set yet is not a useful suggestion — the card
-       would read "Pengguna Karsa" and mean nothing. */
     .filter((row) => (row.full_name as string | null)?.trim())
     .slice(0, limit)
     .map(personOf);
@@ -536,14 +509,15 @@ export const getMyGroupCount = cache(async (): Promise<number> => {
   return count ?? 0;
 });
 
-/** Everything the page needs, gathered once. */
+
 export async function getCommunityData() {
-  const [posts, groups, topics, people, me] = await Promise.all([
+  const [posts, groups, topics, people, me, followedIds] = await Promise.all([
     getCommunityPosts(),
     getCommunityGroups(),
     getCommunityTopics(),
     getSuggestedPeople(),
     getSessionProfile(),
+    getFollowedIds(),
   ]);
   return {
     posts,
@@ -553,7 +527,127 @@ export async function getCommunityData() {
     myGroups: groups.filter((g) => g.joined),
     meId: me?.id ?? null,
     ownsGroup: groups.some((g) => g.isAdmin),
+
+    followedIds,
   };
 }
 
 export type CommunityData = Awaited<ReturnType<typeof getCommunityData>>;
+
+
+
+
+export const getFollowedIds = cache(async (): Promise<string[]> => {
+  if (!isSupabaseConfigured()) return [];
+  const me = await getSessionProfile();
+  if (!me) return [];
+
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("community_follows")
+    .select("followee_id")
+    .eq("follower_id", me.id);
+
+  return (data ?? []).map((r) => r.followee_id as string);
+});
+
+
+export async function searchPeople(query: string, limit = 12): Promise<CommunityPerson[]> {
+  const term = query.trim();
+  if (!isSupabaseConfigured() || term.length < 2) return [];
+
+  const supabase = await createClient();
+  const me = await getSessionProfile();
+  const escaped = term.replace(/[%_\\]/g, (c) => `\\${c}`);
+
+  const { data } = await supabase
+    .from("profiles")
+    .select("id, full_name, headline, verified, role, avatar_url")
+    .ilike("full_name", `%${escaped}%`)
+    .order("verified", { ascending: false })
+    .limit(limit + 1);
+
+  return (data ?? [])
+    .filter((row) => row.id !== me?.id)
+    .filter((row) => (row.full_name as string | null)?.trim())
+    .slice(0, limit)
+    .map(personOf);
+}
+
+
+export type ProfileCard = CommunityPerson & {
+
+  bio: string | null;
+
+  isCaregiver: boolean;
+  followers: number;
+  following: number;
+
+  team: number;
+
+  followed: boolean;
+};
+
+export async function getProfileCard(profileId: string): Promise<ProfileCard | null> {
+  if (!isSupabaseConfigured() || !profileId) return null;
+
+  const supabase = await createClient();
+  const me = await getSessionProfile();
+
+  const { data: row } = await supabase
+    .from("profiles")
+    .select("id, full_name, headline, verified, role, avatar_url")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  if (!row) return null;
+
+  const [followers, following, asCaregiver, theirPatient, mine] = await Promise.all([
+    supabase
+      .from("community_follows")
+      .select("follower_id", { count: "exact", head: true })
+      .eq("followee_id", profileId),
+    supabase
+      .from("community_follows")
+      .select("followee_id", { count: "exact", head: true })
+      .eq("follower_id", profileId),
+    supabase
+      .from("care_relationships")
+      .select("id", { count: "exact", head: true })
+      .eq("caregiver_id", profileId)
+      .in("status", ["pending", "active"]),
+    supabase.from("patients").select("id").eq("user_id", profileId).maybeSingle(),
+    me
+      ? supabase
+          .from("community_follows")
+          .select("followee_id")
+          .eq("follower_id", me.id)
+          .eq("followee_id", profileId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  let team = asCaregiver.count ?? 0;
+
+
+  if (theirPatient.data?.id) {
+    const { count } = await supabase
+      .from("care_relationships")
+      .select("id", { count: "exact", head: true })
+      .eq("patient_id", theirPatient.data.id)
+      .in("status", ["pending", "active"]);
+    team += count ?? 0;
+  }
+
+  const person = personOf(row);
+
+  return {
+    ...person,
+    bio: (row.headline as string | null)?.trim() || null,
+    isCaregiver: row.role !== "patient",
+    followers: followers.count ?? 0,
+    following: following.count ?? 0,
+    team,
+    followed: Boolean(mine.data),
+  };
+}

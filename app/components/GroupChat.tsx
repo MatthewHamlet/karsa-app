@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Send, UserMinus, UsersRound } from "lucide-react";
 import Modal from "./Modal";
 import HealthPattern from "./HealthPattern";
+import TypingDots from "./TypingDots";
+import { useGroupChannel } from "./useGroupChannel";
 import {
   kickMember,
   loadGroupMembers,
@@ -59,6 +61,25 @@ export default function GroupChat({
     };
   }, [group]);
 
+
+  const meAs = useMemo(() => {
+    if (!meId) return null;
+    const mine = members.find((m) => m.id === meId);
+    if (!mine) return null;
+    return { id: mine.id, name: mine.name, initial: mine.initial, color: mine.color };
+  }, [meId, members]);
+
+  const refetch = useCallback(() => {
+    if (!group) return;
+    loadGroupMessages(group.id).then(setMessages);
+  }, [group]);
+
+  const { typists, notifyTyping, notifyStopped } = useGroupChannel({
+    groupId: group?.id ?? null,
+    me: meAs,
+    onChange: refetch,
+  });
+
   const kick = async (profileId: string) => {
     if (!group) return;
     const fd = new FormData();
@@ -71,13 +92,16 @@ export default function GroupChat({
   useEffect(() => {
     if (!state.ok || !group) return;
     setDraft("");
+
     loadGroupMessages(group.id).then(setMessages);
-  }, [state.ok, group]);
+    notifyStopped();
+  }, [state.ok, group, notifyStopped]);
+
 
   useEffect(() => {
     const node = streamRef.current;
     if (node) node.scrollTop = node.scrollHeight;
-  }, [messages.length, loading]);
+  }, [messages.length, loading, typists.length]);
 
   return (
     <Modal
@@ -154,6 +178,17 @@ export default function GroupChat({
                   </li>
                 );
               })}
+
+
+              {typists.length === 1 ? (
+                <TypingDots
+                  name={typists[0].name}
+                  color={typists[0].color}
+                  initial={typists[0].initial}
+                />
+              ) : typists.length > 1 ? (
+                <TypingDots name={`${typists.length} orang`} />
+              ) : null}
             </ul>
           </div>
 
@@ -173,7 +208,12 @@ export default function GroupChat({
               name="body"
               rows={1}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+
+                if (event.target.value.trim()) notifyTyping();
+                else notifyStopped();
+              }}
               disabled={sending}
               placeholder={`Tulis pesan ke ${group.name}…`}
               className="min-h-[48px] flex-1 resize-none rounded-2xl bg-white px-4 py-3 text-[14.5px] leading-5 text-neutral-800 outline-none ring-1 ring-karsa-line placeholder:text-neutral-400 focus-visible:ring-2 focus-visible:ring-karsa/40 disabled:opacity-70"

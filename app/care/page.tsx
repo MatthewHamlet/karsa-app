@@ -22,8 +22,7 @@ export const metadata: Metadata = {
   description: "Profil perawatan pasien: statistik, aktivitas, dan obrolan tim.",
 };
 
-/** Reads the session on every request, so it must not be cached — the same URL
- *  answers differently for two caregivers. */
+
 export const dynamic = "force-dynamic";
 
 const PERIODS: Period[] = ["daily", "weekly", "monthly"];
@@ -35,8 +34,7 @@ export default async function Care({ searchParams }: PageProps<"/care">) {
   const params = await searchParams;
   const me = await getSessionProfile();
 
-  /* Signed out, or no keys configured: the page renders from the placeholder
-     data so the design is still workable. */
+
   if (!me) return <CarePage params={params} />;
 
   const patients = await getMyPatients();
@@ -50,10 +48,7 @@ export default async function Care({ searchParams }: PageProps<"/care">) {
   const patientId = active.patientId;
   const today = jakartaToday();
 
-  /* All three periods are fetched, not just the one showing. The period switch
-     is a client-side control with its own animation — going back to the server
-     for each press would put a network round trip inside a 200ms transition,
-     and the whole set is one indexed scan per period. */
+
   const [fixed, monitor, weekly, monthly, patient, feed, byDate, notes, messages, group, moods] =
     await Promise.all([
       Promise.all(PERIODS.map((p) => getFixedStats(patientId, p))),

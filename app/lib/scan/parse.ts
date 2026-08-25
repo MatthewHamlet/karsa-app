@@ -103,11 +103,7 @@ export function parsePrescription(raw: string): ParsedMedicine[] {
     if (NOISE.test(line)) continue;
 
     const dose = line.match(DOSE);
-    /* Prescriptions often break after the drug name, putting "3x sehari
-       sesudah makan" on its own line underneath. Looking one line ahead when
-       this one has no schedule of its own is what turns two half-rows into one
-       complete medicine — and `consumed` is what stops that continuation line
-       being emitted again as a medicine called "3x Sehari Sesudah Makan". */
+
     const next = lines[i + 1] ?? "";
     const nextIsOwnDrug = DOSE.test(next);
     const ownFreq = frequencyOf(line);

@@ -1,16 +1,4 @@
-/** What a stat card shows once it stops being about today.
- *
- *  A day has one reading; a week has seven and a month thirty, and a single
- *  averaged figure throws away the only thing a caregiver actually wants from
- *  a period — whether it is drifting. So each metric carries a shape here:
- *  a series to draw, a compliance record to count, or a run of moods to lay
- *  out side by side.
- *
- *  The readings are generated rather than typed out, from a seeded wobble
- *  around a baseline. `Math.random()` would redraw every chart on hydration
- *  and disagree with what the server rendered; this gives the same numbers
- *  every time while keeping three hundred of them out of the file. Still
- *  placeholders — this is a design pass, not a data layer. */
+
 
 import type { MoodKey } from "./mood";
 
@@ -21,19 +9,18 @@ export type ChartKind = "line" | "dualLine" | "bar" | "compliance" | "mood";
 export type SeriesPoint = {
   label: string;
   value: number;
-  /** Diastolic, on the one metric that is two numbers. */
+
   secondary?: number;
 };
 
 export type Series = {
   points: SeriesPoint[];
-  /** Averages are computed from the points, never typed — a reference line
-   *  that disagrees with the curve it sits on is worse than no line. */
+
   average: number;
   averageSecondary?: number;
-  /** Already formatted, unit and all: goes in the badge and on the line. */
+
   averageLabel: string;
-  /** Formats one reading for a tooltip. */
+
   format: (value: number, secondary?: number) => string;
 };
 
@@ -42,9 +29,7 @@ export type DayStatus = "done" | "partial" | "missed";
 export type ComplianceDay = {
   label: string;
   status: DayStatus;
-  /** What actually happened that day, and what was due. The tooltip prints
-   *  both, so these have to be real numbers rather than a status dressed up
-   *  as one — summed across the period they equal the headline exactly. */
+
   done: number;
   target: number;
 };
@@ -61,7 +46,7 @@ export type MoodSpan = {
   days: { label: string; mood: MoodKey }[];
 };
 
-/** How this metric changed against the period before it. */
+
 export type Comparison = { text: string; direction: "up" | "down" | "flat" };
 
 export type PeriodDetail = {
@@ -72,25 +57,20 @@ export type PeriodDetail = {
   comparison?: Comparison;
 };
 
-/* ── Generators ───────────────────────────────────────────────────────────── */
+
 
 const DAY_LABELS = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
 
-/** Column headers for the monthly grid, initials only — seven "Sen/Sel/Rab"
- *  across a card is more type than the days underneath it. */
+
 export const WEEKDAY_INITIALS = ["S", "S", "R", "K", "J", "S", "M"];
 
-/** The month the generated readings stand for, and where its first day falls
- *  in a Monday-first week (0 = Senin). September 2024 opened on a Sunday, so
- *  the grid starts with six blanks — the same blanks a wall calendar has, and
- *  the reason the grid reads as dates rather than as a run of dots. */
+
 export const MONTH = { short: "Sep", firstWeekday: 6 } as const;
 
 const labelsFor = (count: number) =>
   count === 7 ? DAY_LABELS : Array.from({ length: count }, (_, i) => String(i + 1));
 
-/** Deterministic, in −0.5…0.5. Seeded on the metric so two cards never draw
- *  the same silhouette. */
+
 const wobble = (seed: number, i: number) => {
   const x = Math.sin(seed * 127.1 + i * 311.7) * 43758.5453;
   return x - Math.floor(x) - 0.5;
@@ -106,7 +86,7 @@ const mean = (values: number[]) => values.reduce((a, b) => a + b, 0) / values.le
 const id = (n: number, decimals = 0) =>
   n.toLocaleString("id-ID", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 
-/** Minutes as the app writes durations elsewhere. */
+
 const asDuration = (minutes: number) => {
   const m = Math.round(minutes);
   return `${Math.floor(m / 60)}j ${String(m % 60).padStart(2, "0")}m`;
@@ -151,9 +131,7 @@ function buildSeries({
   };
 }
 
-/** The sub-header badge. `better` says which direction is good news, so the
- *  arrow can be green for a kilo gained and green for a point of blood
- *  pressure lost. */
+
 function compare(
   delta: number,
   unit: string,
@@ -182,15 +160,7 @@ function buildCompliance({
   seed: number;
   count: number;
 }): Compliance {
-  /* Every day starts fully done, then the period's shortfall is taken off the
-     days the wobble ranks worst, one dose at a time. Doing it by subtraction
-     rather than by picking whole "missed" days is what makes the grid add up:
-     the per-day figures sum to `done`, so a tooltip saying 2/3 and a headline
-     saying 19 of 21 are the same claim counted twice.
 
-     It also produces the middle state honestly. A day that got two of three
-     doses is neither kept nor missed, and flattening it to either would be the
-     grid telling a caregiver something that did not happen. */
   const perDay = Math.round(target / count);
   const taken = new Array<number>(count).fill(perDay);
 
@@ -238,7 +208,7 @@ function buildMood(seed: number, count: number): MoodSpan {
   return { dominant: dominant as MoodKey, dominantDays, days };
 }
 
-/* ── Per-metric detail ────────────────────────────────────────────────────── */
+
 
 const COUNT: Record<TrendPeriod, number> = { weekly: 7, monthly: 30 };
 

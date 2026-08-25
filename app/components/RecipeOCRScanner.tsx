@@ -24,15 +24,10 @@ import { lockScroll } from "../lib/scrollLock";
 
 type Stage = "camera" | "review";
 
-/** Bright emerald, not the app's sage: this is the one surface in Karsa that is
- *  black, and the sage green disappears against it. Everything outside the
- *  viewport goes back to the app's own palette. */
+
 const BEAM = "#059669";
 
-/** Open/closed only. Every piece of scanner state lives in the sheet below,
- *  which exists only while it is open — so "start at the camera again" is a
- *  fresh mount rather than an effect resetting six values, and reopening can
- *  never land on last week's review screen. */
+
 export default function RecipeOCRScanner({
   open,
   onClose,
@@ -93,7 +88,7 @@ function ScannerSheet({
     };
     document.addEventListener("keydown", onKey);
 
-    /* The page behind must not scroll under a full-height sheet. */
+
     const unlock = lockScroll();
 
     return () => {
@@ -125,8 +120,6 @@ function ScannerSheet({
     if (!initialFile || startedRef.current) return;
     startedRef.current = true;
     void fromFile(initialFile);
-    /* `fromFile` is recreated every render but the guard above makes this run
-       exactly once per mounted sheet. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFile]);
 
@@ -175,11 +168,7 @@ function ScannerSheet({
             className="fixed inset-0 z-[60] bg-neutral-950/55 backdrop-blur-[2px]"
           />
 
-          {/* ── Sheet ───────────────────────────────────────────────────────
-              Capped below the viewport and column-flexed, so the shutter bar
-              and the save button are always on screen and only the middle
-              scrolls. A sheet that grows past the fold puts its own primary
-              action out of reach. */}
+
           <motion.div
             key="sheet"
             ref={sheetRef}
@@ -195,8 +184,7 @@ function ScannerSheet({
             }
             className="fixed inset-x-0 bottom-0 z-[61] flex max-h-[94dvh] flex-col overflow-hidden rounded-t-3xl bg-[#FDFBF7] shadow-[0_-12px_44px_-16px_rgba(24,32,24,0.5)] outline-none sm:mx-auto sm:max-w-lg"
           >
-            {/* Drag handle. Decorative — the scrim and the X are what close it,
-                and a handle that looks draggable but isn't would be worse. */}
+
             <div className="flex shrink-0 justify-center pb-1 pt-2.5">
               <span aria-hidden className="h-1.5 w-10 rounded-full bg-slate-300" />
             </div>
@@ -206,9 +194,7 @@ function ScannerSheet({
               flash={flash}
               onFlash={() => setFlash((v) => !v)}
               onClose={onClose}
-              /* Coming from the gallery there is no viewfinder to go back to,
-                 so the leading button closes instead of stranding the sheet on
-                 a camera the caregiver never opened. */
+
               onBack={initialStage === "review" ? onClose : () => setStage("camera")}
               backLabel={initialStage === "review" ? "Batal" : "Kembali ke kamera"}
             />
@@ -241,7 +227,7 @@ function ScannerSheet({
               )}
             </div>
 
-            {/* ── Action bar ───────────────────────────────────────────── */}
+
             <div className="shrink-0 border-t border-slate-200/80 bg-white/80 px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm">
               {stage === "camera" ? (
                 <ShutterBar
@@ -270,7 +256,7 @@ function ScannerSheet({
   );
 }
 
-/* ── Header ───────────────────────────────────────────────────────────────── */
+
 
 function Header({
   stage,
@@ -315,14 +301,14 @@ function Header({
           {flash ? <Zap size={18} strokeWidth={2.4} /> : <ZapOff size={18} strokeWidth={2.2} />}
         </button>
       ) : (
-        /* Keeps the title centred once the flash button is gone. */
+
         <span aria-hidden className="h-9 w-9" />
       )}
     </header>
   );
 }
 
-/* ── State 1: camera ──────────────────────────────────────────────────────── */
+
 
 function CameraStage({
   reading,
@@ -464,7 +450,7 @@ function ShutterBar({
   );
 }
 
-/* ── State 2: review ──────────────────────────────────────────────────────── */
+
 
 function ReviewStage({
   nothingFound,
@@ -495,15 +481,14 @@ function ReviewStage({
           dan terang, atau tambahkan obatnya manual di bawah.
         </p>
       )}
-      {/* Thumbnail. Small on purpose — the photo is evidence to check against,
-          not the subject of this screen. */}
+
       <div className="flex items-center gap-3 rounded-2xl bg-white p-2.5 ring-1 ring-slate-200">
         <span
           aria-hidden
           className="relative grid h-14 w-11 shrink-0 place-items-center overflow-hidden rounded-lg bg-slate-900"
         >
           {previewUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
+
             <img src={previewUrl} alt="" className="h-full w-full object-cover" />
           ) : (
             <span className="h-[62%] w-[62%] rounded-sm bg-slate-600/60" />
@@ -678,8 +663,7 @@ function MedicineCard({
         </div>
       </div>
 
-      {/* The reader's own doubt, said out loud. A dose it guessed wrong is the
-          one error this screen exists to catch. */}
+
       {med.confident === false && !editing && (
         <p className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[12px] font-medium leading-4 text-amber-800 ring-1 ring-amber-100">
           <TriangleAlert size={13} strokeWidth={2.4} className="mt-0.5 shrink-0" aria-hidden />
@@ -690,7 +674,7 @@ function MedicineCard({
   );
 }
 
-/* ── Secondary sheets ─────────────────────────────────────────────────────── */
+
 
 function TipsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
@@ -763,7 +747,7 @@ function PhotoViewer({
           className="fixed inset-0 z-[64] flex items-center justify-center bg-neutral-950/90 p-6"
         >
           {url ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
+
             <img
               src={url}
               alt="Foto resep"

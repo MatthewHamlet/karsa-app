@@ -12,12 +12,6 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-/** The onboarding gate's destination.
- *
- *  Also its own exit: a caregiver who already has somebody is sent on to the
- *  dashboard rather than being shown a screen asking them to start. Without
- *  that, pairing successfully in another tab would leave this one insisting
- *  they still had nobody. */
 export default async function Mulai() {
   if (!isSupabaseConfigured()) return <StartHere />;
 

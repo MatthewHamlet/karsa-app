@@ -5,11 +5,7 @@ import { CalendarDays, ChevronRight, Clock, Pill, Stethoscope, X } from "lucide-
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { ScannedPrescription as Prescription } from "../lib/scan/queries";
 
-/** Every sheet scanned before, newest first.
- *
- *  A row says the three things worth scanning for: when, who wrote it, and
- *  whether it is still being taken. The drugs are chips rather than a list —
- *  you are looking for a name you half-remember, not reading a label. */
+
 export default function RecipeHistory({
   prescriptions = [],
 }: {
@@ -106,8 +102,7 @@ function StatusTag({ status }: { status: Prescription["status"] }) {
   );
 }
 
-/** Tapping a row opens the sheet the row summarised: the original photo, and
- *  every drug on it with its hours. */
+
 function DetailSheet({
   prescription,
   onClose,
@@ -169,14 +164,13 @@ function DetailSheet({
             </header>
 
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] [contain:paint]">
-              {/* The original sheet. Kept because a caregiver checking a dose
-                  months later trusts the paper, not the transcription. */}
+
               <div>
                 <h3 className="mb-2 text-[11px] font-semibold uppercase leading-4 tracking-[0.14em] text-neutral-400">
                   Foto resep asli
                 </h3>
                 {prescription.imageUrl ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
+
                   <img
                     src={prescription.imageUrl}
                     alt="Foto resep asli"

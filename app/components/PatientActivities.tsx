@@ -10,10 +10,13 @@ import {
   Droplets,
   Gauge,
   MessageSquare,
+  MessagesSquare,
+  Paperclip,
   Pill,
   Utensils,
 } from "lucide-react";
 import Modal from "./Modal";
+import ActivityDiscussion, { type ActivityContext } from "./ActivityDiscussion";
 import { EASE } from "./List";
 import { MONTHS, WEEKDAYS } from "../data/dashboard";
 import type { CareData } from "../lib/care/view";
@@ -27,9 +30,7 @@ import {
   type PatientActivity,
 } from "../data/careStats";
 
-/** How the feed's five kinds land on this page's five icons. The card on Home
- *  has three tones for the same rows; here there is room to tell a glass of
- *  water from a night's sleep. */
+
 const ICON_FOR: Record<string, ActivityIcon> = {
   medication: "medication",
   meal: "meal",
@@ -48,10 +49,102 @@ const ICON: Record<ActivityIcon, { icon: typeof Pill; bg: string; ink: string }>
 
 const key = (y: number, m: number, d: number) => `${y}-${m}-${d}`;
 const daysIn = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-/** Monday-first, matching the rest of the app. */
+
 const lead = (y: number, m: number) => (new Date(y, m, 1).getDay() + 6) % 7;
 
-function ActivityRow({ activity }: { activity: PatientActivity }) {
+
+function DiscussButton({
+  activity,
+  onDiscuss,
+}: {
+  activity: PatientActivity;
+  onDiscuss: (context: ActivityContext) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  const context = {
+    id: activity.id,
+    label: activity.text,
+    detail: activity.time,
+  };
+
+  return (
+    <span className="relative shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Diskusikan: ${activity.text}`}
+        title="Diskusikan dengan tim perawatan"
+        className="grid h-9 w-9 place-items-center rounded-full text-neutral-400 outline-none transition-colors duration-200 hover:bg-white hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
+      >
+        <MessageSquare size={17} strokeWidth={2} />
+      </button>
+
+      {open && (
+        <>
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-20 cursor-default"
+          />
+          <span
+            role="menu"
+            className="absolute right-0 top-10 z-30 w-60 overflow-hidden rounded-2xl bg-white p-1.5 shadow-[0_18px_40px_-20px_rgba(24,32,24,0.5)] ring-1 ring-karsa-line"
+          >
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                onDiscuss(context);
+              }}
+              className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40"
+            >
+              <MessagesSquare size={16} strokeWidth={2.2} className="mt-0.5 shrink-0 text-karsa-dark" />
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-semibold text-neutral-800">
+                  Diskusikan di sini
+                </span>
+                <span className="block text-[12px] leading-4 text-neutral-500">
+                  Buka obrolan singkat tanpa meninggalkan halaman.
+                </span>
+              </span>
+            </button>
+
+            <Link
+              role="menuitem"
+              href={chatHref({ type: "record", ...context })}
+              onClick={() => setOpen(false)}
+              className="flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left outline-none transition-colors duration-150 hover:bg-karsa-canvas focus-visible:ring-2 focus-visible:ring-karsa/40"
+            >
+              <Paperclip size={16} strokeWidth={2.2} className="mt-0.5 shrink-0 text-karsa-dark" />
+              <span className="min-w-0">
+                <span className="block text-[13.5px] font-semibold text-neutral-800">
+                  Lampirkan ke Obrolan Tim
+                </span>
+                <span className="block text-[12px] leading-4 text-neutral-500">
+                  Bawa aktivitas ini ke obrolan grup perawatan.
+                </span>
+              </span>
+            </Link>
+          </span>
+        </>
+      )}
+    </span>
+  );
+}
+
+function ActivityRow({
+  activity,
+  onDiscuss,
+}: {
+  activity: PatientActivity;
+  onDiscuss: (context: ActivityContext) => void;
+}) {
   const { icon: Icon, bg, ink } = ICON[activity.icon];
 
   return (
@@ -72,19 +165,7 @@ function ActivityRow({ activity }: { activity: PatientActivity }) {
         </span>
       </span>
 
-      <Link
-        href={chatHref({
-          type: "record",
-          id: activity.id,
-          label: activity.text,
-          detail: activity.time,
-        })}
-        aria-label={`Diskusikan: ${activity.text}`}
-        title="Diskusikan dengan tim perawatan"
-        className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-neutral-400 outline-none transition-colors duration-200 hover:bg-white hover:text-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40"
-      >
-        <MessageSquare size={17} strokeWidth={2} />
-      </Link>
+      <DiscussButton activity={activity} onDiscuss={onDiscuss} />
     </li>
   );
 }
@@ -94,12 +175,11 @@ export default function PatientActivities({ data }: { data?: CareData }) {
   const [view, setView] = useState(data?.today ?? ACTIVITY_MONTH);
   const [picked, setPicked] = useState(data?.today ?? ACTIVITY_TODAY);
   const [monthOpen, setMonthOpen] = useState(false);
+
+  const [discussing, setDiscussing] = useState<ActivityContext | null>(null);
   const reduce = useReducedMotion();
 
-  /* The month in the modal is fetched for whatever month the page loaded on —
-     see `getActivitiesByDate`. Paging past it shows empty days rather than
-     wrong ones, which is the honest failure: the grid says "no activity
-     recorded", and that is true of every day it has not been given. */
+
   const byDate = data?.activitiesByDate ?? ACTIVITIES_BY_DATE;
   const recent = data
     ? data.feed.map((item) => ({
@@ -150,11 +230,11 @@ export default function PatientActivities({ data }: { data?: CareData }) {
 
       <ul className="-mx-3">
         {recent.map((activity) => (
-          <ActivityRow key={activity.id} activity={activity} />
+          <ActivityRow key={activity.id} activity={activity} onDiscuss={setDiscussing} />
         ))}
       </ul>
 
-      {/* "See more": a month to pick from, then that day's activities. */}
+
       <Modal
         open={open}
         onClose={() => setOpen(false)}
@@ -282,7 +362,7 @@ export default function PatientActivities({ data }: { data?: CareData }) {
           {dayList.length > 0 ? (
             <ul className="rounded-2xl bg-white p-2 ring-1 ring-karsa-line">
               {dayList.map((activity) => (
-                <ActivityRow key={activity.id} activity={activity} />
+                <ActivityRow key={activity.id} activity={activity} onDiscuss={setDiscussing} />
               ))}
             </ul>
           ) : (
@@ -292,6 +372,13 @@ export default function PatientActivities({ data }: { data?: CareData }) {
           )}
         </motion.div>
       </Modal>
+
+
+      <ActivityDiscussion
+        context={discussing}
+        data={data}
+        onClose={() => setDiscussing(null)}
+      />
     </section>
   );
 }

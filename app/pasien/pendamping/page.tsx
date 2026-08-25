@@ -15,8 +15,6 @@ export const dynamic = "force-dynamic";
 export default async function Pendamping() {
   if (!isSupabaseConfigured()) return <PatientCareTeam team={[]} shareCode={null} />;
 
-  /* Optimistic gate only — the queries and every action behind them are
-     enforced by RLS, which is what actually decides. */
   if (!(await getSessionProfile())) redirect("/login?next=/pasien/pendamping");
 
   const [record, team] = await Promise.all([getMyPatientRecord(), getMyCareTeam()]);

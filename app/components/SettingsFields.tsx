@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { ChevronDown, Trash2, Upload } from "lucide-react";
+import { createClient } from "../lib/supabase/client";
 
-/** The shell every field shares: label above, control below, hint under that.
- *  Labels sit above rather than beside — a two-column form makes the eye travel
- *  sideways for every value, and these are read far more often than edited. */
+
 function Field({
   id,
   label,
@@ -109,40 +108,94 @@ export function SelectField({
   );
 }
 
-/** Picture picker. The preview is a real local object URL, so choosing a file
- *  actually shows that file — a chooser that silently discards what you gave it
- *  is worse than no chooser. Nothing is uploaded: there is no server yet, and
- *  the button says as much by only ever changing what is on this screen. */
+
 export function AvatarField({
   initial,
-  onFileChange,
+  value,
+  onChange,
 }: {
   initial: string;
-  onFileChange?: (file: File | null) => void;
+
+  value: string | null;
+
+  onChange: (url: string | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  /* Object URLs are held by the document until revoked, so each one is released
-     as soon as it is replaced and again when the field goes away. */
-  useEffect(() => {
-    if (!preview) return;
-    return () => URL.revokeObjectURL(preview);
-  }, [preview]);
+  const pick = async (file: File | null) => {
+    setError(null);
 
-  const pick = (file: File | null) => {
-    setPreview(file ? URL.createObjectURL(file) : null);
-    onFileChange?.(file);
+    if (!file) {
+
+      if (inputRef.current) inputRef.current.value = "";
+      onChange(null);
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setError("Fotonya lebih dari 2 MB. Pilih yang lebih kecil ya.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setError("Kamu belum masuk.");
+        return;
+      }
+
+
+      const ext = (file.name.split(".").pop() ?? "jpg").toLowerCase().slice(0, 5);
+      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(path, file, { cacheControl: "3600", upsert: false });
+
+      if (uploadError) {
+
+        const missingBucket = /bucket not found|does not exist/i.test(uploadError.message);
+        setError(
+          missingBucket
+            ? "Penyimpanan foto belum disiapkan. Jalankan supabase/migrations/0024_avatar_storage.sql dulu."
+            : process.env.NODE_ENV === "development"
+              ? `Fotonya gagal diunggah.\n\n[dev] ${uploadError.message}`
+              : "Fotonya gagal diunggah. Coba lagi atau pilih yang lain.",
+        );
+        return;
+      }
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(path);
+
+      onChange(publicUrl);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
     <div className="flex flex-wrap items-center gap-5">
       <span className="relative grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full bg-karsa text-[28px] font-bold text-white ring-1 ring-karsa-line">
-        {preview ? (
-          // eslint-disable-next-line @next/next/no-img-element -- a blob: URL, not an asset the optimiser can touch
-          <img src={preview} alt="" className="h-full w-full object-cover" />
+        {value ? (
+
+          <img src={value} alt="" className="h-full w-full object-cover" />
         ) : (
           initial
+        )}
+
+        {busy && (
+          <span className="absolute inset-0 grid place-items-center bg-karsa-dark/55 text-[11px] font-bold">
+            …
+          </span>
         )}
       </span>
 
@@ -156,19 +209,17 @@ export function AvatarField({
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="inline-flex items-center gap-2 rounded-full bg-karsa px-4 py-2 text-[13.5px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2"
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-full bg-karsa px-4 py-2 text-[13.5px] font-bold text-white outline-none transition-colors duration-200 hover:bg-karsa-dark focus-visible:ring-2 focus-visible:ring-karsa/40 focus-visible:ring-offset-2 disabled:opacity-60"
           >
             <Upload size={15} strokeWidth={2.3} />
-            Pilih foto
+            {busy ? "Mengunggah…" : "Pilih foto"}
           </button>
 
-          {preview && (
+          {value && !busy && (
             <button
               type="button"
-              onClick={() => {
-                if (inputRef.current) inputRef.current.value = "";
-                pick(null);
-              }}
+              onClick={() => pick(null)}
               className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13.5px] font-semibold text-rose-600 outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-rose-50 focus-visible:ring-2 focus-visible:ring-rose-300"
             >
               <Trash2 size={15} strokeWidth={2.2} />
@@ -177,10 +228,19 @@ export function AvatarField({
           )}
         </div>
 
+        {error && (
+          <p
+            role="alert"
+            className="mt-2 whitespace-pre-line text-[12.5px] font-semibold leading-4 text-rose-700"
+          >
+            {error}
+          </p>
+        )}
+
         <input
           ref={inputRef}
           type="file"
-          accept="image/png,image/jpeg"
+          accept="image/png,image/jpeg,image/webp"
           className="sr-only"
           aria-label="Pilih foto profil"
           onChange={(event) => pick(event.target.files?.[0] ?? null)}
@@ -190,9 +250,7 @@ export function AvatarField({
   );
 }
 
-/** Save and cancel. Both are dead until something has actually changed — a live
- *  Save on an untouched form invites a click that does nothing and teaches the
- *  caregiver the button is unreliable. */
+
 export function FormActions({
   dirty,
   onSave,
@@ -224,8 +282,7 @@ export function FormActions({
         Batal
       </button>
 
-      {/* Polite, so it is announced after the caregiver stops typing rather
-          than interrupting them mid-field. */}
+
       <p role="status" aria-live="polite" className="text-[13px] text-neutral-500">
         {dirty ? "Ada perubahan yang belum disimpan." : saved ? "Perubahan tersimpan." : ""}
       </p>

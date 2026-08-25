@@ -23,9 +23,7 @@ import { createClient as createSupabaseClient } from "../lib/supabase/client";
 import { logHealthReading, logMood } from "../lib/care/actions";
 import type { JournalMonth } from "../lib/care/queries";
 
-/** What the wizard renders against with no session — the design-preview case.
- *  A month shaped correctly and entirely empty, so the calendar draws real
- *  squares rather than crashing on a missing prop. */
+
 const EMPTY_MONTH: JournalMonth = {
   year: new Date().getFullYear(),
   month: new Date().getMonth(),
@@ -48,26 +46,11 @@ import {
 } from "../data/journal";
 import { PATIENT } from "../data/patient";
 
-/** The patient's journal, as a wizard.
- *
- *  Three questions, one per screen, each one the only thing on it. A single
- *  form with mood, a recorder and a note stacked down it asks this reader to
- *  hold three tasks at once and to scroll to find the end of them; one question
- *  at a time asks for nothing but the answer in front of them.
- *
- *  Nothing behind the sheet scrolls, and nothing on this page does either. The
- *  screen is a fixed frame: header, the calendar button, the step. */
+
 
 const STEPS = 3;
 
-/** The journal's names for its metrics, and the database's.
- *
- *  The two lists differ because they answer to different things: `bp` and
- *  `glucose` are what fits on a stepper's label, while `blood_pressure` and
- *  `blood_sugar` are the values `health_readings.kind` is constrained to
- *  (migration 0005). Mapped explicitly rather than renamed on either side — the
- *  UI names are load-bearing in `METRICS`, and the column's check constraint is
- *  load-bearing everywhere else. */
+
 const READING_KIND: Record<MetricKind, string> = {
   bp: "blood_pressure",
   glucose: "blood_sugar",
@@ -76,7 +59,7 @@ const READING_KIND: Record<MetricKind, string> = {
   hr: "heart_rate",
 };
 
-/** Spoken or written — the same answer, two ways of giving it. */
+
 type NoteMode = "voice" | "text";
 
 export default function PatientJournalPage({
@@ -86,15 +69,13 @@ export default function PatientJournalPage({
   filledToday = false,
   month,
 }: {
-  /** Absent when signed out, which is the design-preview case: the wizard still
-   *  runs, it simply has nowhere to write to. */
+
   patientId?: string;
   patientName?: string;
   initial?: string;
-  /** Whether today's entry already exists. Opens the "done" screen instead of
-   *  the wizard — see the note where it is rendered. */
+
   filledToday?: boolean;
-  /** The current month, already built from the database. */
+
   month: JournalMonth;
 } = { month: EMPTY_MONTH }) {
   const reduce = useReducedMotion();
@@ -102,7 +83,7 @@ export default function PatientJournalPage({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [step, setStep] = useState(1);
   const [mood, setMood] = useState<MoodKey | null>(null);
-  /** Step 2 offers both ways of telling it. */
+
   const [noteMode, setNoteMode] = useState<NoteMode>("voice");
   const [note, setNote] = useState("");
   const [clip, setClip] = useState<{ path: string; seconds: number; url: string } | null>(null);
@@ -111,7 +92,7 @@ export default function PatientJournalPage({
   const [saved, setSaved] = useState(filledToday);
   const [burst, setBurst] = useState(0);
 
-  /* Step 3. Which metrics are on the card, and what they read. */
+
   const [metrics, setMetrics] = useState<MetricKind[]>(DEFAULT_METRICS);
   const [bp, setBp] = useState({ sys: "", dia: "" });
   const [values, setValues] = useState<Record<string, number>>(() =>
@@ -123,33 +104,20 @@ export default function PatientJournalPage({
   );
   const [addOpen, setAddOpen] = useState(false);
 
-  /** What the add button still has to offer. Computed once, up here, because
-   *  both the button's caption and the sheet's list read from it. */
+
   const remaining = ADDABLE_METRICS.filter((k) => !metrics.includes(k));
 
   const stepMetric = (kind: MetricKind, delta: number) =>
     setValues((prev) => ({
       ...prev,
-      /* Rounded to the metric's own step: 36.6 + 0.1 in binary floating point
-         is 36.699999999999996, and that is what would be printed. */
+
       [kind]: Math.max(0, Math.round((prev[kind] + delta) * 10) / 10),
     }));
 
-  /** Writes the day down: the mood, the note, and whatever was measured.
-   *
-   *  Each reading is its own row in `health_readings` rather than one "journal
-   *  entry" record, because that is the table the caregiver's charts and stat
-   *  cards already read — a journal that stored its numbers somewhere else
-   *  would be a second, quieter source of truth for the same blood pressure.
-   *
-   *  Sent together, and a failure anywhere is reported rather than swallowed.
-   *  This is the one screen where a silent failure is worst: the person has
-   *  just told the app how they feel, and being lied to with a tick is worse
-   *  than being asked to try again. */
+
   const save = async () => {
     if (!patientId) {
-      /* Design preview with no session. The confetti still fires so the flow
-         can be walked through, but nothing pretends to have been stored. */
+
       setSaved(true);
       setBurst((n) => n + 1);
       return;
@@ -185,8 +153,7 @@ export default function PatientJournalPage({
       if (kind === "bp") {
         const sys = Number(bp.sys);
         const dia = Number(bp.dia);
-        /* Both or neither — a systolic on its own is stored as a bare number
-           that the activity feed then prints as a whole blood pressure. */
+
         if (Number.isFinite(sys) && Number.isFinite(dia) && sys > 0 && dia > 0) {
           jobs.push(reading("blood_pressure", sys, dia));
         }
@@ -211,18 +178,9 @@ export default function PatientJournalPage({
   };
 
   return (
-    /* Fixed frame. The page ends where the bottom bar begins — `--bottom-nav`
-       carries that height — so nothing here can ever slide under it. */
-    <div className="flex h-[calc(100dvh-var(--bottom-nav))] flex-col overflow-hidden px-4 pb-3 pt-4 sm:px-6">
-      {/* ── Header ───────────────────────────────────────────────────────────
-          The app's own header: a full-bleed colour field with the deep curve
-          along its bottom, running back up behind the page's padding. Plum
-          here — every route owns a hue, and this is the only one not yet spoken
-          for. The negative margins cancel the page's own padding; keep the pair
-          in step if that padding ever changes.
 
-          The connection badge is gone. A status light earns its corner when it
-          can be off, and this one never was. */}
+    <div className="flex h-[calc(100dvh-var(--bottom-nav))] flex-col overflow-hidden px-4 pb-3 pt-4 sm:px-6">
+
       <header
         className="relative -mx-4 -mt-4 mb-4 shrink-0 overflow-hidden rounded-b-[28px] px-4 pb-5 pt-4 sm:-mx-6 sm:px-6"
         style={{ backgroundColor: "#6f5a7d" }}
@@ -251,34 +209,23 @@ export default function PatientJournalPage({
         </div>
       </header>
 
-      {/* ── Calendar trigger ─────────────────────────────────────────────── */}
+
       <button
         type="button"
         onClick={() => setCalendarOpen(true)}
-        /* No top margin: the header already carries the gap below its curve. */
+
         className="flex shrink-0 items-center justify-between gap-3 rounded-2xl bg-white px-5 py-4 text-left outline-none ring-2 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft/60 focus-visible:ring-4 focus-visible:ring-karsa/40"
       >
         <span className="inline-flex items-center gap-2.5 text-[16px] font-extrabold text-neutral-900">
           <CalendarDays size={20} strokeWidth={2.6} className="text-karsa-dark" aria-hidden />
           BUKA KALENDER SEHAT
         </span>
-        {/* No date printed here any more. It showed whichever square was last
-            selected inside the modal, which read as "the journal is about that
-            day" while the wizard underneath was always writing today's. Two
-            different dates on one screen, and the wrong one was the louder. */}
+
         <ChevronDown size={20} strokeWidth={3} className="shrink-0 text-neutral-500" aria-hidden />
       </button>
 
       {saved ? (
-        /* Today is already written. The wizard is not re-opened by default:
-           the question it asks — "hari ini kamu merasa apa?" — has an answer on
-           file, and asking again as if it did not is how an app makes somebody
-           doubt whether the first one saved.
 
-           It is a screen, not a lock. `Catat lagi` is right there, because a
-           mood is a reading taken at a moment: somebody who felt awful this
-           morning and better tonight has two true things to record, and
-           `mood_entries` is insert-only precisely so both survive. */
         <div className="mt-4 flex min-h-0 flex-1 flex-col items-center justify-center px-4 text-center">
           <span
             aria-hidden
@@ -322,7 +269,7 @@ export default function PatientJournalPage({
       ) : (
         <>
 
-        {/* ── Progress ─────────────────────────────────────────────────────── */}
+
         <div className="mt-4 shrink-0">
           <p className="mb-2 text-[14px] font-bold text-neutral-600">
             Langkah {step} dari {STEPS}
@@ -342,24 +289,11 @@ export default function PatientJournalPage({
           </div>
         </div>
 
-        {/* ── Step ─────────────────────────────────────────────────────────── */}
-        {/* Padding, then the same amount back off as margin: the box keeps its
-            place and gains 4px of clip room on every side. Without it this
-            scroller — and `contain: paint` with it — cuts at exactly the line the
-            cards' `ring-2` paints on, which is why every card lost its border and
-            the heading lost its top. */}
-        {/* `overflow-x-clip`, not `hidden`. The step slides in from `x: 24`, and a
-            transform that ends past the right edge counts toward scrollable
-            overflow — so a horizontal scrollbar flashed for the length of every
-            transition. `clip` refuses to scroll on that axis instead of offering
-            to, and unlike `hidden` it leaves the vertical axis alone rather than
-            turning it into a second scroll container.
 
-            It clips at the padding box, so the 4px below still shelters the
-            cards' `ring-2` — the reason that padding is here at all. */}
+
+
         <div className="-mx-1 -my-1 mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-clip overscroll-contain p-1 [contain:paint]">
-          {/* Keyed remount, not `AnimatePresence mode="wait"`: waiting for the old
-              step to leave puts a delay on every Lanjut for no gain. */}
+
           <motion.div
             key={step}
             initial={reduce ? false : { opacity: 0, x: 24 }}
@@ -394,7 +328,7 @@ export default function PatientJournalPage({
           </motion.div>
         </div>
 
-        {/* ── Navigation ───────────────────────────────────────────────────── */}
+
         <div className="mt-3 flex shrink-0 gap-3">
           {step > 1 && (
             <button
@@ -408,9 +342,7 @@ export default function PatientJournalPage({
           )}
 
           {step < STEPS && (
-            /* Same width as Kembali. Weighting the primary wider made the pair
-               look misaligned rather than emphasised; the colour already says
-               which one is the way forward. */
+
             <button
               type="button"
               onClick={() => setStep((s) => s + 1)}
@@ -422,9 +354,7 @@ export default function PatientJournalPage({
             </button>
           )}
 
-          {/* The last step's action is not a sibling of Kembali in the way Lanjut
-              was — it is the end of the whole wizard, and it takes the room its
-              label needs. */}
+
           {step === STEPS &&
             (saved ? (
               <p
@@ -469,12 +399,7 @@ export default function PatientJournalPage({
         patientId={patientId}
       />
 
-      {/* Rendered here, at the page root, and not inside the step that opens it.
-          `position: fixed` is relative to the viewport only until an ancestor
-          has a transform or paint containment — and the step has both: framer's
-          slide-in sets a transform, and the scroller carries `contain: paint`.
-          Inside them the sheet was being positioned against the step box, which
-          is why it surfaced halfway up the page instead of over it. */}
+
       <AddMetricSheet
         open={addOpen}
         options={remaining}
@@ -490,7 +415,7 @@ export default function PatientJournalPage({
   );
 }
 
-/* ── Step 1 ───────────────────────────────────────────────────────────────── */
+
 
 function MoodStep({
   mood,
@@ -507,16 +432,7 @@ function MoodStep({
         {name ? `Hari ini ${name} merasa apa?` : "Hari ini kamu merasa apa?"}
       </h2>
 
-      {/* `MoodFace`, the same drawing the caregiver reads on their side — not
-          emoji. Two reasons, and the second is the one that matters: emoji
-          render as a different typeface at a different weight on every
-          platform (several of these arrived flat and grey on Windows), and
-          more importantly the caregiver's dashboard draws these five faces, so
-          a patient tapping a yellow emoji here would have their answer shown
-          to their family as a different picture with a different name.
 
-          Two columns, and the fifth spans the pair so the grid has no hole in
-          it. Large targets throughout — this is a hand that does not aim well. */}
       <div className="mt-3 grid flex-1 grid-cols-2 gap-3">
         {MOODS.map((m, i) => {
           const on = mood === m.key;
@@ -550,7 +466,7 @@ function MoodStep({
   );
 }
 
-/* ── Step 2 ───────────────────────────────────────────────────────────────── */
+
 
 function VoiceStep({
   mode,
@@ -752,7 +668,7 @@ function VoiceStep({
   );
 }
 
-/* ── Step 3 ───────────────────────────────────────────────────────────────── */
+
 
 function MetricsStep({
   active,
@@ -780,10 +696,7 @@ function MetricsStep({
         Isi jika ada pengecekan hari ini (Opsional)
       </p>
 
-      {/* `auto-rows-fr` is what makes the add button the same size as the cards
-          without anyone measuring anything: every row in the grid takes the
-          height of the tallest, and every row is the full width. Hard-coding a
-          height would drift the moment a card gains a line. */}
+
       <div className="mt-3 grid auto-rows-fr gap-3 pb-1">
         {active.map((kind) =>
           kind === "bp" ? (
@@ -817,9 +730,7 @@ function MetricsStep({
   );
 }
 
-/** Two typed numbers, because a blood pressure reading is copied off a machine
- *  rather than nudged to — stepping from 110 to 138 one tap at a time is not a
- *  kindness. */
+
 function BloodPressureCard({
   bp,
   onChange,
@@ -881,7 +792,7 @@ function BloodPressureCard({
   );
 }
 
-/** One number, moved by two very large buttons. */
+
 function StepperCard({
   spec,
   value,
