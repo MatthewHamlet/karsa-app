@@ -88,7 +88,9 @@ export const getMascotView = cache(async (): Promise<MascotView> => {
     }
   }
 
-  if (!patientId) return { ...empty, viewerName: me.fullName };
+  if (!patientId) {
+    return { ...empty, viewerName: me.fullName, history: await getAssistantThreads(), ready: true };
+  }
 
   const [notes, history] = await Promise.all([
     supabase

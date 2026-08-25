@@ -5,7 +5,7 @@ import { getMyPatientRecord, getMyPatients } from "../care/queries";
 import { jakartaDateString, jakartaToday, longDateLabel } from "../care/time";
 
 export type AssistantContext = {
-  patientId: string;
+  patientId: string | null;
   patientName: string;
   viewerName: string;
   viewerRole: "caregiver" | "patient";
@@ -81,7 +81,29 @@ export async function buildAssistantContext(): Promise<AssistantContext | null> 
     }
   }
 
-  if (!patientId) return null;
+  if (!patientId) {
+    return {
+      patientId: null,
+      patientName: "",
+      viewerName: me.fullName,
+      viewerRole: me.role,
+      system: [
+        VOICE,
+        GUARDRAILS,
+        `Hari ini: ${longDateLabel(today)}.`,
+        `Kamu sedang berbicara dengan: ${me.fullName}.`,
+        "",
+        "Akun ini belum terhubung dengan pasien mana pun, jadi kamu TIDAK punya catatan",
+        "tugas, obat, perasaan, atau pengukuran siapa pun. Jangan pernah berpura-pura",
+        "punya. Kalau ditanya angka atau jadwal seseorang, katakan datanya belum ada",
+        "dan sarankan menghubungkan pasien dulu lewat kode undangan atau QR.",
+        "",
+        "Yang boleh kamu berikan: tips merawat orang tua atau anggota keluarga secara",
+        "umum, cara menyusun rutinitas harian, menjaga semangat pendamping, dan",
+        "penjelasan sederhana soal kebiasaan sehat. Tetap hangat dan singkat.",
+      ].join("\n"),
+    };
+  }
 
   const since = new Date(Date.now() - 7 * 86400_000).toISOString();
 

@@ -20,12 +20,28 @@ const ONBOARDING_ALLOWED = [
   "/care/tambah-pasien",
   "/pair",
   "/pasien",
+  "/community",
+  "/settings",
+  "/mascot",
 ];
 
 function allowedWhileOnboarding(pathname: string): boolean {
   return ONBOARDING_ALLOWED.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+}
+
+const GATE_COOKIE = "karsa-gate";
+
+const GATE_MAX_AGE = 600;
+
+function passGate(response: NextResponse, userId: string) {
+  response.cookies.set(GATE_COOKIE, userId, {
+    maxAge: GATE_MAX_AGE,
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+  });
 }
 
 export async function proxy(request: NextRequest) {
@@ -84,6 +100,8 @@ export async function proxy(request: NextRequest) {
   }
 
   if (user && !isPublic(pathname) && !allowedWhileOnboarding(pathname)) {
+    if (request.cookies.get(GATE_COOKIE)?.value === user.id) return response;
+
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
@@ -91,7 +109,11 @@ export async function proxy(request: NextRequest) {
       .maybeSingle();
 
     if (profileError || !profile) return response;
-    if (profile.role === "patient") return response;
+
+    if (profile.role === "patient") {
+      passGate(response, user.id);
+      return response;
+    }
 
     const { count, error: countError } = await supabase
       .from("care_relationships")
@@ -107,6 +129,8 @@ export async function proxy(request: NextRequest) {
       url.search = "";
       return NextResponse.redirect(url);
     }
+
+    passGate(response, user.id);
   }
 
   return response;

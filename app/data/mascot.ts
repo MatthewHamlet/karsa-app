@@ -33,7 +33,20 @@ export const QUICK_ACTIONS: {
 
 
 export function promptFor(intent: Intent, patientName: string): string {
-  const who = patientName.trim() || "pasien";
+  const who = patientName.trim();
+
+  if (!who) {
+    switch (intent) {
+      case "tasks":
+        return "Rutinitas harian apa yang baik untuk lansia di rumah?";
+      case "vitals":
+        return "Apa saja yang sebaiknya rutin dipantau saat merawat orang tua?";
+      case "urgent":
+        return "Tanda bahaya apa yang harus segera dibawa ke IGD?";
+      default:
+        return "";
+    }
+  }
 
   switch (intent) {
     case "meds":

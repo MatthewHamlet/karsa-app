@@ -60,9 +60,7 @@ export async function POST(request: Request) {
       : Promise.resolve({ data: null }),
   ]);
 
-  if (!context) {
-    return fail("Belum ada pasien yang terhubung dengan akun ini.", 409);
-  }
+  if (!context) return fail("Belum masuk.", 401);
 
   const past = pastResult.data ?? [];
   let threadId = past.length > 0 ? asked : null;

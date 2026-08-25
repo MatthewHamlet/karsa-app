@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { KeyRound, Plus } from "lucide-react";
+import { KeyRound, Plus, UserRound, UsersRound } from "lucide-react";
 import Mascot from "../components/Mascot";
 import RoomScene from "../components/RoomScene";
 import PairingModal from "../components/PairingModal";
@@ -62,7 +62,24 @@ export default function StartHere({ name }: { name?: string }) {
             dan hanya bisa dipakai sekali.
           </p>
 
-          <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="mt-7 flex flex-wrap items-center gap-2">
+            <Link
+              href="/community"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-[13.5px] font-bold text-karsa-dark outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
+            >
+              <UsersRound size={16} strokeWidth={2.2} aria-hidden />
+              Komunitas
+            </Link>
+            <Link
+              href="/settings"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-3.5 py-2 text-[13.5px] font-bold text-karsa-dark outline-none ring-1 ring-karsa-line transition-colors duration-200 hover:bg-karsa-soft focus-visible:ring-2 focus-visible:ring-karsa/40"
+            >
+              <UserRound size={16} strokeWidth={2.2} aria-hidden />
+              Profil
+            </Link>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
             <Link
               href="/login/peran?ganti=1"
               className="rounded text-[13.5px] font-semibold text-neutral-500 underline underline-offset-4 outline-none transition-colors duration-200 hover:text-neutral-800 focus-visible:ring-2 focus-visible:ring-karsa/40"
