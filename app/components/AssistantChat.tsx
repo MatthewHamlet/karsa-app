@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, type FormEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Mic, Send } from "lucide-react";
+import { ListChecks, Mic, Send, Siren, Stethoscope } from "lucide-react";
 import MascotAvatar from "./MascotAvatar";
 import CareActionCards from "./CareActionCards";
 import {
@@ -12,6 +12,12 @@ import {
   type MascotState,
 } from "../data/mascot";
 
+
+const QUICK_ICON = {
+  tasks: ListChecks,
+  vitals: Stethoscope,
+  urgent: Siren,
+} as const;
 
 export type ChatTurn = {
   id: string;
@@ -55,7 +61,11 @@ export default function AssistantChat({
   useEffect(() => {
     const stream = streamRef.current;
     if (!stream) return;
-    stream.scrollTo({ top: stream.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+    const streaming = state === "presenting";
+    stream.scrollTo({
+      top: stream.scrollHeight,
+      behavior: reduce || streaming ? "auto" : "smooth",
+    });
   }, [turns, state, reduce]);
 
   const submit = (event: FormEvent) => {
@@ -183,7 +193,7 @@ export default function AssistantChat({
       </div>
 
 
-      <div className="absolute inset-x-0 bottom-3 z-10 px-4 sm:px-6 xl:px-8">
+      <div className="absolute inset-x-0 bottom-9 z-10 px-4 sm:bottom-3 sm:px-6 xl:px-8">
         <div className="mx-auto w-full max-w-[760px] rounded-[28px] border border-white/70 bg-white/90 p-1.5 shadow-[0_8px_20px_-8px_rgba(24,32,24,0.18),0_24px_48px_-24px_rgba(24,32,24,0.45)] backdrop-blur-xl">
           <form onSubmit={submit} className="flex items-end gap-1.5">
             <label htmlFor="karsa-draft" className="sr-only">
@@ -235,13 +245,16 @@ export default function AssistantChat({
                       key={action.intent}
                       type="button"
                       onClick={() => onQuickAction(action.intent)}
-                      className={`inline-flex items-center gap-2 rounded-full px-3.5 py-2 text-[13px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 ${
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[12px] font-semibold outline-none ring-1 transition-colors duration-200 focus-visible:ring-2 sm:gap-2 sm:px-3.5 sm:py-2 sm:text-[13px] ${
                         action.urgent
                           ? "bg-rose-600 text-white ring-rose-600 hover:bg-rose-700 focus-visible:ring-rose-300"
                           : "bg-white/80 text-neutral-700 ring-karsa-line hover:bg-white focus-visible:ring-karsa/40"
                       }`}
                     >
-                      <span aria-hidden>{action.emoji}</span>
+                      {(() => {
+                        const QuickIcon = QUICK_ICON[action.icon];
+                        return <QuickIcon size={14} strokeWidth={2.4} aria-hidden />;
+                      })()}
                       {action.label}
                     </button>
                   ))}

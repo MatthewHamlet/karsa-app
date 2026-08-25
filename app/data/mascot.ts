@@ -21,14 +21,14 @@ export type Intent = "meds" | "vitals" | "tasks" | "urgent" | "general";
 
 export const QUICK_ACTIONS: {
   intent: Intent;
-  emoji: string;
+  icon: "tasks" | "vitals" | "urgent";
   label: string;
 
   urgent?: boolean;
 }[] = [
-  { intent: "tasks", emoji: "✅", label: "Apa yang belum dikerjakan?" },
-  { intent: "vitals", emoji: "🩺", label: "Bagaimana kondisinya minggu ini?" },
-  { intent: "urgent", emoji: "🚨", label: "Butuh bantuan darurat", urgent: true },
+  { intent: "tasks", icon: "tasks", label: "Apa yang belum dikerjakan?" },
+  { intent: "vitals", icon: "vitals", label: "Bagaimana kondisinya minggu ini?" },
+  { intent: "urgent", icon: "urgent", label: "Butuh bantuan darurat", urgent: true },
 ];
 
 

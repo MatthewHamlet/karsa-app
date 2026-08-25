@@ -331,7 +331,7 @@ export default function TeamChat({
 
 
       <div
-        className={`relative shrink-0 border-t border-karsa-line bg-karsa-cream py-2.5 sm:py-3 ${PAD}`}
+        className={`relative shrink-0 border-t border-karsa-line bg-karsa-cream pb-7 pt-2.5 sm:py-3 ${PAD}`}
       >
         {attached && (
           <motion.div

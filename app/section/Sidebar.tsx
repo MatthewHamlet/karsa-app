@@ -310,6 +310,7 @@ export default function Sidebar({
   const patientApp = pathname.startsWith("/pasien");
 
   const patientHome = pathname === "/pasien";
+  const chatShell = pathname === "/mascot" || pathname === "/pasien/maskot";
 
 
   const bareShell =
@@ -442,10 +443,8 @@ export default function Sidebar({
         <main
           data-rail={isOpen ? "open" : "closed"}
           className={`min-w-0 flex-1 pb-[var(--bottom-nav)] ${
-            patientApp ? "patient-shell" : ""
-          } ${
             patientHome ? "patient-home lg:h-full lg:min-h-0 lg:pb-0" : ""
-          }`}
+          } ${chatShell ? "chat-shell" : ""}`}
         >
           {children}
         </main>

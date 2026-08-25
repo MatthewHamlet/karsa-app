@@ -119,15 +119,6 @@
   :root {
     --bottom-nav: calc(4.5rem + env(safe-area-inset-bottom));
   }
-
-  /* The patient app's bar floats instead of sitting on the edge, so it needs
-     more room than the caregiver's: its own 70px, the 12px it is lifted by, and
-     12px of air above it. Redeclaring the variable on the shell means every
-     page that already subtracts `--bottom-nav` — including the ones shared
-     between the two apps — lands correctly without knowing which app it is in. */
-  .patient-shell {
-    --bottom-nav: calc(5.875rem + env(safe-area-inset-bottom));
-  }
 }
 
 body {
@@ -228,6 +219,16 @@ body {
    route keeps its ordinary scrolling. */
 html:has(.patient-home),
 html:has(.patient-home) body {
+  overscroll-behavior: none;
+}
+
+/* The assistant is a chat, not a document. The thread does its own scrolling,
+   so the page behind it must not move at all — otherwise the composer drifts
+   off the bottom while somebody is typing into it. */
+html:has(.chat-shell),
+html:has(.chat-shell) body {
+  height: 100%;
+  overflow: hidden;
   overscroll-behavior: none;
 }
 

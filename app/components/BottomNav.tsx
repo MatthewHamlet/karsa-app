@@ -66,16 +66,16 @@ export default function BottomNav({
                 <Link
                   href={item.link}
                   aria-current={active ? "page" : undefined}
-                  className="group/scan flex h-[72px] flex-col items-center justify-end gap-1 pb-2.5 outline-none"
+                  className="group/scan flex h-[72px] flex-col items-center justify-end gap-1 pb-2.5 outline-none active:scale-[0.96] motion-reduce:active:scale-100"
                 >
                   <span
-                    className={`absolute -top-5 grid h-[58px] w-[58px] place-items-center rounded-full ring-[5px] ring-karsa-canvas transition-transform duration-200 group-active/scan:scale-95 group-focus-visible/scan:ring-karsa ${
+                    className={`absolute -top-3.5 grid h-[50px] w-[50px] place-items-center rounded-full ring-4 ring-karsa-canvas transition-transform duration-200 group-active/scan:scale-90 group-active/scan:shadow-[0_2px_8px_-2px_rgba(63,92,70,0.9)] group-focus-visible/scan:ring-karsa ${
                       active
                         ? "bg-karsa-dark shadow-[0_10px_24px_-6px_rgba(63,92,70,0.75)]"
                         : "bg-karsa shadow-[0_8px_20px_-6px_rgba(63,92,70,0.6)]"
                     }`}
                   >
-                    <Icon size={26} strokeWidth={2.3} className="text-white" />
+                    <Icon size={23} strokeWidth={2.3} className="text-white" />
                   </span>
                   <span
                     className={`text-[11.5px] leading-3 transition-colors duration-200 ${
@@ -94,7 +94,7 @@ export default function BottomNav({
               <Link
                 href={item.link}
                 aria-current={active ? "page" : undefined}
-                className="group/tab relative flex h-[72px] flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+                className={`group/tab relative flex h-[72px] flex-col items-center justify-center gap-1 rounded-2xl outline-none transition-[transform,background-color] duration-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40 active:scale-[0.92] active:bg-karsa-soft/70 motion-reduce:active:scale-100`}
               >
                 {active && (
                   <motion.span
@@ -129,7 +129,7 @@ export default function BottomNav({
             type="button"
             onClick={onMore}
             aria-expanded={moreOpen}
-            className="group/tab relative flex h-[72px] w-full flex-col items-center justify-center gap-1 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40"
+            className={`group/tab relative flex h-[72px] w-full flex-col items-center justify-center gap-1 rounded-2xl outline-none transition-[transform,background-color] duration-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-karsa/40 active:scale-[0.92] active:bg-karsa-soft/70 motion-reduce:active:scale-100`}
           >
             {moreOpen && (
               <motion.span

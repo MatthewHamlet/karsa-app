@@ -96,7 +96,14 @@ export default function MascotAssistant({
       const decoder = new TextDecoder();
       let full = "";
       let started = false;
+      let frame: number | null = null;
 
+      const paint = () => {
+        frame = null;
+        setTurns((prev) =>
+          prev.map((turn) => (turn.id === replyId ? { ...turn, text: full } : turn)),
+        );
+      };
 
       while (true) {
         const { done, value } = await reader.read();
@@ -110,12 +117,13 @@ export default function MascotAssistant({
           started = true;
           setState("presenting");
           setTurns((prev) => [...prev, { id: replyId, from: "karsa", text: full }]);
-        } else {
-          setTurns((prev) =>
-            prev.map((turn) => (turn.id === replyId ? { ...turn, text: full } : turn)),
-          );
+        } else if (frame === null) {
+          frame = requestAnimationFrame(paint);
         }
       }
+
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (started) paint();
 
       if (!started) {
         settle("Maaf, aku belum punya jawaban untuk itu. Coba tanya dengan cara lain ya.");
