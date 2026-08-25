@@ -2,12 +2,15 @@
 
 import {
   useActionState,
+  useCallback,
   useEffect,
   useMemo,
   useOptimistic,
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
+import { useCareChannel } from "./useCareChannel";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   BedDouble,
@@ -194,6 +197,10 @@ export default function TeamChat({
 }) {
   const [draft, setDraft] = useState("");
   const [attached, setAttached] = useState(context ?? null);
+
+  const router = useRouter();
+  const refresh = useCallback(() => router.refresh(), [router]);
+  useCareChannel(data?.activePatientId ?? null, refresh);
   const streamRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 

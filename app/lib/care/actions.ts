@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "../supabase/config";
 import { NOT_CONFIGURED_MESSAGE } from "../supabase/config";
 import { getSessionProfile } from "../profile";
 import { jakartaDateString } from "./time";
-import { getJournalMonth } from "./queries";
+import { getCareMessages, getJournalMonth } from "./queries";
 
 
 
@@ -582,6 +582,13 @@ export async function deleteCareNote(_prev: CareResult, formData: FormData): Pro
 
   revalidatePath("/care");
   return { error: null, ok: true };
+}
+
+
+export async function loadCareMessages(patientId: string) {
+  if (!isSupabaseConfigured() || !patientId) return [];
+  if (!(await getSessionProfile())) return [];
+  return getCareMessages(patientId);
 }
 
 

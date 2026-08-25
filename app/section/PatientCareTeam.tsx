@@ -1,21 +1,35 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Copy, ShieldCheck, UserMinus, X } from "lucide-react";
 import { respondToInvitation, revokeRelationship, type CareResult } from "../lib/care/actions";
 import type { CareTeamMember } from "../lib/care/types";
 import ConnectCaregiver from "../components/ConnectCaregiver";
+import PatientCareChat from "../components/PatientCareChat";
+import { useCareChannel } from "../components/useCareChannel";
+import type { CareMessage } from "../lib/care/queries";
 
 
 export default function PatientCareTeam({
   team,
   shareCode,
+  patientId,
+  me,
+  messages,
 }: {
   team: CareTeamMember[];
   shareCode: string | null;
+  patientId: string | null;
+  me: { id: string; name: string; initial: string } | null;
+  messages: CareMessage[];
 }) {
   const pending = team.filter((m) => m.status === "pending");
   const active = team.filter((m) => m.status === "active");
+
+  const router = useRouter();
+  const refresh = useCallback(() => router.refresh(), [router]);
+  useCareChannel(patientId, refresh, "care_relationships");
 
   return (
 
@@ -71,6 +85,10 @@ export default function PatientCareTeam({
               </ul>
             )}
           </section>
+
+          {patientId && (
+            <PatientCareChat patientId={patientId} me={me} initial={messages} />
+          )}
         </div>
       </div>
     </div>

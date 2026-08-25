@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
@@ -26,6 +27,7 @@ import Calendar, { type Selection } from "../components/Calendar";
 import ScheduleItem from "../components/ScheduleItem";
 import ScheduleForm from "../components/ScheduleForm";
 import PatientSwitcher from "../components/PatientSwitcher";
+import { useCareChannel } from "../components/useCareChannel";
 import type { CarePatient } from "../lib/care/types";
 import SlideOver from "../components/SlideOver";
 import Confetti from "../components/Confetti";
@@ -113,6 +115,10 @@ export default function Homepage({
 
   const [planOpen, setPlanOpen] = useState(false);
   const reduce = useReducedMotion();
+
+  const router = useRouter();
+  const refresh = useCallback(() => router.refresh(), [router]);
+  useCareChannel(activePatientId ?? null, refresh, "care_relationships");
 
 
   const mine = useMemo(
