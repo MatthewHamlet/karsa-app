@@ -45,7 +45,7 @@ const num = (value: number, decimals = 0) =>
     maximumFractionDigits: decimals,
   });
 
-const EMPTY: StatValue = { value: "—", caption: "belum ada data" };
+const EMPTY: StatValue = { value: "-", caption: "belum ada data" };
 
 type Reading = { kind: string; value: number; secondary: number | null; at: string };
 
@@ -176,7 +176,7 @@ export const getFixedStats = cache(
     const doseCount = (doseRows.data ?? []).length;
     const medication: StatValue =
       doseTarget === 0
-        ? { value: "—", caption: "belum ada obat terdaftar" }
+        ? { value: "-", caption: "belum ada obat terdaftar" }
         : {
             value: `${doseCount} dari ${doseTarget}`,
             caption: `dosis ${PERIOD_WORD[period]}`,

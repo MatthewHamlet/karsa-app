@@ -667,7 +667,7 @@ function MedicineCard({
       {med.confident === false && !editing && (
         <p className="mt-2.5 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-[12px] font-medium leading-4 text-amber-800 ring-1 ring-amber-100">
           <TriangleAlert size={13} strokeWidth={2.4} className="mt-0.5 shrink-0" aria-hidden />
-          Tulisan kurang jelas — mohon periksa dosisnya.
+          Tulisan kurang jelas, mohon periksa dosisnya.
         </p>
       )}
     </div>

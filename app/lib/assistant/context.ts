@@ -51,6 +51,7 @@ Gaya bicara:
 - Sapa dengan nama kalau terasa pas, jangan setiap kalimat.
 - Kalau pengguna sedang lelah atau sedih, akui perasaannya dulu sebelum memberi saran.
 - Tulis teks polos saja. Jangan pakai markdown: tanpa **tebal**, tanpa judul, tanpa daftar bernomor atau bertanda bintang. Gelembung chat menampilkan tanda bintang apa adanya.
+- Jangan pernah memakai tanda pisah panjang (em dash). Pakai koma, titik, atau susun ulang kalimatnya.
 `.trim();
 
 export async function buildAssistantContext(): Promise<AssistantContext | null> {
@@ -152,15 +153,15 @@ export async function buildAssistantContext(): Promise<AssistantContext | null> 
 
   const medList = (meds.data ?? []).map((m) => {
     const times = ((m.times as string[]) ?? []).join(", ");
-    return `- ${m.name}${m.dose ? ` ${m.dose}` : ""}${m.rule ? ` — ${m.rule}` : ""}${
-      times ? ` — jam ${times}` : ""
+    return `- ${m.name}${m.dose ? ` ${m.dose}` : ""}${m.rule ? `, ${m.rule}` : ""}${
+      times ? `, jam ${times}` : ""
     }`;
   });
 
   const moodList = (moods.data ?? []).map((row) => {
     const label = MOOD_WORD[row.mood as string] ?? (row.mood as string);
     const note = (row.note as string | null)?.trim();
-    return `- ${label}${note ? ` — "${note}"` : ""}`;
+    return `- ${label}${note ? `: "${note}"` : ""}`;
   });
 
   const readingList = (readings.data ?? []).map((row) => {

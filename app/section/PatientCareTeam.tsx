@@ -189,7 +189,7 @@ function ShareCode({ code }: { code: string }) {
       </h2>
       <p className="mt-1.5 text-[14px] leading-5 text-neutral-600">
         Bacakan kode ini ke orang yang kamu percaya. Hanya dengan kode ini mereka
-        bisa meminta jadi pendampingmu — dan kamu tetap harus menyetujuinya dulu.
+        bisa meminta jadi pendampingmu, dan kamu tetap harus menyetujuinya dulu.
       </p>
 
       <div className="mt-3 flex items-center gap-2">

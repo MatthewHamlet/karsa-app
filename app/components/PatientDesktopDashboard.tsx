@@ -287,7 +287,7 @@ export default function PatientDesktopDashboard({ home }: { home?: PatientHome |
                   </span>
                   <span className="min-w-0">
                     <span className="block text-[12px] font-semibold uppercase tracking-[0.1em] text-neutral-500">
-                      Pesan dari {affirmation.relation} — {affirmation.from}
+                      Pesan dari {affirmation.relation} · {affirmation.from}
                     </span>
                     <span className="mt-1 block text-[16px] font-bold leading-6 text-neutral-800 lg:text-[17px]">
                       {affirmation.text}

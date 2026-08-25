@@ -314,10 +314,7 @@ export default function Sidebar({
 
 
   const bareShell =
-    pathname === "/login" ||
-    pathname.startsWith("/login/") ||
-    pathname === "/mulai" ||
-    pathname === "/pair";
+    pathname === "/login" || pathname.startsWith("/login/") || pathname === "/pair";
 
 
   if (pathname !== seenPath) {

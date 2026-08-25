@@ -191,7 +191,7 @@ export async function resendConfirmation(
     }
     if (m.includes("error sending") || m.includes("smtp") || m.includes("mail")) {
       return {
-        error: withDetail("Email gagal dikirim — setelan SMTP di Supabase sepertinya belum benar.", error.message),
+        error: withDetail("Email gagal dikirim. Setelan SMTP di Supabase sepertinya belum benar.", error.message),
         check_email: true,
         email,
       };
@@ -300,7 +300,7 @@ export async function verifySignupCode(_prev: OtpState, formData: FormData): Pro
 
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE, email };
   if (token.length < OTP_MIN || token.length > OTP_MAX)
-    return { error: `Kodenya ${OTP_MIN}–${OTP_MAX} digit ya — salin lengkap dari email.`, email };
+    return { error: `Kodenya ${OTP_MIN} sampai ${OTP_MAX} digit ya, salin lengkap dari email.`, email };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "signup" });
@@ -333,7 +333,7 @@ export async function verifyRecoveryCode(_prev: OtpState, formData: FormData): P
 
   if (!isSupabaseConfigured()) return { error: NOT_CONFIGURED_MESSAGE, email };
   if (token.length < OTP_MIN || token.length > OTP_MAX)
-    return { error: `Kodenya ${OTP_MIN}–${OTP_MAX} digit ya — salin lengkap dari email.`, email };
+    return { error: `Kodenya ${OTP_MIN} sampai ${OTP_MAX} digit ya, salin lengkap dari email.`, email };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.verifyOtp({ email, token, type: "recovery" });

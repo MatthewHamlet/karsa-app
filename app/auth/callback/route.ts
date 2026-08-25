@@ -11,7 +11,7 @@ function readableCallbackError(code: string | null, raw: string | null): string 
   switch (code) {
     case "otp_expired":
 
-      return "Tautannya sudah tidak berlaku — mungkin kedaluwarsa atau sudah pernah dibuka. Minta kirim ulang ya.";
+      return "Tautannya sudah tidak berlaku, mungkin kedaluwarsa atau sudah pernah dibuka. Minta kirim ulang ya.";
     case "access_denied":
       return "Akses ditolak. Coba ulangi dari awal.";
     case "provider_email_needs_verification":

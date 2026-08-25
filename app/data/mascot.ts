@@ -70,7 +70,7 @@ export function greetingFor(patientName: string, viewerName: string): string {
     return `Halo${you ? `, ${you}` : ""}. Aku Arsa. Tanya apa saja soal perawatan hari ini.`;
   }
 
-  return `Halo${you ? `, ${you}` : ""}. Aku Arsa, dan aku ikut menemani ${who} hari ini — tanya apa saja, atau pilih salah satu di bawah untuk mulai cepat.`;
+  return `Halo${you ? `, ${you}` : ""}. Aku Arsa, dan aku ikut menemani ${who} hari ini. Tanya apa saja, atau pilih salah satu di bawah untuk mulai cepat.`;
 }
 
 

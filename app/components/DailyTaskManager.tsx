@@ -48,7 +48,7 @@ export default function DailyTaskManager({
       <div className="flex flex-col gap-3">
         {tasks.length === 0 && editing === null && (
           <p className="rounded-2xl bg-white px-5 py-8 text-center text-[14px] leading-6 text-neutral-500 ring-1 ring-karsa-line">
-            Belum ada tugas harian. Tambahkan yang pertama — misalnya “Obat pagi” pukul 07:00.
+            Belum ada tugas harian. Tambahkan yang pertama, misalnya “Obat pagi” pukul 07:00.
           </p>
         )}
 

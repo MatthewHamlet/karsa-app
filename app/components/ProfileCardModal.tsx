@@ -201,7 +201,7 @@ function InviteToCare({
   if (patients.length === 0) {
     return (
       <p className="rounded-2xl bg-karsa-canvas/60 px-4 py-3 text-[12.5px] leading-4 text-neutral-500 ring-1 ring-karsa-line">
-        Tidak ada pasien yang bisa kamu bagikan ke {person} — mungkin dia sudah ada di timnya, atau
+        Tidak ada pasien yang bisa kamu bagikan ke {person}. Mungkin dia sudah ada di timnya, atau
         sudah kamu undang.
       </p>
     );

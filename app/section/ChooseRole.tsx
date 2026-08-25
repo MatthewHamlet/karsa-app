@@ -18,7 +18,7 @@ const OPTIONS: {
     value: "caregiver",
     icon: HeartHandshake,
     title: "Saya mendampingi",
-    body: "Saya merawat atau membantu orang lain — orang tua, kakek-nenek, atau keluarga.",
+    body: "Saya merawat atau membantu orang lain seperti orang tua, kakek-nenek, atau keluarga.",
   },
   {
     value: "patient",
@@ -49,7 +49,7 @@ export default function ChooseRole({
               Halo{name ? `, ${name}` : ""}! 👋
             </h1>
             <p className="mt-3 text-[17px] leading-6 text-neutral-700">
-              Satu pertanyaan terakhir — kamu memakai Karsa sebagai apa?
+              Satu pertanyaan terakhir. Kamu memakai Karsa sebagai apa?
             </p>
           </header>
 

@@ -179,7 +179,7 @@ export default function ScanPrescriptionPage({
               {dragging ? "Lepaskan fotonya di sini" : "Klik untuk mulai scan"}
             </span>
             <span className="relative mt-2 block max-w-[34ch] text-[13.5px] leading-5 text-neutral-500 sm:text-[14.5px] lg:mt-3 lg:max-w-[42ch] lg:text-[16.5px] lg:leading-7">
-              Foto resep dokter — obat, dosis, dan jam minumnya dibaca untukmu.
+              Foto resep dokter. Obat, dosis, dan jam minumnya dibaca untukmu.
             </span>
 
             <span className="relative mt-4 hidden items-center gap-2 rounded-full bg-white px-4 py-2 text-[12.5px] font-semibold text-neutral-500 ring-1 ring-karsa-line lg:mt-7 lg:inline-flex lg:px-5 lg:py-2.5 lg:text-[13.5px]">

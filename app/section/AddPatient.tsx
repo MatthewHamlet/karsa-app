@@ -157,7 +157,7 @@ export default function AddPatient({ initialMode = "share" }: { initialMode?: Mo
             type="text"
             maxLength={40}
             disabled={inviting}
-            placeholder="Hubunganmu — Ibu, Ayah, Nenek (opsional)"
+            placeholder="Hubunganmu: Ibu, Ayah, Nenek (opsional)"
             className={`${FIELD} mt-3`}
           />
 

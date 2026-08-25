@@ -151,7 +151,7 @@ function PostCard({
           >
             <MessageCircle size={15} strokeWidth={2.2} aria-hidden />
             {count(post.replies)}
-            <span className="sr-only">tanggapan — buka untuk berkomentar</span>
+            <span className="sr-only">tanggapan, buka untuk berkomentar</span>
           </button>
           <button
             type="button"
