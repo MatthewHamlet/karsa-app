@@ -193,7 +193,11 @@ export default function Homepage({
 
 
 
-            <section className="relative flex min-h-[calc(100svh-488px)] flex-1 flex-col justify-center pb-4 pt-1 sm:min-h-0 sm:pb-6 sm:pt-2 xl:pb-8">
+            {/* overflow-x-clip: lapisan RoomScene di bawah sengaja melar
+                ke kiri (-left-10) biar gradasinya gak keliatan kepotong.
+                tanpa ini dia nambahin lebar halaman di hp, jadi layarnya bisa
+                digeser ke samping dan navbar bawah keliatan gak nempel. */}
+            <section className="relative flex min-h-[calc(100svh-488px)] flex-1 flex-col justify-center overflow-x-clip pb-4 pt-1 sm:min-h-0 sm:pb-6 sm:pt-2 xl:pb-8">
 
               <div
                 aria-hidden

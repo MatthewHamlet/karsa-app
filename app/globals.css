@@ -121,10 +121,21 @@
   }
 }
 
+/* clip, bukan hidden.
+   overflow-x: hidden maksa overflow-y jadi auto, jadi body berubah jadi kotak
+   scroll sendiri. efeknya di hp: ada dua lapis scroll, position: sticky suka
+   ngaco, dan halaman masih bisa ditarik ke samping.
+   clip cuma motong yang lewat, gak bikin kotak scroll baru. dipasang di html
+   juga karena kalau cuma di body, html-nya masih bisa digeser. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
 body {
   background: var(--color-karsa-canvas);
   color: #262626;
-  overflow-x:hidden;
   font-family: var(--font-satoshi);
 }
 
