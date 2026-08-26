@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateRelationships } from "../revalidate";
 import { createClient } from "../supabase/server";
 import { NOT_CONFIGURED_MESSAGE, isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
@@ -97,6 +97,6 @@ export async function redeemPairingCode(
     return { error: REDEEM_MESSAGE[verdict?.reason ?? ""] ?? "Kodenya tidak bisa dipakai." };
   }
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true, caregiverName: verdict.caregiver_name ?? "Pendamping" };
 }

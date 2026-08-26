@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { useRouter } from "next/navigation";
 import { useCareChannel } from "./useCareChannel";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -29,7 +28,8 @@ import HealthPattern from "./HealthPattern";
 import { EASE } from "./List";
 import { CHAT_DAY, ME, MESSAGES, SENDERS, type ChatMessage } from "../data/chat";
 import { CONTEXT_LABEL, type CareContextType } from "../data/care";
-import { sendCareMessage, type CareResult } from "../lib/care/actions";
+import { loadCareMessages, sendCareMessage, type CareResult } from "../lib/care/actions";
+import type { CareMessage } from "../lib/care/queries";
 import type { CareData } from "../lib/care/view";
 import { colourFor } from "./avatarColour";
 
@@ -198,9 +198,28 @@ export default function TeamChat({
   const [draft, setDraft] = useState("");
   const [attached, setAttached] = useState(context ?? null);
 
-  const router = useRouter();
-  const refresh = useCallback(() => router.refresh(), [router]);
-  useCareChannel(data?.activePatientId ?? null, refresh);
+  /* pesan baru cuma ambil ulang pesannya, bukan seluruh halaman.
+     dulu ini router.refresh(), yang bikin /care ngulang semua query-nya
+     (statistik 3 periode, tren, feed, kalender, catatan) cuma gara-gara ada
+     yang ngetik "oke". */
+  const [live, setLive] = useState<CareMessage[] | null>(null);
+  const patientId = data?.activePatientId ?? null;
+
+  const pull = useCallback(() => {
+    if (!patientId) return;
+    loadCareMessages(patientId).then(setLive);
+  }, [patientId]);
+
+  useCareChannel(patientId, pull);
+
+  /* kalau server ngirim data baru (ganti pasien / habis kirim pesan), data
+     server yang menang. di-reset waktu render, bukan di useEffect, biar gak
+     kena render dobel. */
+  const lastServer = useRef(data?.messages);
+  if (data?.messages !== lastServer.current) {
+    lastServer.current = data?.messages;
+    setLive(null);
+  }
   const streamRef = useRef<HTMLDivElement>(null);
   const reduce = useReducedMotion();
 
@@ -231,14 +250,15 @@ export default function TeamChat({
 
   const messages: ChatMessage[] = useMemo(() => {
     if (!data) return MESSAGES;
-    return data.messages.map((m) => ({
+    /* pakai live kalau subscription udah bawa yang lebih baru */
+    return (live ?? data.messages).map((m) => ({
       kind: "text" as const,
       id: m.id,
       from: m.authorId,
       time: m.when,
       text: m.context ? `[${m.context.label}] ${m.body}` : m.body,
     }));
-  }, [data]);
+  }, [data, live]);
 
 
   const senders = useMemo(() => {

@@ -11,6 +11,7 @@ import {
 import { getDaySummary } from "./lib/care/stats";
 import { getSessionProfile } from "./lib/profile";
 import { jakartaToday } from "./lib/care/time";
+import { HOME_FOR } from "./lib/roles";
 
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,12 @@ export default async function Home({ searchParams }: PageProps<"/">) {
 
 
   if (!me) return <Homepage today={today} />;
+
+  /* pasien yang buka home pendamping dilempar ke halaman dia sendiri.
+     getMyPatients() itu "siapa yang aku rawat" — buat pasien hasilnya kosong,
+     sama kayak pendamping baru. jadi cek di bawah salah baca dan ngirim pasien
+     ke /mulai (halaman "tambahkan pasien"). */
+  if (me.role === "patient") redirect(HOME_FOR.patient);
 
   const patients = await getMyPatients();
 

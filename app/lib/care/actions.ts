@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateCare, revalidateCareTalk, revalidateRelationships } from "../revalidate";
 import { createClient } from "../supabase/server";
 import { isSupabaseConfigured } from "../supabase/config";
 import { NOT_CONFIGURED_MESSAGE } from "../supabase/config";
@@ -76,7 +76,7 @@ export async function createPatientProfile(
     return { error: readable(relError.message) };
   }
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }
 
@@ -114,7 +114,7 @@ export async function invitePatient(_prev: CareResult, formData: FormData): Prom
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }
 
@@ -150,7 +150,7 @@ export async function respondToInvitation(
 
   if (!data?.length) return { error: "Undangan itu sudah tidak berlaku." };
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }
 
@@ -176,7 +176,7 @@ export async function revokeRelationship(
   if (error) return { error: readable(error.message) };
   if (!data?.length) return { error: "Kamu tidak bisa mencabut hubungan itu." };
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }
 
@@ -212,7 +212,7 @@ export async function toggleTask(_prev: CareResult, formData: FormData): Promise
     if (error) return { error: readable(error.message) };
   }
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -249,7 +249,7 @@ export async function logHealthReading(_prev: CareResult, formData: FormData): P
   });
 
   if (error) return { error: readable(error.message) };
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -269,7 +269,7 @@ export async function activatePatientProfile(
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }
 
@@ -325,7 +325,7 @@ export async function logMood(_prev: CareResult, formData: FormData): Promise<Ca
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -359,7 +359,7 @@ export async function toggleMeal(_prev: CareResult, formData: FormData): Promise
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -396,7 +396,7 @@ export async function logMedication(_prev: CareResult, formData: FormData): Prom
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -426,7 +426,7 @@ export async function addMedication(_prev: CareResult, formData: FormData): Prom
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -464,7 +464,7 @@ export async function addScheduleEvent(_prev: CareResult, formData: FormData): P
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -484,7 +484,7 @@ export async function deleteScheduleEvent(
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -508,7 +508,7 @@ export async function addCareNote(_prev: CareResult, formData: FormData): Promis
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/care");
+  revalidateCareTalk();
   return { error: null, ok: true };
 }
 
@@ -563,7 +563,7 @@ export async function saveCareNotes(_prev: CareResult, formData: FormData): Prom
     if (error) return { error: readable(error.message) };
   }
 
-  revalidatePath("/care");
+  revalidateCareTalk();
   return { error: null, ok: true };
 }
 
@@ -580,7 +580,7 @@ export async function deleteCareNote(_prev: CareResult, formData: FormData): Pro
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/care");
+  revalidateCareTalk();
   return { error: null, ok: true };
 }
 
@@ -619,7 +619,7 @@ export async function sendCareMessage(_prev: CareResult, formData: FormData): Pr
 
   if (error) return { error: readable(error.message) };
 
-  revalidatePath("/care");
+  revalidateCareTalk();
   return { error: null, ok: true };
 }
 
@@ -661,7 +661,7 @@ export async function updatePatientCare(
   if (error) return { error: readable(error.message) };
   if (!data?.length) return { error: "Kamu tidak punya akses untuk mengubah itu." };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -723,7 +723,7 @@ export async function createDailyTask(_prev: CareResult, formData: FormData): Pr
     return { error: readable(error.message) };
   }
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -753,7 +753,7 @@ export async function updateDailyTask(_prev: CareResult, formData: FormData): Pr
 
   if (!data?.length) return { error: "Kamu tidak punya akses untuk mengubah itu." };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -776,7 +776,7 @@ export async function deleteDailyTask(_prev: CareResult, formData: FormData): Pr
   if (error) return { error: readable(error.message) };
   if (!data?.length) return { error: "Kamu tidak punya akses untuk menghapus itu." };
 
-  revalidatePath("/", "layout");
+  revalidateCare();
   return { error: null, ok: true };
 }
 
@@ -809,7 +809,7 @@ export async function inviteToCareTeam(_prev: CareResult, formData: FormData): P
     return { error: readable(error.message) };
   }
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }
 
@@ -843,6 +843,6 @@ export async function respondToCareInvite(
     if (!data?.length) return { error: "Undangannya sudah dijawab." };
   }
 
-  revalidatePath("/", "layout");
+  revalidateRelationships();
   return { error: null, ok: true };
 }

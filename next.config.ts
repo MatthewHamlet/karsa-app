@@ -37,6 +37,19 @@ const nextConfig: NextConfig = {
         ]
       : [],
   },
+
+  experimental: {
+    /* berapa lama browser boleh pakai ulang halaman yang udah dimuat.
+       ini penyebab utama pindah-pindah halaman kerasa berat: sejak next 15
+       defaultnya 0 detik alias gak di-cache sama sekali, padahal semua route
+       di sini dinamis (baca cookie sesi). jadi balik ke Beranda dari Komunitas
+       itu ngulang render server lengkap + puluhan query supabase.
+       30 detik = default lama. aman karena action yang ngubah data manggil
+       revalidatePath, yang langsung buang cache ini. */
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
 };
 
 export default nextConfig;

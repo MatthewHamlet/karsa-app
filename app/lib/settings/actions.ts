@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidateAccount } from "../revalidate";
 import { createClient } from "../supabase/server";
 import { NOT_CONFIGURED_MESSAGE, SUPABASE_URL, isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
@@ -34,7 +34,7 @@ async function patch(fields: Record<string, unknown>): Promise<SettingsResult> {
   if (error) return { error: readable(error.message) };
   if (!data?.length) return { error: "Profilnya tidak ditemukan." };
 
-  revalidatePath("/", "layout");
+  revalidateAccount();
   return { error: null, ok: true };
 }
 

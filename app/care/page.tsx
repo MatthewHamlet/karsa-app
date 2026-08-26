@@ -15,6 +15,7 @@ import {
 import { getFixedStats, getMonitorStats, type Period } from "../lib/care/stats";
 import { getTrendDetail, monthShortOf } from "../lib/care/trends";
 import { jakartaToday } from "../lib/care/time";
+import { HOME_FOR } from "../lib/roles";
 import type { CareData } from "../lib/care/view";
 
 export const metadata: Metadata = {
@@ -36,6 +37,10 @@ export default async function Care({ searchParams }: PageProps<"/care">) {
 
 
   if (!me) return <CarePage params={params} />;
+
+  /* jebakan yang sama kayak di home: getMyPatients() kosong juga buat pasien,
+     jadi tanpa ini pasien yang buka Perawatan dilempar ke /mulai */
+  if (me.role === "patient") redirect(HOME_FOR.patient);
 
   const patients = await getMyPatients();
   if (patients.length === 0) redirect("/mulai");

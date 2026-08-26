@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePrescriptions } from "../revalidate";
 import { createClient } from "../supabase/server";
 import { NOT_CONFIGURED_MESSAGE, isSupabaseConfigured } from "../supabase/config";
 import { getSessionProfile } from "../profile";
@@ -93,7 +93,7 @@ export async function savePrescription(
     };
   }
 
-  revalidatePath("/", "layout");
+  revalidatePrescriptions();
   return { error: null, ok: true };
 }
 
@@ -112,6 +112,6 @@ export async function deletePrescription(
   const { error } = await supabase.from("prescriptions").delete().eq("id", id);
   if (error) return { error: "Gagal menghapus resep." };
 
-  revalidatePath("/", "layout");
+  revalidatePrescriptions();
   return { error: null, ok: true };
 }
